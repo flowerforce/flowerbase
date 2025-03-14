@@ -2,10 +2,10 @@
   "name": "flower-server",
   "version": "1.0.0",
   "description": "flower-server-packages",
-  "main": "index.js",
   "scripts": {
     "test": "npx jest",
     "coverage": "npm run test -- --coverage",
+    "build": "cd packages/flower-db-services && rm -rf dist/ && tsc",
     "dev": "nodemon index.ts",
     "lint:fds": "eslint packages/flower-db-services",
     "format:fds": "prettier --write 'packages/flower-db-services/**/*.ts'",
@@ -48,6 +48,14 @@
     "prettier": "^3.3.3",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
-    "typescript-eslint": "^8.8.1"
+    "typescript-eslint": "^8.8.1",
+    "@babel/cli": "^7.26.4",
+    "@babel/core": "^7.26.0",
+    "@babel/preset-env": "^7.26.0",
+    "@types/cors": "^2.8.17",
+    "@types/lodash": "^4.17.9",
+    "@types/node": "22.6.1",
+    "@types/node-cron": "^3.0.11",
+    "typescript": "^5.6.2"
   }
 }
