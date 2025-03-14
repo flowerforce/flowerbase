@@ -2,6 +2,8 @@
   "name": "flower-server",
   "version": "1.0.0",
   "description": "flower-server-packages",
+  "main": "packages/flower-db-services/dist/index.js",
+  "types": "packages/flower-db-services/dist/index.d.ts",
   "scripts": {
     "test": "npx jest",
     "coverage": "npm run test -- --coverage",
