@@ -1,11 +1,26 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "outDir": "./dist",
+    "rootDir": "./src",           // Include solo i file nella directory src
     "module": "commonjs",
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
+    "target": "ES6",
+    "declaration": true,
+    "declarationMap": true,       // (Facoltativo) Per mappe di debug
+    "noImplicitAny": true,
     "strict": true,
-    "skipLibCheck": true
-  }
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "lib": [
+          "ES2021.String"
+        ]
+  },
+  "include": ["src/**/*"],       // Include solo i file TypeScript nella cartella src
+  "exclude": [
+    "node_modules",              // Esclude i moduli di Node.js
+    "**/*.test.ts",              // Esclude i file di test
+    "**/*.spec.ts",              // Esclude i file di test (alternativo)
+    "jest.config.ts",            // Esclude configurazioni Jest
+    "dist"                       // Esclude l'output della build
+  ]
 }
