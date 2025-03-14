@@ -1,0 +1,32 @@
+{
+  "name": "flower-db-services",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@fastify/jwt": "^9.0.1",
+    "@fastify/mongodb": "^9.0.1",
+    "aws-sdk": "^2.1692.0",
+    "bson": "^6.8.0",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.0.0",
+    "fastify-mongoose-driver": "^3.2.0",
+    "fastify-plugin": "^5.0.1",
+    "lodash": "^4.17.21",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/lodash": "^4.17.9",
+    "@types/node": "22.6.1",
+    "@types/node-cron": "^3.0.11",
+    "typescript": "^5.6.2"
+  }
+}
