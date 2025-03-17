@@ -8,6 +8,8 @@ export type FieldPermissionExpression = {
 export interface ReadWritePermissions {
   read?: PermissionExpression
   write?: PermissionExpression
+  insert?: PermissionExpression
+  delete?: PermissionExpression
 }
 
 export interface Role {

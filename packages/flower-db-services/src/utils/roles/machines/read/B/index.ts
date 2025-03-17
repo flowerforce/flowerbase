@@ -1,6 +1,7 @@
+import { evaluateDocumentFiltersWriteFn } from '../../commonValidators'
 import { States } from '../../interface'
 import { logMachineInfo } from '../../utils'
-import { evaluateDocumentFiltersReadFn, evaluateDocumentFiltersWriteFn } from './validators'
+import { evaluateDocumentFiltersReadFn } from './validators'
 
 export const STEP_B_STATES: States = {
   checkDocumentsFilters: async ({ context, next, goToNextValidationStage }) => {

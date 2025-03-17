@@ -15,9 +15,6 @@ jest.mock('../roles/machines/C/validators', () => ({
     evaluateTopLevelWriteFn: jest.fn()
 }));
 
-
-
-
 describe('STEP_C_STATES', () => {
     beforeEach(() => {
         jest.clearAllMocks();
