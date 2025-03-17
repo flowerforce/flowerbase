@@ -42,6 +42,15 @@ function localUserPassController(app) {
             return __awaiter(this, void 0, void 0, function* () {
                 const { email, password } = req.body;
                 const hashedPassword = yield (0, crypto_1.hashPassword)(password);
+                const existingUser = yield db.collection(authCollection).findOne({
+                    email
+                });
+                if (existingUser) {
+                    res.status(409);
+                    return {
+                        error: 'This email address is already used'
+                    };
+                }
                 const result = yield db.collection(authCollection).insertOne({
                     email: email,
                     password: hashedPassword,

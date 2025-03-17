@@ -41,6 +41,18 @@ export async function localUserPassController(app: FastifyInstance) {
     async function (req, res) {
       const { email, password } = req.body
       const hashedPassword = await hashPassword(password)
+
+      const existingUser = await db.collection(authCollection!).findOne({
+        email
+      })
+
+      if (existingUser) {
+        res.status(409)
+        return {
+          error: 'This email address is already used'
+        }
+      }
+
       const result = await db.collection(authCollection!).insertOne({
         email: email,
         password: hashedPassword,

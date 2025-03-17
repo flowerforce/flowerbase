@@ -9,12 +9,11 @@ import { API_VERSION } from '../../constants'
  */
 export const exposeRoutes = async (fastify: FastifyInstance) => {
   try {
-    fastify.get(`${API_VERSION}/app/:appId/location`, async () => ({
+    fastify.get(`${API_VERSION}/app/:appId/location`, async (req) => ({
       deployment_model: 'LOCAL',
       location: 'IE',
-      //TODO -> use referrer
-      hostname: 'http://localhost:3000',
-      ws_hostname: 'wss://localhost:3000'
+      hostname: `http://${req.headers.host}`,
+      ws_hostname: `wss://${req.headers.host}`
     }))
 
     fastify.get('/health', async () => ({

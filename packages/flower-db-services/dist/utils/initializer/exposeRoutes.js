@@ -19,13 +19,12 @@ const constants_1 = require("../../constants");
  */
 const exposeRoutes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        fastify.get(`${constants_1.API_VERSION}/app/:appId/location`, () => __awaiter(void 0, void 0, void 0, function* () {
+        fastify.get(`${constants_1.API_VERSION}/app/:appId/location`, (req) => __awaiter(void 0, void 0, void 0, function* () {
             return ({
                 deployment_model: 'LOCAL',
                 location: 'IE',
-                //TODO -> use referrer
-                hostname: 'http://localhost:3000',
-                ws_hostname: 'wss://localhost:3000'
+                hostname: `http://${req.headers.host}`,
+                ws_hostname: `wss://${req.headers.host}`
             });
         }));
         fastify.get('/health', () => __awaiter(void 0, void 0, void 0, function* () {
