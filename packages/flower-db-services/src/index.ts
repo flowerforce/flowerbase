@@ -12,6 +12,7 @@ import { services } from './services'
 import { StateManager } from './state'
 import { exposeRoutes } from './utils/initializer/exposeRoutes'
 import { registerPlugins } from './utils/initializer/registerPlugins'
+export * from "./model";
 
 export type InitializeConfig = {
   projectId: string
