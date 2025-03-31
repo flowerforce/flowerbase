@@ -1,1 +1,1 @@
-{"version":3,"file":"jwt.d.ts","sourceRoot":"","sources":["../../../src/auth/plugins/jwt.ts"],"names":[],"mappings":"AAIA,KAAK,OAAO,GAAG;IACb,MAAM,EAAE,MAAM,CAAA;CACf,CAAA;AAED;;;;;;;GAOG;iSAC8C,OAAO;AAAxD,wBAmDE"}
+{"version":3,"file":"jwt.d.ts","sourceRoot":"","sources":["../../../src/auth/plugins/jwt.ts"],"names":[],"mappings":"AAIA,KAAK,OAAO,GAAG;IACb,MAAM,EAAE,MAAM,CAAA;CACf,CAAA;AAED;;;;;;;GAOG;iUAC8C,OAAO;AAAxD,wBAmDE"}

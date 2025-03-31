@@ -13,8 +13,8 @@ export declare const loadFunctions: (rootDir?: string) => Promise<Functions>;
 export declare const executeQuery: ({ currentMethod, query, update, document }: ExecuteQueryParams) => Promise<{
     find: () => Promise<any[]>;
     findOne: () => Promise<unknown>;
-    deleteOne: () => Promise<import("mongodb").DeleteResult>;
-    insertOne: () => Promise<import("mongodb").InsertOneResult<import("bson").Document>>;
-    updateOne: () => Promise<unknown> | import("mongodb").FindCursor<any>;
+    deleteOne: () => Promise<import("mongodb/mongodb").DeleteResult>;
+    insertOne: () => Promise<import("mongodb/mongodb").InsertOneResult<import("bson").Document>>;
+    updateOne: () => Promise<unknown> | import("mongodb/mongodb").FindCursor<any>;
 }>;
 //# sourceMappingURL=utils.d.ts.map
