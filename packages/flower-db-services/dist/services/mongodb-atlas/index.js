@@ -112,7 +112,8 @@ const getOperators = (collection, { rules = {}, collName, user, run_as_system })
         });
         return newCursor;
     },
-    watch: (pipeline, options) => __awaiter(void 0, void 0, void 0, function* () { return collection.watch(pipeline, options); })
+    watch: (//TODO -> add filter & rules in watch
+    pipeline, options) => __awaiter(void 0, void 0, void 0, function* () { return collection.watch(pipeline, options); })
 });
 const MongodbAtlas = (app, { rules, user, run_as_system } = {}) => ({
     db: (dbName) => {

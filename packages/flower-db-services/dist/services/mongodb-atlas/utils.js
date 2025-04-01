@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getFormattedQuery = exports.getValidRule = void 0;
 const rules_1 = require("../../utils/rules");
 const utils_1 = __importDefault(require("../../utils/rules-matcher/utils"));
-const getValidRule = ({ filters, user, record = null }) => {
+const getValidRule = ({ filters = [], user, record = null }) => {
     if (!filters.length)
         return [];
     return filters.filter((f) => {

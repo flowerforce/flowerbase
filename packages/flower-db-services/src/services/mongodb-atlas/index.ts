@@ -121,7 +121,7 @@ const getOperators: GetOperatorsFunction = (
     }
     return newCursor
   },
-  watch: async (
+  watch: async ( //TODO -> add filter & rules in watch
     pipeline?: Parameters<typeof collection.watch>[0],
     options?: Parameters<typeof collection.watch>[1]
   ) => collection.watch(pipeline, options)

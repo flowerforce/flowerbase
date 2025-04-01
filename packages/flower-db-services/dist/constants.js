@@ -13,19 +13,22 @@ var __rest = (this && this.__rest) || function (s, e) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AUTH_CONFIG = exports.DB_NAME = exports.HTTPS_SCHEMA = exports.API_VERSION = exports.DEFAULT_CONFIG = void 0;
 const utils_1 = require("./auth/utils");
-const { database_name, collection_name = 'users' } = (0, utils_1.loadCustomUserData)();
+const { database_name, collection_name = 'users', user_id_field = "id" } = (0, utils_1.loadCustomUserData)();
 const _a = (0, utils_1.loadAuthConfig)(), { auth_collection = 'auth_users' } = _a, configuration = __rest(_a, ["auth_collection"]);
 exports.DEFAULT_CONFIG = {
     PORT: Number(process.env.PORT) || 3000,
     MONGODB_URL: process.env.MONGODB_URL || '',
-    JWT_SECRET: process.env.JWT_SECRET || ''
+    JWT_SECRET: process.env.JWT_SECRET || '',
+    API_VERSION: process.env.API_VERSION || "v2.0",
+    HTTPS_SCHEMA: process.env.HTTPS_SCHEMA || 'https'
 };
-exports.API_VERSION = `/api/client/${process.env.API_VERSION}`;
-exports.HTTPS_SCHEMA = process.env.HTTPS_SCHEMA || 'https';
+exports.API_VERSION = `/api/client/${exports.DEFAULT_CONFIG.API_VERSION}`;
+exports.HTTPS_SCHEMA = exports.DEFAULT_CONFIG.HTTPS_SCHEMA;
 exports.DB_NAME = database_name;
 exports.AUTH_CONFIG = {
     authCollection: auth_collection,
     userCollection: collection_name,
     resetPasswordCollection: "reset-password-requests",
-    resetPasswordConfig: configuration['local-userpass'].config
+    resetPasswordConfig: configuration['local-userpass'].config,
+    user_id_field
 };

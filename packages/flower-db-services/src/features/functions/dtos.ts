@@ -15,6 +15,11 @@ export type FunctionCallDto =
     service: 'mongodb-atlas'
   }
 
+export type FunctionCallBase64Dto = {
+  baas_request?: string
+  stitch_request?: string
+}
+
 type ArgumentsData = Arguments<{
   database: string
   collection: string
@@ -22,3 +27,15 @@ type ArgumentsData = Arguments<{
   update: Document
   document: Document
 }>
+
+
+export type Base64Function = {
+  name: string
+  arguments: Argument[]
+  service: string
+}
+
+type Argument = {
+  database: string
+  collection: string
+}

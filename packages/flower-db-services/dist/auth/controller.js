@@ -65,7 +65,7 @@ function authController(app) {
                 if (!auth_user) {
                     throw new Error(`User with ID ${req.user.sub} not found`);
                 }
-                const user = yield db.collection(userCollection).findOne({ userId: req.user.sub });
+                const user = yield db.collection(userCollection).findOne({ [constants_1.AUTH_CONFIG.user_id_field]: req.user.sub });
                 res.status(201);
                 return {
                     access_token: this.createAccessToken(Object.assign(Object.assign({}, auth_user), { user_data: user }))
