@@ -1,11 +1,11 @@
 {
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",           // Include solo i file nella directory src
+    "rootDir": "./src",
     "module": "commonjs",
     "target": "ES6",
     "declaration": true,
-    "declarationMap": true,       // (Facoltativo) Per mappe di debug
+    "declarationMap": true,
     "noImplicitAny": true,
     "strict": true,
     "moduleResolution": "node",
@@ -17,12 +17,12 @@
     },
     "lib": ["ES2021", "DOM"]
   },
-  "include": ["src/**/*"],       // Include solo i file TypeScript nella cartella src
+  "include": ["src/**/*"],
   "exclude": [
-    "node_modules",              // Esclude i moduli di Node.js
-    "**/*.test.ts",              // Esclude i file di test
-    "**/*.spec.ts",              // Esclude i file di test (alternativo)
-    "jest.config.ts",            // Esclude configurazioni Jest
-    "dist"                       // Esclude l'output della build
+    "node_modules",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "jest.config.ts",
+    "dist"
   ]
 }
