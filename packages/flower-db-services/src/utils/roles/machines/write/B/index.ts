@@ -1,6 +1,6 @@
+import { checkFieldsPropertyExists, evaluateTopLevelPermissionsFn } from '../../commonValidators'
 import { States } from '../../interface'
 import { logMachineInfo } from '../../utils'
-import { checkFieldsPropertyExists, evaluateTopLevelDeleteFn, evaluateTopLevelInsertFn, evaluateTopLevelWriteFn } from './validators'
 
 export const STEP_B_STATES: States = {
   checkDeleteRequest: async ({ context, next }) => {
@@ -15,14 +15,14 @@ export const STEP_B_STATES: States = {
     endValidation,
   }) => {
     logMachineInfo({ enabled: context.enableLog, machine: "B", step: 2, stepName: "evaluateTopLevelDelete" })
-    const check = await evaluateTopLevelDeleteFn(context)
-    return endValidation({ success: check })
+    const check = await evaluateTopLevelPermissionsFn(context, "delete")
+    return endValidation({ success: !!check })
   },
   evaluateTopLevelWrite: async ({ context, next, endValidation }) => {
     logMachineInfo({ enabled: context.enableLog, machine: "B", step: 3, stepName: "evaluateTopLevelWrite" })
-    const check = await evaluateTopLevelWriteFn(context)
+    const check = await evaluateTopLevelPermissionsFn(context, "write")
     if (check) return context.params.type === "insert" ? next('evaluateTopLevelInsert') : endValidation({ success: true })
-    return context?.prevParams?.check === false
+    return check === false
       ? endValidation({ success: false })
       : next('checkFieldsProperty')
   },
@@ -35,8 +35,8 @@ export const STEP_B_STATES: States = {
   },
   evaluateTopLevelInsert: async ({ context, endValidation }) => {
     logMachineInfo({ enabled: context.enableLog, machine: "B", step: 5, stepName: "evaluateTopLevelInsert" })
-    const check = await evaluateTopLevelInsertFn(context)
-    return endValidation({ success: check })
+    const check = await evaluateTopLevelPermissionsFn(context, "insert")
+    return endValidation({ success: !!check })
   }
 }
 

@@ -1,4 +1,4 @@
-import { evaluateDocumentFiltersWriteFn } from '../../commonValidators'
+import { evaluateDocumentFiltersFn } from '../../commonValidators'
 import { States } from '../../interface'
 import { logMachineInfo } from '../../utils'
 
@@ -17,7 +17,7 @@ export const STEP_A_STATES: States = {
     goToNextValidationStage
   }) => {
     logMachineInfo({ enabled: context.enableLog, machine: "B", step: 2, stepName: "evaluateDocumentsFiltersWrite" })
-    const check = await evaluateDocumentFiltersWriteFn(context)
+    const check = await evaluateDocumentFiltersFn(context, "write")
     return check ? goToNextValidationStage() : endValidation({ success: false })
   }
 }

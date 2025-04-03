@@ -1,7 +1,6 @@
-import { evaluateDocumentFiltersWriteFn } from '../../commonValidators'
+import { evaluateDocumentFiltersFn } from '../../commonValidators'
 import { States } from '../../interface'
 import { logMachineInfo } from '../../utils'
-import { evaluateDocumentFiltersReadFn } from './validators'
 
 export const STEP_B_STATES: States = {
   checkDocumentsFilters: async ({ context, next, goToNextValidationStage }) => {
@@ -14,7 +13,7 @@ export const STEP_B_STATES: States = {
   },
   evaluateDocumentsFiltersRead: async ({ context, next, goToNextValidationStage }) => {
     logMachineInfo({ enabled: context.enableLog, machine: "B", step: 2, stepName: "evaluateDocumentsFiltersRead" })
-    const hasDocumentFiltersRead = await evaluateDocumentFiltersReadFn(context)
+    const hasDocumentFiltersRead = await evaluateDocumentFiltersFn(context, "read")
     if (!hasDocumentFiltersRead) return next('evaluateDocumentsFiltersWrite')
     return goToNextValidationStage()
   },
@@ -24,7 +23,7 @@ export const STEP_B_STATES: States = {
     goToNextValidationStage
   }) => {
     logMachineInfo({ enabled: context.enableLog, machine: "B", step: 3, stepName: "evaluateDocumentsFiltersWrite" })
-    const check = await evaluateDocumentFiltersWriteFn(context)
+    const check = await evaluateDocumentFiltersFn(context, "write")
     return check ? goToNextValidationStage() : endValidation({ success: false })
   }
 }

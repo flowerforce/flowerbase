@@ -1,23 +1,19 @@
+import { checkFieldsPropertyExists, evaluateTopLevelPermissionsFn } from '../../commonValidators'
 import { States } from '../../interface'
 import { logMachineInfo } from '../../utils'
-import {
-  checkFieldsPropertyExists,
-  evaluateTopLevelReadFn,
-  evaluateTopLevelWriteFn
-} from './validators'
 
 
 export const STEP_C_STATES: States = {
   evaluateTopLevelRead: async ({ context, next, endValidation }) => {
     logMachineInfo({ enabled: context.enableLog, machine: "C", step: 1, stepName: "evaluateTopLevelRead" })
-    const check = await evaluateTopLevelReadFn(context)
+    const check = await evaluateTopLevelPermissionsFn(context, "read")
     return check
       ? endValidation({ success: true })
       : next('evaluateTopLevelWrite', { check })
   },
   evaluateTopLevelWrite: async ({ context, next, endValidation }) => {
     logMachineInfo({ enabled: context.enableLog, machine: "C", step: 2, stepName: "evaluateTopLevelWrite" })
-    const check = await evaluateTopLevelWriteFn(context)
+    const check = await evaluateTopLevelPermissionsFn(context, "write")
     if (check) return endValidation({ success: true })
     return context?.prevParams?.check === false
       ? endValidation({ success: false })
