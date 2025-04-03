@@ -6,7 +6,7 @@ export declare class StateMachine {
     private _validation;
     private _machines;
     private _currentStep;
-    constructor(role: Role, params: Params, user: User);
+    constructor(role: Role, params: Params, user: User, enableLog?: boolean);
     runValidation(): Promise<StepResult>;
     private runMachine;
     private endValidation;

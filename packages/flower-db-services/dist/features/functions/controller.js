@@ -63,12 +63,16 @@ const functionsController = (app_1, _a) => __awaiter(void 0, [app_1, _a], void 0
         return JSON.stringify(result);
     }));
     app.get('/call', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-        const { baas_request, stitch_request } = req.query;
+        const { query, user } = req;
+        const { baas_request, stitch_request } = query;
         const config = JSON.parse(Buffer.from(baas_request || stitch_request || "", "base64").toString("utf8"));
         const [{ database, collection }] = config.arguments;
         const app = state_1.StateManager.select("app");
         const services = state_1.StateManager.select("services");
-        const changeStream = yield services["mongodb-atlas"](app, {}).db(database).collection(collection).watch([], { fullDocument: "whenAvailable" }); // TODO -> aggiungere i filtri
+        const changeStream = yield services["mongodb-atlas"](app, {
+            user,
+            rules
+        }).db(database).collection(collection).watch([], { fullDocument: "whenAvailable" });
         res.header('Content-Type', 'text/event-stream');
         res.header('Cache-Control', 'no-cache');
         res.header('Connection', 'keep-alive');

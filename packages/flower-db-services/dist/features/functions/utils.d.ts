@@ -15,6 +15,9 @@ export declare const executeQuery: ({ currentMethod, query, update, document }: 
     findOne: () => Promise<unknown>;
     deleteOne: () => Promise<import("mongodb/mongodb").DeleteResult>;
     insertOne: () => Promise<import("mongodb/mongodb").InsertOneResult<import("bson").Document>>;
-    updateOne: () => Promise<unknown> | import("mongodb/mongodb").FindCursor<any>;
+    updateOne: () => Promise<unknown> | import("mongodb/mongodb").FindCursor<any> | import("mongodb/mongodb").AggregationCursor<import("bson").Document>;
+    aggregate: () => import("mongodb/mongodb").AggregationCursor<import("bson").Document>;
+    insertMany: () => Promise<import("mongodb/mongodb").InsertManyResult<import("bson").Document>>;
+    updateMany: () => Promise<import("mongodb/mongodb").UpdateResult<import("bson").Document>>;
 }>;
 //# sourceMappingURL=utils.d.ts.map

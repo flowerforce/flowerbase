@@ -6,7 +6,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "npx jest",
-    "build": "rm -rf dist/ && tsc"
+    "build": "rm -rf dist/ && tsc",
+    "start": "node src/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -54,5 +55,9 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.6.2",
     "typescript-eslint": "^8.8.1"
+  },
+  "peerDependencies": {
+    "@stackhouseos/flower-client-nodejs": "^1.2.12",
+    "crypto-js": "4.1.1"
   }
 }

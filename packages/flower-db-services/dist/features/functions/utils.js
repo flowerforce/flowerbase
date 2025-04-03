@@ -66,7 +66,10 @@ const executeQuery = (_a) => __awaiter(void 0, [_a], void 0, function* ({ curren
         findOne: () => currentMethod(bson_1.EJSON.deserialize(query)),
         deleteOne: () => currentMethod(bson_1.EJSON.deserialize(query)),
         insertOne: () => currentMethod(bson_1.EJSON.deserialize(document)),
-        updateOne: () => currentMethod(bson_1.EJSON.deserialize(query), bson_1.EJSON.deserialize(update))
+        updateOne: () => currentMethod(bson_1.EJSON.deserialize(query), bson_1.EJSON.deserialize(update)),
+        aggregate: () => currentMethod(bson_1.EJSON.deserialize(query)),
+        insertMany: () => currentMethod(bson_1.EJSON.deserialize(query)),
+        updateMany: () => currentMethod(bson_1.EJSON.deserialize(query), bson_1.EJSON.deserialize(update)),
     };
 });
 exports.executeQuery = executeQuery;

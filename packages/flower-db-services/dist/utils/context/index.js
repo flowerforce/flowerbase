@@ -39,7 +39,12 @@ function GenerateContext(_a) {
             functionsList,
             GenerateContext
         });
-        vm_1.default.runInContext(module_1.default.wrap(currentFunction.code), vm_1.default.createContext(contextData))(exports, require, module, __filename, __dirname);
+        try {
+            vm_1.default.runInContext(module_1.default.wrap(currentFunction.code), vm_1.default.createContext(contextData))(exports, require, module, __filename, __dirname);
+        }
+        catch (e) {
+            console.log(e);
+        }
         return yield module.exports(...bson_1.EJSON.deserialize(args));
     });
 }

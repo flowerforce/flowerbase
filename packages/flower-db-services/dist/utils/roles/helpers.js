@@ -22,7 +22,7 @@ const functionsConditions = ["%%true", "%%false"];
 const evaluateExpression = (params, expression, user) => __awaiter(void 0, void 0, void 0, function* () {
     if (!expression || typeof expression === 'boolean')
         return !!expression;
-    const value = Object.assign(Object.assign({}, params.expansions), { '%%true': true });
+    const value = Object.assign(Object.assign(Object.assign({}, params.expansions), params.cursor), { "%%user": user, '%%true': true });
     const conditions = (0, rules_1.expandQuery)(expression, value);
     const complexCondition = Object.entries(conditions).find(([key]) => functionsConditions.includes(key));
     return complexCondition ? yield evaluateComplexExpression(complexCondition, params, user) : utils_1.default.checkRule(conditions, value, {});
