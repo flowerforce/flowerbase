@@ -23,13 +23,13 @@ const C_1 = require("./read/C");
 const D_1 = require("./read/D");
 const machines = [A_1.STEP_A_STATES, B_1.STEP_B_STATES, C_1.STEP_C_STATES, D_1.STEP_D_STATES];
 class StateMachine {
-    constructor(role, params, user) {
+    constructor(role, params, user, enableLog) {
         this._validation = {
             status: null,
             nextInitialStep: null
         };
         this._machines = machines;
-        this._context = { role, params, user };
+        this._context = { role, params, user, enableLog };
         this._currentStep = {
             names: [],
             states: {},

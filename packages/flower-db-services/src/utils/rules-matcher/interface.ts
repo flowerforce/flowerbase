@@ -29,7 +29,7 @@ export interface RulesMatcherUtils {
   rule: (
     block: Record<string, any>,
     keys: Record<string, any>,
-    options: Record<string, any>
+    options?: Record<string, any>
   ) => {
     valid: boolean
     name: string
@@ -161,7 +161,7 @@ export interface RulesMatcherUtils {
   checkRule: <T extends Record<string, any>>(
     block: RulesObject<T>,
     data: T,
-    options: Record<string, any>
+    options?: Record<string, any>
   ) => boolean
   /**
    * @param rules

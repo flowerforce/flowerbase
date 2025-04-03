@@ -9,6 +9,6 @@ type Options = {
  * @param {Object} opts - Options for the plugin.
  * @param {string} opts.secret - The secret key used for signing JWTs.
  */
-declare const _default: (fastify: import("fastify").FastifyInstance<import("fastify").RawServerDefault, import("http").IncomingMessage, import("http").ServerResponse<import("http").IncomingMessage>, import("fastify").FastifyBaseLogger, import("fastify").FastifyTypeProviderDefault>, opts: Options) => Promise<void>;
+declare const _default: (fastify: import("fastify/fastify").FastifyInstance<import("fastify/fastify").RawServerDefault, import("http").IncomingMessage, import("http").ServerResponse<import("http").IncomingMessage>, import("fastify/fastify").FastifyBaseLogger, import("fastify/fastify").FastifyTypeProviderDefault>, opts: Options) => Promise<void>;
 export default _default;
 //# sourceMappingURL=jwt.d.ts.map

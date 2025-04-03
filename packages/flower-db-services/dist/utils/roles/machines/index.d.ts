@@ -10,5 +10,5 @@ import { StepResult } from './interface';
  *
  * @returns {Promise<StepResult>} - The result of the state machine's validation process.
  */
-export declare const checkValidation: (role: Role, params: Params, user: User) => Promise<StepResult>;
+export declare const checkValidation: (role: Role, params: Params, user: User, enableLog?: boolean) => Promise<StepResult>;
 //# sourceMappingURL=index.d.ts.map

@@ -4,12 +4,12 @@ module.exports = {
     '^.+\\.[tj]s$': [
       'ts-jest',
       {
-        tsconfig: '<rootDir>/packages/flower-db-services/tsconfig.json'
+        tsconfig: './tsconfig.json'
       }
     ]
   },
   collectCoverage: false,
-  collectCoverageFrom: ['<rootDir>/packages/flower-db-services/**/*.ts'],
+  collectCoverageFrom: ['./**/*.ts'],
   coverageDirectory: 'coverage',
   coverageThreshold: {
     global: {
@@ -20,5 +20,5 @@ module.exports = {
     }
   },
   testEnvironment: 'node',
-  testMatch: ['<rootDir>/packages/flower-db-services/**/*.test.ts']
+  testMatch: ['./**/*.test.ts']
 }

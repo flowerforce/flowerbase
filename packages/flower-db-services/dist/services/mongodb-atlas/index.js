@@ -112,7 +112,50 @@ const getOperators = (collection, { rules = {}, collName, user, run_as_system })
         });
         return newCursor;
     },
-    watch: (pipeline, options) => __awaiter(void 0, void 0, void 0, function* () { return collection.watch(pipeline, options); })
+    watch: (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (pipeline = [], options) {
+        if (!run_as_system) {
+            const { filters, roles } = rules[collName] || {};
+            const formattedQuery = (0, utils_2.getFormattedQuery)(filters, {}, user);
+            const formattedPipeline = [{
+                    $match: {
+                        $and: formattedQuery
+                    }
+                }, ...pipeline];
+            const result = collection.watch(formattedPipeline, options);
+            const originalOn = result.on.bind(result);
+            const isValidChange = (_a) => __awaiter(void 0, [_a], void 0, function* ({ fullDocument, updateDescription }) {
+                const winningRole = (0, utils_1.getWinningRole)(fullDocument, user, roles);
+                const { status, document } = winningRole ? yield (0, machines_1.checkValidation)(winningRole, {
+                    type: "read",
+                    roles,
+                    cursor: fullDocument,
+                    expansions: {},
+                }, user) : { status: true, document: fullDocument };
+                const { status: updatedFieldsStatus, document: updatedFields } = winningRole ? yield (0, machines_1.checkValidation)(winningRole, {
+                    type: "read",
+                    roles,
+                    cursor: updateDescription.updatedFields,
+                    expansions: {},
+                }, user) : { status: true, document: updateDescription.updatedFields };
+                return { status, document, updatedFieldsStatus, updatedFields };
+            });
+            result.on = (eventType, listener) => {
+                return originalOn(eventType, (change) => __awaiter(void 0, void 0, void 0, function* () {
+                    const { status, document, updatedFieldsStatus, updatedFields } = yield isValidChange(change);
+                    if (!status)
+                        return;
+                    const filteredChange = Object.assign(Object.assign({}, change), { fullDocument: document, updateDescription: Object.assign(Object.assign({}, change.updateDescription), { updatedFields: updatedFieldsStatus ? updatedFields : {} }) });
+                    listener(filteredChange);
+                }));
+            };
+            return result;
+        }
+        return collection.watch(pipeline, options);
+    }),
+    aggregate: (//TODO -> add filter & rules in aggregate
+    pipeline, options) => collection.aggregate(pipeline, options),
+    insertMany: (documents, options) => collection.insertMany(documents, options), //TODO -> add filter & rules in insertMany
+    updateMany: (filter, updates, options) => collection.updateMany(filter, updates, options) //TODO -> add filter & rules in updateMany
 });
 const MongodbAtlas = (app, { rules, user, run_as_system } = {}) => ({
     db: (dbName) => {

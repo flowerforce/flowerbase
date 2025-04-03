@@ -1,4 +1,5 @@
 import 'dotenv/config';
+export * from "./model";
 export type InitializeConfig = {
     projectId: string;
     mongodbUrl?: string;

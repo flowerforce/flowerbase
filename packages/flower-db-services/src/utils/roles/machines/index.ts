@@ -12,8 +12,8 @@ import { StateMachine } from './machine'
  * 
  * @returns {Promise<StepResult>} - The result of the state machine's validation process.
  */
-export const checkValidation = async (role: Role, params: Params, user: User): Promise<StepResult> => {
-  const stateMachine = new StateMachine(role, params, user)
+export const checkValidation = async (role: Role, params: Params, user: User, enableLog?: boolean): Promise<StepResult> => {
+  const stateMachine = new StateMachine(role, params, user, enableLog)
   return await stateMachine.runValidation()
 }
 

@@ -8,7 +8,7 @@ import rulesMatcherUtils from '../../utils/rules-matcher/utils'
 import { GetValidRuleParams } from './model'
 
 export const getValidRule = <T extends Role | Filter>({
-  filters,
+  filters = [],
   user,
   record = null
 }: GetValidRuleParams<T>) => {

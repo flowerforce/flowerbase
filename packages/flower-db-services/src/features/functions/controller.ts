@@ -1,7 +1,10 @@
 import { ObjectId } from 'bson'
+
+
 import { services } from '../../services'
+import { StateManager } from '../../state'
 import { GenerateContext } from '../../utils/context'
-import { FunctionCallDto } from './dtos'
+import { Base64Function, FunctionCallBase64Dto, FunctionCallDto } from './dtos'
 import { FunctionController } from './interface'
 import { executeQuery } from './utils'
 
@@ -51,17 +54,49 @@ export const functionsController: FunctionController = async (
       throw new Error(`Function "${req.body.name}" is private`)
     }
 
+
     const result = await GenerateContext({
       args: req.body.arguments,
       app,
       rules,
       user: { ...user, _id: new ObjectId(user.id) },
-      currentFunction: currentFunction,
+      currentFunction,
       functionsList,
       services
     })
     res.type("application/json")
     return JSON.stringify(result)
   })
+  app.get<{
+    Querystring: FunctionCallBase64Dto,
+  }>('/call', async (req, res) => {
+    const { query, user } = req
+    const { baas_request, stitch_request } = query
+
+    const config: Base64Function = JSON.parse(Buffer.from(baas_request || stitch_request || "", "base64").toString("utf8"));
+    const [{ database, collection }] = config.arguments
+    const app = StateManager.select("app")
+    const services = StateManager.select("services")
+
+    const changeStream = await services["mongodb-atlas"](app, {
+      user,
+      rules
+    }).db(database).collection(collection).watch([], { fullDocument: "whenAvailable" })
+
+    res.header('Content-Type', 'text/event-stream');
+    res.header('Cache-Control', 'no-cache');
+    res.header('Connection', 'keep-alive');
+    res.raw.flushHeaders();
+
+
+    changeStream.on('change', (change) => {
+      res.raw.write(`data: ${JSON.stringify(change)}\n\n`);
+    });
+
+    req.raw.on('close', () => {
+      changeStream.close();
+    });
+  })
+
 
 }

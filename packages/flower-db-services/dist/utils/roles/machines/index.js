@@ -20,8 +20,8 @@ const machine_1 = require("./machine");
  *
  * @returns {Promise<StepResult>} - The result of the state machine's validation process.
  */
-const checkValidation = (role, params, user) => __awaiter(void 0, void 0, void 0, function* () {
-    const stateMachine = new machine_1.StateMachine(role, params, user);
+const checkValidation = (role, params, user, enableLog) => __awaiter(void 0, void 0, void 0, function* () {
+    const stateMachine = new machine_1.StateMachine(role, params, user, enableLog);
     return yield stateMachine.runValidation();
 });
 exports.checkValidation = checkValidation;
