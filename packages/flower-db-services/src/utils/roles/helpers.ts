@@ -13,14 +13,12 @@ export const evaluateExpression = async (params: MachineContext["params"], expre
 
   const value = {
     ...params.expansions,
+    ...params.cursor,
+    "%%user": user,
     '%%true': true
-    /** values */
   }
-
   const conditions = expandQuery(expression, value)
-
   const complexCondition = Object.entries<Record<string, any>>(conditions).find(([key]) => functionsConditions.includes(key))
-
   return complexCondition ? await evaluateComplexExpression(complexCondition, params, user) : rulesMatcherUtils.checkRule(conditions, value, {})
 
 }

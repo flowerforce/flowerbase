@@ -64,4 +64,9 @@ export type GetOperatorsFunction = (
   watch: (
     ...params: Parameters<Collection<Document>['watch']>
   ) => Promise<ReturnType<Collection<Document>['watch']>>
+  aggregate: (
+    ...params: Parameters<Collection<Document>['aggregate']>
+  ) => ReturnType<Collection<Document>['aggregate']>
+  insertMany: (...params: Parameters<Collection<Document>['insertMany']>) => ReturnType<Collection<Document>['insertMany']>
+  updateMany: (...params: Parameters<Collection<Document>['updateMany']>) => ReturnType<Collection<Document>['updateMany']>
 }

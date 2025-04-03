@@ -23,8 +23,8 @@ export class StateMachine {
         completed?: boolean,
         initialStep: string | null
     }
-    constructor(role: Role, params: Params, user: User) {
-        this._context = { role, params, user }
+    constructor(role: Role, params: Params, user: User, enableLog?: boolean) {
+        this._context = { role, params, user, enableLog }
         this._currentStep = {
             names: [],
             states: {},

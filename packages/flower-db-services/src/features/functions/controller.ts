@@ -70,12 +70,18 @@ export const functionsController: FunctionController = async (
   app.get<{
     Querystring: FunctionCallBase64Dto,
   }>('/call', async (req, res) => {
-    const { baas_request, stitch_request } = req.query
+    const { query, user } = req
+    const { baas_request, stitch_request } = query
+
     const config: Base64Function = JSON.parse(Buffer.from(baas_request || stitch_request || "", "base64").toString("utf8"));
     const [{ database, collection }] = config.arguments
     const app = StateManager.select("app")
     const services = StateManager.select("services")
-    const changeStream = await services["mongodb-atlas"](app, {}).db(database).collection(collection).watch([], { fullDocument: "whenAvailable" }) // TODO -> aggiungere i filtri
+
+    const changeStream = await services["mongodb-atlas"](app, {
+      user,
+      rules
+    }).db(database).collection(collection).watch([], { fullDocument: "whenAvailable" })
 
     res.header('Content-Type', 'text/event-stream');
     res.header('Cache-Control', 'no-cache');

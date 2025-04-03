@@ -34,12 +34,19 @@ export async function GenerateContext({
     GenerateContext
   })
 
-  vm.runInContext(m.wrap(currentFunction.code), vm.createContext(contextData))(
-    exports,
-    require,
-    module,
-    __filename,
-    __dirname
-  )
+  try {
+    vm.runInContext(m.wrap(currentFunction.code), vm.createContext(contextData))(
+      exports,
+      require,
+      module,
+      __filename,
+      __dirname
+    )
+  }
+  catch (e) {
+    console.log(e)
+  }
+
+
   return await module.exports(...EJSON.deserialize(args))
 }

@@ -1,5 +1,5 @@
 import { EventEmitterAsyncResourceOptions } from 'events'
-import { Collection, Document, FindCursor } from 'mongodb'
+import { Collection, Document, EventsDescription, FindCursor } from 'mongodb'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
 import { expandQuery } from '../../utils/rules'
@@ -121,10 +121,60 @@ const getOperators: GetOperatorsFunction = (
     }
     return newCursor
   },
-  watch: async ( //TODO -> add filter & rules in watch
-    pipeline?: Parameters<typeof collection.watch>[0],
-    options?: Parameters<typeof collection.watch>[1]
-  ) => collection.watch(pipeline, options)
+  watch: async (
+    pipeline = [],
+    options
+  ) => {
+    if (!run_as_system) {
+      const { filters, roles } = rules[collName] || {}
+      const formattedQuery = getFormattedQuery(filters, {}, user)
+      const formattedPipeline = [{
+        $match: {
+          $and: formattedQuery
+        }
+      }, ...pipeline]
+
+      const result = collection.watch(formattedPipeline, options)
+      const originalOn = result.on.bind(result);
+
+      const isValidChange = async ({ fullDocument, updateDescription }: Document) => {
+        const winningRole = getWinningRole(fullDocument, user, roles)
+        const { status, document } = winningRole ? await checkValidation(winningRole, {
+          type: "read",
+          roles,
+          cursor: fullDocument,
+          expansions: {},
+        }, user) : { status: true, document: fullDocument }
+
+        const { status: updatedFieldsStatus, document: updatedFields } = winningRole ? await checkValidation(winningRole, {
+          type: "read",
+          roles,
+          cursor: updateDescription.updatedFields,
+          expansions: {},
+        }, user) : { status: true, document: updateDescription.updatedFields }
+        return { status, document, updatedFieldsStatus, updatedFields }
+      }
+
+      result.on = <EventKey extends keyof EventsDescription>(eventType: EventKey, listener: EventsDescription[EventKey]) => {
+        return originalOn(eventType, async (change: Document) => {
+          const { status, document, updatedFieldsStatus, updatedFields } = await isValidChange(change)
+          if (!status) return
+          const filteredChange = { ...change, fullDocument: document, updateDescription: { ...change.updateDescription, updatedFields: updatedFieldsStatus ? updatedFields : {} } }
+          listener(filteredChange)
+        });
+      }
+
+      return result
+    }
+    return collection.watch(pipeline, options)
+  },
+  aggregate: ( //TODO -> add filter & rules in aggregate
+    pipeline,
+    options,
+  ) => collection.aggregate(pipeline, options),
+  insertMany: (documents, options) => collection.insertMany(documents, options), //TODO -> add filter & rules in insertMany
+  updateMany: (filter, updates, options) => collection.updateMany(filter, updates, options) //TODO -> add filter & rules in updateMany
+
 })
 
 const MongodbAtlas: MongodbAtlasFunction = (
