@@ -14,16 +14,12 @@ const getOperators: GetOperatorsFunction = (
   { rules = {}, collName, user, run_as_system }
 ) => ({
   findOne: async (query) => {
-
     if (!run_as_system) {
       const { filters, roles } = rules[collName] || {}
-
       // PRE QUERY -> build the right filter
       const formattedQuery = getFormattedQuery(filters, query, user)
-
       // QUERY -> findOne document with the formatted Query
       const result = await collection.findOne({ $and: formattedQuery })
-
       // POST QUERY -> check the if the user can read the document
       const winningRole = getWinningRole(result, user, roles)
       const { status, document } = winningRole ? await checkValidation(winningRole, {
@@ -37,14 +33,25 @@ const getOperators: GetOperatorsFunction = (
     }
     return collection.findOne(query)
   },
-  deleteOne: async (query) => {
+  deleteOne: async (query = {}) => {
     if (!run_as_system) {
       const { roles } = rules[collName] || {}
-      const currentRules = getValidRule({ filters: roles, user })
-      const deleteForbidden = !!currentRules?.length && currentRules[0].delete === false
-      if (deleteForbidden) {
-        throw new Error('Delete not permitted')
+      const result = await collection.findOne(query)
+      const winningRole = getWinningRole(result, user, roles)
+      const { status } = winningRole ? await checkValidation(winningRole, {
+        type: "delete",
+        roles,
+        cursor: result,
+        expansions: {},
+      }, user) : { status: true }
+
+      if (!status) {
+        return Promise.resolve({
+          acknowledged: false,
+          deletedCount: 0
+        })
       }
+      return collection.deleteOne(query)
     }
     return collection.deleteOne(query)
   },

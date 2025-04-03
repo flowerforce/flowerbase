@@ -2,12 +2,8 @@ import { Document } from "mongodb"
 import { User } from "../../../auth/dtos";
 import { Params, Role } from "../interface";
 import { MachineContext, PrevParams, States, StepResult, ValidationStatus } from "./interface";
-import { STEP_A_STATES } from "./read/A";
-import { STEP_B_STATES } from "./read/B";
-import { STEP_C_STATES } from "./read/C";
-import { STEP_D_STATES } from "./read/D";
-
-const machines = [STEP_A_STATES, STEP_B_STATES, STEP_C_STATES, STEP_D_STATES]
+import { READ_MACHINE } from "./read";
+import { WRITE_MACHINE } from "./write";
 
 export class StateMachine {
     private _context: MachineContext
@@ -15,7 +11,7 @@ export class StateMachine {
         status: null,
         nextInitialStep: null
     }
-    private _machines = machines
+    private _machines: States[]
     private _currentStep: {
         names: readonly string[]
         states: States
@@ -25,6 +21,7 @@ export class StateMachine {
     }
     constructor(role: Role, params: Params, user: User, enableLog?: boolean) {
         this._context = { role, params, user, enableLog }
+        this._machines = params.type === "read" ? READ_MACHINE : WRITE_MACHINE
         this._currentStep = {
             names: [],
             states: {},
