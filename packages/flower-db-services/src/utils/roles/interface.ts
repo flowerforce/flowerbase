@@ -5,11 +5,9 @@ export type FieldPermissionExpression = {
   write?: boolean
 }
 
-export interface ReadWritePermissions {
+export interface DocumentFiltersPermissions {
   read?: PermissionExpression
   write?: PermissionExpression
-  insert?: PermissionExpression
-  delete?: PermissionExpression
 }
 
 export interface Role {
@@ -17,7 +15,7 @@ export interface Role {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   apply_when: Record<string, any> // TODO -> define this type
   search?: PermissionExpression
-  document_filters?: ReadWritePermissions
+  document_filters?: DocumentFiltersPermissions
   read?: PermissionExpression
   write?: PermissionExpression
   insert?: PermissionExpression

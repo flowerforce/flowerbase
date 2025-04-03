@@ -1,15 +1,15 @@
 import { someAsync } from "../../helpers/someAsync"
 import { evaluateExpression } from "../helpers"
-import { ReadWritePermissions } from "../interface"
+import { DocumentFiltersPermissions } from "../interface"
 import { MachineContext } from "./interface"
 
 const readOnlyPermissions = ['read']
 const readWritePermissions = ['write', 'delete', 'insert', ...readOnlyPermissions]
 
-export const evaluateDocumentFiltersFn = async ({ params, role, user }: MachineContext, currentType: MachineContext["params"]["type"]) => {
+export const evaluateDocumentFiltersFn = async ({ params, role, user }: MachineContext, currentType: keyof DocumentFiltersPermissions) => {
     const permissions = currentType === "read" ? readOnlyPermissions : readWritePermissions
     return await someAsync([
-        permissions.includes(params.type) && role.document_filters?.[currentType as keyof ReadWritePermissions]
+        permissions.includes(params.type) && role.document_filters?.[currentType]
     ]
         .filter(Boolean), async (expr) => evaluateExpression(params, expr, user))
 }
