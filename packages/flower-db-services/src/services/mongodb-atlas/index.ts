@@ -1,10 +1,9 @@
 import { EventEmitterAsyncResourceOptions } from 'events'
-import { Collection, Document, EventsDescription, FindCursor } from 'mongodb'
+import { Collection, Document, EventsDescription, FindCursor, OptionalId, WithId } from 'mongodb'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
-import { expandQuery } from '../../utils/rules'
 import { GetOperatorsFunction, MongodbAtlasFunction } from './model'
-import { getFormattedQuery, getValidRule } from './utils'
+import { getFormattedQuery } from './utils'
 
 
 
@@ -13,127 +12,259 @@ const getOperators: GetOperatorsFunction = (
   collection,
   { rules = {}, collName, user, run_as_system }
 ) => ({
+  /**
+   * Finds a single document in a MongoDB collection with optional role-based filtering and validation.
+   *
+   * @param {Filter<Document>} query - The MongoDB query used to match the document.
+   * @returns {Promise<Document | {} | null>} A promise resolving to the document if found and permitted, an empty object if access is denied, or `null` if not found.
+   *
+   * @description
+   * If `run_as_system` is enabled, the function behaves like a standard `collection.findOne(query)` with no access checks.
+   * Otherwise:
+   *  - Merges the provided query with any access control filters using `getFormattedQuery`.
+   *  - Attempts to find the document using the formatted query.
+   *  - Determines the user's role via `getWinningRole`.
+   *  - Validates the result using `checkValidation` to ensure read permission.
+   *  - If validation fails, returns an empty object; otherwise returns the validated document.
+   */
   findOne: async (query) => {
     if (!run_as_system) {
       const { filters, roles } = rules[collName] || {}
-      // PRE QUERY -> build the right filter
+
+      // Apply access control filters to the query
       const formattedQuery = getFormattedQuery(filters, query, user)
-      // QUERY -> findOne document with the formatted Query
+
       const result = await collection.findOne({ $and: formattedQuery })
-      // POST QUERY -> check the if the user can read the document
+
       const winningRole = getWinningRole(result, user, roles)
-      const { status, document } = winningRole ? await checkValidation(winningRole, {
-        type: "read",
-        roles,
-        cursor: result,
-        expansions: {},
-      }, user) : { status: true, document: result }
 
-      return Promise.resolve(status ? document : {});
-    }
-    return collection.findOne(query)
-  },
-  deleteOne: async (query = {}) => {
-    if (!run_as_system) {
-      const { roles } = rules[collName] || {}
-      const result = await collection.findOne(query)
-      const winningRole = getWinningRole(result, user, roles)
-      const { status } = winningRole ? await checkValidation(winningRole, {
-        type: "delete",
-        roles,
-        cursor: result,
-        expansions: {},
-      }, user) : { status: true }
-
-      if (!status) {
-        return Promise.resolve({
-          acknowledged: false,
-          deletedCount: 0
-        })
-      }
-      return collection.deleteOne(query)
-    }
-    return collection.deleteOne(query)
-  },
-  insertOne: async (data) => {
-    const { roles } = rules[collName] || {}
-    if (!run_as_system) {
-      const currentRules = getValidRule({
-        filters: roles,
-        user,
-        record: { ...data, ...data.$set, ...data.$setOnInsert }
-      })
-      const insertForbidden = !!currentRules?.length && currentRules[0].insert === false
-      if (insertForbidden) {
-        throw new Error('Insert not permitted')
-      }
-    }
-    return collection.insertOne(data)
-  },
-  updateOne: async (query, data) => {
-    const { roles, filters } = rules[collName]
-    const currentRules = getValidRule({
-      filters: roles,
-      user,
-      record: { ...data, ...data.$set, ...data.$setOnInsert }
-    })
-    const updateForbidden = !!currentRules?.length && currentRules[0].write === false
-    if (updateForbidden) {
-      throw new Error('Update not permitted')
-    }
-
-    const preFilter = run_as_system ? undefined : getValidRule({ filters, user })
-    const isValidPreFilter = !!preFilter?.length
-    const formattedQuery = [
-      isValidPreFilter && expandQuery(preFilter[0]?.query, { '%%user': user }),
-      query
-    ].filter(Boolean)
-
-    // TODO -> fare filtro reale
-    return collection.updateOne({ $and: formattedQuery }, data)
-  },
-  find: (query) => {
-    const { filters, roles } = rules[collName] || {}
-    const preFilter = run_as_system ? undefined : getValidRule({ filters, user })
-    const isValidPreFilter = !!preFilter?.length
-    const formattedQuery = [
-      isValidPreFilter && expandQuery(preFilter[0].query, { '%%user': user }),
-      query
-    ].filter(Boolean)
-
-    // QUERY -> find documents with the formatted Query
-    const originalCursor = collection.find({ $and: formattedQuery })
-
-    // CURSOR -> create a cloned cursor to manipulate the response
-    const client = originalCursor[
-      'client' as keyof typeof originalCursor
-    ] as EventEmitterAsyncResourceOptions
-    const newCursor = new FindCursor(client)
-
-    newCursor.toArray = async () => {
-      const response = await originalCursor.toArray()
-      const filteredResponse = await Promise.all(response.map(async (currentDoc) => {
-        const winningRole = getWinningRole(currentDoc, user, roles)
-        // POST QUERY -> check the if the user can read the single document
-        const { status, document } = winningRole ? await checkValidation(winningRole, {
+      const { status, document } = winningRole
+        ? await checkValidation(winningRole, {
           type: "read",
           roles,
-          cursor: currentDoc,
+          cursor: result,
           expansions: {},
-        }, user) : { status: !roles.length, document: currentDoc }
-        return status ? document : undefined
-      }))
-      return filteredResponse.filter(Boolean)
+        }, user)
+        : { status: true, document: result }
 
+      // Return validated document or empty object if not permitted
+      return Promise.resolve(status ? document : {})
     }
-    return newCursor
+    // System mode: no validation applied
+    return collection.findOne(query)
   },
-  watch: async (
+  /**
+   * Deletes a single document from a MongoDB collection with optional role-based validation.
+   *
+   * @param {Filter<Document>} [query={}] - The MongoDB query used to match the document to delete.
+   * @returns {Promise<DeleteResult>} A promise resolving to the result of the delete operation.
+   *
+   * @throws {Error} If the user is not authorized to delete the document.
+   *
+   * @description
+   * If `run_as_system` is enabled, the function deletes the document directly using `collection.deleteOne(query)`.
+   * Otherwise:
+   *  - Applies role-based and custom filters to the query using `getFormattedQuery`.
+   *  - Retrieves the document using `findOne` to validate user permissions.
+   *  - Checks if the user has the appropriate role to perform a delete via `checkValidation`.
+   *  - If validation fails, throws an error.
+   *  - If validation passes, deletes the document using the filtered query.
+   */
+  deleteOne: async (query = {}) => {
+    if (!run_as_system) {
+      const { filters, roles } = rules[collName] || {}
+
+      // Apply access control filters
+      const formattedQuery = getFormattedQuery(filters, query, user)
+
+      // Retrieve the document to check permissions before deleting
+      const result = await collection.findOne(formattedQuery)
+      const winningRole = getWinningRole(result, user, roles)
+
+      const { status } = winningRole
+        ? await checkValidation(winningRole, {
+          type: "delete",
+          roles,
+          cursor: result,
+          expansions: {},
+        }, user)
+        : { status: true }
+
+      if (!status) {
+        throw new Error('Delete not permitted')
+      }
+
+      return collection.deleteOne(formattedQuery)
+    }
+    // System mode: bypass access control
+    return collection.deleteOne(query)
+  },
+  /**
+   * Inserts a single document into a MongoDB collection with optional role-based validation.
+   *
+   * @param {OptionalId<Document>} data - The document to insert.
+   * @param {InsertOneOptions} [options] - Optional settings for the insert operation, such as `writeConcern`.
+   * @returns {Promise<InsertOneResult<Document>>} A promise resolving to the result of the insert operation.
+   *
+   * @throws {Error} If the user is not authorized to insert the document.
+   *
+   * @description
+   * If `run_as_system` is enabled, the document is inserted directly without any validation.
+   * Otherwise:
+   *  - Determines the appropriate user role using `getWinningRole`.
+   *  - Validates the insert operation using `checkValidation`.
+   *  - If validation fails, an error is thrown.
+   *  - If validation passes, the document is inserted.
+   *
+   * This ensures that only users with the correct permissions can insert data into the collection.
+   */
+  insertOne: async (data, options) => {
+    const { roles } = rules[collName] || {}
+
+    if (!run_as_system) {
+      const winningRole = getWinningRole(data, user, roles)
+
+      const { status, document } = winningRole
+        ? await checkValidation(winningRole, {
+          type: "insert",
+          roles,
+          cursor: data,
+          expansions: {},
+        }, user)
+        : { status: true, document: data }
+
+      if (!status || !document) {
+        throw new Error('Insert not permitted')
+      }
+      return collection.insertOne(document, options)
+    }
+    // System mode: insert without validation
+    return collection.insertOne(data, options)
+  },
+  //TODO -> add filter & rules in updateMany
+  updateOne: async (query, data, options) => {
+    return collection.updateOne(query, data, options)
+    // if (!run_as_system) {
+
+    //   const { filters, roles } = rules[collName] || {}
+    //   const formattedQuery = getFormattedQuery(filters, query, user)
+    //   const result = await collection.findOne({ $and: formattedQuery })
+    //   const winningRole = getWinningRole(result, user, roles)
+
+    //   const { status, document } = winningRole ? await checkValidation(winningRole, {
+    //     type: "write",
+    //     roles,
+    //     cursor: result,
+    //     expansions: {},
+    //   }, user) : { status: true, document: result }
+
+    //   if (!status || !document) {
+    //     throw new Error('Update not permitted')
+    //   }
+    //   const hasOperators = Object.keys(data).some(key => key.startsWith("$"))
+
+    //   const filteredOperation = Object.entries(data).reduce((acc, [operator, query]) => {
+    //     const [key] = Object.keys(query)
+    //     if (document[key]) {
+    //       return { ...acc, [operator]: query }
+    //     }
+    //     return acc
+    //   }, {})
+
+
+    //   return collection.updateOne(query, data, options)
+    // }
+    // return collection.updateOne(query, data, options)
+  },
+  /**
+  * Finds documents in a MongoDB collection with optional role-based access control and post-query validation.
+  *
+  * @param {Filter<Document>} query - The MongoDB query to filter documents.
+  * @returns {FindCursor} A customized `FindCursor` that includes additional access control logic in its `toArray()` method.
+  *
+  * @description
+  * If `run_as_system` is enabled, the function simply returns a regular MongoDB cursor (`collection.find(query)`).
+  * Otherwise:
+  *  - Combines the user query with role-based filters via `getFormattedQuery`.
+  *  - Executes the query using `collection.find` with a `$and` of all filters.
+  *  - Returns a cloned `FindCursor` where `toArray()`:
+  *    - Applies additional post-query validation using `checkValidation` for each document.
+  *    - Filters out documents the current user is not authorized to read.
+  *
+  * This ensures that both pre-query filtering and post-query validation are applied consistently.
+  */
+  find: (query) => {
+    if (!run_as_system) {
+      const { filters, roles } = rules[collName] || {}
+
+      // Pre-query filtering based on access control rules
+      const formattedQuery = getFormattedQuery(filters, query, user)
+      const originalCursor = collection.find({ $and: formattedQuery })
+
+      // Clone the cursor to override `toArray` with post-query validation
+      const client = originalCursor[
+        'client' as keyof typeof originalCursor
+      ] as EventEmitterAsyncResourceOptions
+      const newCursor = new FindCursor(client)
+
+      /**
+       * Overridden `toArray` method that validates each document for read access.
+       *
+       * @returns {Promise<Document[]>} An array of documents the user is authorized to read.
+       */
+      newCursor.toArray = async () => {
+        const response = await originalCursor.toArray()
+
+        const filteredResponse = await Promise.all(response.map(async (currentDoc) => {
+          const winningRole = getWinningRole(currentDoc, user, roles)
+
+          const { status, document } = winningRole
+            ? await checkValidation(winningRole, {
+              type: "read",
+              roles,
+              cursor: currentDoc,
+              expansions: {},
+            }, user)
+            : { status: !roles.length, document: currentDoc }
+
+          return status ? document : undefined
+        }))
+
+        return filteredResponse.filter(Boolean)
+      }
+
+      return newCursor
+    }
+    // System mode: return original unfiltered cursor
+    return collection.find(query)
+  },
+  /**
+ * Watches changes on a MongoDB collection with optional role-based filtering of change events.
+ *
+ * @param {Document[]} [pipeline=[]] - Optional aggregation pipeline stages to apply to the change stream.
+ * @param {ChangeStreamOptions} [options] - Optional settings for the change stream, such as `fullDocument`, `resumeAfter`, etc.
+ * @returns {ChangeStream} A MongoDB `ChangeStream` instance, optionally enhanced with access control.
+ *
+ * @description
+ * If `run_as_system` is enabled, this function simply returns `collection.watch(pipeline, options)`.
+ * Otherwise:
+ *  - Applies access control filters via `getFormattedQuery`.
+ *  - Prepends a `$match` stage to the pipeline to limit watched changes to authorized documents.
+ *  - Overrides the `.on()` method of the returned `ChangeStream` to:
+ *    - Validate the `fullDocument` and any `updatedFields` using `checkValidation`.
+ *    - Filter out change events the user is not authorized to see.
+ *    - Pass only validated and filtered events to the original listener.
+ *
+ * This allows fine-grained control over what change events a user can observe, based on roles and filters.
+ */
+  watch: (
     pipeline = [],
     options
   ) => {
     if (!run_as_system) {
       const { filters, roles } = rules[collName] || {}
+
+      // Apply access filters to initial change stream pipeline
       const formattedQuery = getFormattedQuery(filters, {}, user)
       const formattedPipeline = [{
         $match: {
@@ -142,45 +273,182 @@ const getOperators: GetOperatorsFunction = (
       }, ...pipeline]
 
       const result = collection.watch(formattedPipeline, options)
-      const originalOn = result.on.bind(result);
+      const originalOn = result.on.bind(result)
 
+      /**
+       * Validates a change event against the user's roles.
+       *
+       * @param {Document} change - A change event from the ChangeStream.
+       * @returns {Promise<{ status: boolean, document: Document, updatedFieldsStatus: boolean, updatedFields: Document }>}
+       */
       const isValidChange = async ({ fullDocument, updateDescription }: Document) => {
         const winningRole = getWinningRole(fullDocument, user, roles)
-        const { status, document } = winningRole ? await checkValidation(winningRole, {
-          type: "read",
-          roles,
-          cursor: fullDocument,
-          expansions: {},
-        }, user) : { status: true, document: fullDocument }
 
-        const { status: updatedFieldsStatus, document: updatedFields } = winningRole ? await checkValidation(winningRole, {
-          type: "read",
-          roles,
-          cursor: updateDescription.updatedFields,
-          expansions: {},
-        }, user) : { status: true, document: updateDescription.updatedFields }
+        const { status, document } = winningRole
+          ? await checkValidation(winningRole, {
+            type: "read",
+            roles,
+            cursor: fullDocument,
+            expansions: {},
+          }, user)
+          : { status: true, document: fullDocument }
+
+        const { status: updatedFieldsStatus, document: updatedFields } = winningRole
+          ? await checkValidation(winningRole, {
+            type: "read",
+            roles,
+            cursor: updateDescription?.updatedFields,
+            expansions: {},
+          }, user)
+          : { status: true, document: updateDescription?.updatedFields }
+
         return { status, document, updatedFieldsStatus, updatedFields }
       }
 
-      result.on = <EventKey extends keyof EventsDescription>(eventType: EventKey, listener: EventsDescription[EventKey]) => {
+      // Override the .on() method to apply validation before emitting events
+      result.on = <EventKey extends keyof EventsDescription>(
+        eventType: EventKey,
+        listener: EventsDescription[EventKey]
+      ) => {
         return originalOn(eventType, async (change: Document) => {
           const { status, document, updatedFieldsStatus, updatedFields } = await isValidChange(change)
           if (!status) return
-          const filteredChange = { ...change, fullDocument: document, updateDescription: { ...change.updateDescription, updatedFields: updatedFieldsStatus ? updatedFields : {} } }
+
+          const filteredChange = {
+            ...change,
+            fullDocument: document,
+            updateDescription: {
+              ...change.updateDescription,
+              updatedFields: updatedFieldsStatus ? updatedFields : {}
+            }
+          }
+
           listener(filteredChange)
-        });
+        })
       }
 
       return result
     }
+
+    // System mode: no filtering applied
     return collection.watch(pipeline, options)
   },
-  aggregate: ( //TODO -> add filter & rules in aggregate
+  //TODO -> add filter & rules in aggregate
+  aggregate: (
     pipeline,
     options,
   ) => collection.aggregate(pipeline, options),
-  insertMany: (documents, options) => collection.insertMany(documents, options), //TODO -> add filter & rules in insertMany
-  updateMany: (filter, updates, options) => collection.updateMany(filter, updates, options) //TODO -> add filter & rules in updateMany
+  /**
+   * Inserts multiple documents into a MongoDB collection with optional role-based access control and validation.
+   *
+   * @param {OptionalId<Document>[]} documents - The array of documents to insert.
+   * @param {BulkWriteOptions} [options] - Optional settings passed to `insertMany`, such as `ordered`, `writeConcern`, etc.
+   * @returns {Promise<InsertManyResult<Document>>} A promise resolving to the result of the insert operation.
+   *
+   * @throws {Error} If no documents pass validation or user is not permitted to insert.
+   *
+   * @description
+   * If `run_as_system` is enabled, this function directly inserts the documents without validation.
+   * Otherwise, for each document:
+   *  - Finds the user's applicable role using `getWinningRole`.
+   *  - Validates the insert operation through `checkValidation`.
+   *  - Filters out any documents the user is not authorized to insert.
+   * Only documents passing validation will be inserted.
+   */
+  insertMany: async (documents, options) => {
+    const { roles } = rules[collName] || {}
+
+    if (!run_as_system) {
+      // Validate each document against user's roles
+      const filteredItems = await Promise.all(documents.map(async (currentDoc) => {
+        const winningRole = getWinningRole(currentDoc, user, roles)
+
+        const { status, document } = winningRole
+          ? await checkValidation(winningRole, {
+            type: "insert",
+            roles,
+            cursor: currentDoc,
+            expansions: {},
+          }, user)
+          : { status: !roles.length, document: currentDoc }
+
+        return status ? document : undefined
+      }))
+
+      const itemsToInsert = filteredItems.filter(Boolean) as OptionalId<Document>[]
+
+      if (!itemsToInsert.length) {
+        throw new Error('Insert not permitted')
+      }
+
+      return collection.insertMany(itemsToInsert, options)
+    }
+    // If system mode is active, insert all documents without validation
+    return collection.insertMany(documents, options)
+  },
+  //TODO -> add filter & rules in updateMany
+  updateMany: (filter, updates, options) => collection.updateMany(filter, updates, options),
+  /**
+   * Deletes multiple documents from a MongoDB collection with role-based access control and validation.
+   *
+   * @param query - The initial MongoDB query to filter documents to be deleted.
+   * @returns {Promise<{ acknowledged: boolean, deletedCount: number }>} A promise resolving to the deletion result.
+   *
+   * @description
+   * If `run_as_system` is enabled, this function directly deletes documents matching the given query.
+   * Otherwise, it:
+   *  - Applies additional filters from access control rules.
+   *  - Fetches matching documents.
+   *  - Validates each document against user roles.
+   *  - Deletes only the documents that the current user has permission to delete.
+   */
+  deleteMany: async (query = {}) => {
+    if (!run_as_system) {
+      const { filters, roles } = rules[collName] || {}
+
+      // Apply access control filters
+      const formattedQuery = getFormattedQuery(filters, query, user)
+
+      // Fetch documents matching the combined filters
+      const data = await collection.find({ $and: formattedQuery }).toArray()
+
+      // Filter and validate each document based on user's roles
+      const filteredItems = await Promise.all(data.map(async (currentDoc) => {
+        const winningRole = getWinningRole(currentDoc, user, roles)
+
+        const { status, document } = winningRole
+          ? await checkValidation(winningRole, {
+            type: "delete",
+            roles,
+            cursor: currentDoc,
+            expansions: {},
+          }, user)
+          : { status: !roles.length, document: currentDoc }
+
+        return status ? document : undefined
+      }))
+
+      // Extract IDs of documents that passed validation
+      const elementsToDelete = (filteredItems.filter(Boolean) as WithId<Document>[]).map(({ _id }) => _id)
+
+      if (!elementsToDelete.length) {
+        return Promise.resolve({
+          acknowledged: true,
+          deletedCount: 0
+        })
+      }
+      // Build final delete query with access control and ID filter
+      const deleteQuery = {
+        $and: [
+          ...formattedQuery,
+          { _id: { $in: elementsToDelete } }
+        ]
+      };
+      return collection.deleteMany(deleteQuery)
+    }
+    // If running as system, bypass access control and delete directly
+    return collection.deleteMany(query)
+  }
 
 })
 

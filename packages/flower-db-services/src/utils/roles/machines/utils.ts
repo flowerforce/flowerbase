@@ -1,4 +1,4 @@
-import { Document, WithId } from "mongodb"
+import { Document, OptionalId } from "mongodb"
 import { User } from "../../../auth/dtos";
 import { Filter } from "../../../features/rules/interface";
 import { getValidRule } from "../../../services/mongodb-atlas/utils";
@@ -8,13 +8,13 @@ import { LogMachineInfoParams } from "./interface";
 /**
  * Determines the first applicable role for a given user and document.
  *
- * @param {WithId<Document> | null} document - The document to check against role conditions.
+ * @param {OptionalId<Document> | null} document - The document to check against role conditions.
  * @param {User} user - The user for whom the role is being determined.
  * @param {Role[]} [roles=[]] - The list of available roles to evaluate.
  *
  * @returns {Role | null} - Returns the first role that matches the `apply_when` condition, or `null` if none match.
  */
-export const getWinningRole = (document: WithId<Document> | null, user: User, roles: Role[] = []): Role | null => {
+export const getWinningRole = (document: OptionalId<Document> | null, user: User, roles: Role[] = []): Role | null => {
   if (!roles.length) return null
   for (const role of roles) {
     if (checkApplyWhen(role.apply_when, user, document)) {
@@ -33,7 +33,7 @@ export const getWinningRole = (document: WithId<Document> | null, user: User, ro
  * 
  * @returns {boolean} - Returns `true` if at least one valid rule is found, otherwise `false`.
  */
-export const checkApplyWhen = (apply_when: Role["apply_when"], user: User, document: WithId<Document> | null) => {
+export const checkApplyWhen = (apply_when: Role["apply_when"], user: User, document: OptionalId<Document> | null) => {
   const validRule = getValidRule({ filters: [{ apply_when } as Filter], user, record: document })
   return !!validRule.length
 }
