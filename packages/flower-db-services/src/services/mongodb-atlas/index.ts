@@ -1,4 +1,5 @@
 import { EventEmitterAsyncResourceOptions } from 'events'
+import isEqual from 'lodash/isEqual'
 import { Collection, Document, EventsDescription, FindCursor, OptionalId, WithId } from 'mongodb'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
@@ -141,40 +142,71 @@ const getOperators: GetOperatorsFunction = (
     // System mode: insert without validation
     return collection.insertOne(data, options)
   },
-  //TODO -> add filter & rules in updateMany
+  /**
+   * Updates a single document in a MongoDB collection with optional role-based validation.
+   *
+   * @param {Filter<Document>} query - The MongoDB query used to match the document to update.
+   * @param {UpdateFilter<Document> | Partial<Document>} data - The update operations or replacement document.
+   * @param {UpdateOptions} [options] - Optional settings for the update operation.
+   * @returns {Promise<UpdateResult>} A promise resolving to the result of the update operation.
+   *
+   * @throws {Error} If the user is not authorized to update the document.
+   *
+   * @description
+   * If `run_as_system` is enabled, the function directly updates the document using `collection.updateOne(query, data, options)`.
+   * Otherwise, it follows these steps:
+   *  - Applies access control filters to the query using `getFormattedQuery`.
+   *  - Retrieves the document using `findOne` to check if it exists and whether the user has permission to modify it.
+   *  - Determines the user's role via `getWinningRole`.
+   *  - Flattens update operators (`$set`, `$inc`, etc.) if present to extract the final modified fields.
+   *  - Validates the update data using `checkValidation` to ensure compliance with role-based rules.
+   *  - Ensures that no unauthorized modifications occur by comparing the validated document with the intended changes.
+   *  - If validation fails, throws an error; otherwise, updates the document.
+   */
   updateOne: async (query, data, options) => {
+    if (!run_as_system) {
+      const { filters, roles } = rules[collName] || {}
+
+      // Apply access control filters
+      const formattedQuery = getFormattedQuery(filters, query, user)
+
+      // Retrieve the document to check permissions before updating
+      const result = await collection.findOne({ $and: formattedQuery })
+      if (!result) {
+        throw new Error('Update not permitted')
+      }
+
+      const winningRole = getWinningRole(result, user, roles)
+
+      // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
+      const hasOperators = Object.keys(data).some(key => key.startsWith("$"))
+
+      // Flatten the update object to extract the actual fields being modified
+      const docToCheck = hasOperators
+        ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
+        : data
+
+      // Validate update permissions
+      const { status, document } = winningRole
+        ? await checkValidation(winningRole, {
+          type: "write",
+          roles,
+          cursor: docToCheck,
+          expansions: {},
+        }, user)
+        : { status: true, document: docToCheck }
+
+      // Ensure no unauthorized changes are made
+      const areDocumentsEqual = isEqual(document, docToCheck)
+
+      if (!status || !areDocumentsEqual) {
+        throw new Error('Update not permitted')
+      }
+
+      return collection.updateOne(formattedQuery, data, options)
+    }
+    // System mode: bypass access control
     return collection.updateOne(query, data, options)
-    // if (!run_as_system) {
-
-    //   const { filters, roles } = rules[collName] || {}
-    //   const formattedQuery = getFormattedQuery(filters, query, user)
-    //   const result = await collection.findOne({ $and: formattedQuery })
-    //   const winningRole = getWinningRole(result, user, roles)
-
-    //   const { status, document } = winningRole ? await checkValidation(winningRole, {
-    //     type: "write",
-    //     roles,
-    //     cursor: result,
-    //     expansions: {},
-    //   }, user) : { status: true, document: result }
-
-    //   if (!status || !document) {
-    //     throw new Error('Update not permitted')
-    //   }
-    //   const hasOperators = Object.keys(data).some(key => key.startsWith("$"))
-
-    //   const filteredOperation = Object.entries(data).reduce((acc, [operator, query]) => {
-    //     const [key] = Object.keys(query)
-    //     if (document[key]) {
-    //       return { ...acc, [operator]: query }
-    //     }
-    //     return acc
-    //   }, {})
-
-
-    //   return collection.updateOne(query, data, options)
-    // }
-    // return collection.updateOne(query, data, options)
   },
   /**
   * Finds documents in a MongoDB collection with optional role-based access control and post-query validation.
