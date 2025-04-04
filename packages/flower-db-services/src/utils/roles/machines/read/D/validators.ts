@@ -14,7 +14,10 @@ export const checkIsValidFieldNameFn = ({ role, params }: MachineContext) => {
     if (fields![key]) {
       return (role.fields![key].read || role.fields![key].write) ? { ...filteredDocument, [key]: value } : filteredDocument
     }
-    return (additional_fields[key]?.read || additional_fields[key]?.write) ? { ...filteredDocument, [key]: value } : filteredDocument
+    if (additional_fields[key]) {
+      return (additional_fields[key]?.read || additional_fields[key]?.write) ? { ...filteredDocument, [key]: value } : filteredDocument
+    }
+    return { ...filteredDocument, [key]: value }
   }, {})
 
   return (rulesOnId || cursor._id === undefined) ? filteredDocument : { ...filteredDocument, "_id": cursor._id }
