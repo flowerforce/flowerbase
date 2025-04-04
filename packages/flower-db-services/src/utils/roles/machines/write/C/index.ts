@@ -9,7 +9,7 @@ export const STEP_C_STATES: States = {
   checkAdditionalFields: async ({ context, next, endValidation }) => {
     logMachineInfo({ enabled: context.enableLog, machine: "C", step: 1, stepName: "checkAdditionalFields" })
     const check = checkAdditionalFieldsFn(context)
-    return check ? next('evaluateWrite') : endValidation({ success: false })
+    return check ? next('checkIsValidFieldName') : endValidation({ success: false })
   },
   checkIsValidFieldName: async ({ context, endValidation }) => {
     logMachineInfo({ enabled: context.enableLog, machine: "D", step: 2, stepName: "checkIsValidFieldName" })
