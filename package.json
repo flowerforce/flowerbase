@@ -10,7 +10,9 @@
     "dev": "nodemon index.ts",
     "lint:fds": "eslint packages/flowerbase",
     "format:fds": "prettier --write 'packages/flowerbase/**/*.ts'",
-    "fix:fds": "npm run format:fds && npm run lint:fds -- --fix"
+    "fix:fds": "npm run format:fds && npm run lint:fds -- --fix",
+    "prepare:prerelease": "npm run build:packages && ts-node scripts/prerelease",
+    "publish:prerelease": "nx release publish --tag prerelease"
   },
   "workspaces": [
     "packages/*"
