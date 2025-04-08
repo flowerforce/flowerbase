@@ -14051,7 +14051,73 @@
     }
   },
   "dependencies": {
-    "@flowerforce/flowerbase": [],
+    "@flowerforce/flowerbase": [
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:bson",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:fastify",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:@fastify/jwt",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:fastify-plugin",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:mongodb",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:@sendgrid/mail",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:node-cron",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:dotenv",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:undici",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:aws-sdk",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:lodash",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:@fastify/cors",
+        "type": "static"
+      },
+      {
+        "source": "@flowerforce/flowerbase",
+        "target": "npm:@fastify/mongodb",
+        "type": "static"
+      }
+    ],
     "npm:@ampproject/remapping": [
       {
         "source": "npm:@ampproject/remapping",
