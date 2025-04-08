@@ -108,7 +108,7 @@
         },
         {
           "file": "packages/flowerbase/package.json",
-          "hash": "4239518592606170476"
+          "hash": "14477113690029083552"
         },
         {
           "file": "packages/flowerbase/project.json",
@@ -679,7 +679,7 @@
       },
       {
         "file": "package.json",
-        "hash": "14521184725252051541"
+        "hash": "7112713410779623625"
       },
       {
         "file": "scripts/prerelease.ts",
