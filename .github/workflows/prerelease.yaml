@@ -43,4 +43,3 @@ jobs:
         run: npm run publish:prerelease
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
