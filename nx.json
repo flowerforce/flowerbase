@@ -1,0 +1,73 @@
+{
+    "pluginsConfig": {
+        "@nx/js": {
+            "analyzeSourceFiles": true
+        }
+    },
+    "extends": "nx/presets/npm.json",
+    "$schema": "./node_modules/nx/schemas/nx-schema.json",
+    "release": {
+        "projects": [
+            "flowerbase"
+        ],
+        "projectsRelationship": "independent",
+        "changelog": {
+            "projectChangelogs": {
+                "createRelease": "github",
+                "renderOptions": {
+                    "commitReferences": true,
+                    "authors": false
+                }
+            }
+        },
+        "git": {
+            "commitMessage": "chore(release): publish [skip ci]"
+        },
+        "version": {
+            "generatorOptions": {
+                "updateDependents": "auto"
+            },
+            "conventionalCommits": true
+        }
+    },
+    "targetDefaults": {
+        "@nx/js:tsc": {
+            "cache": true,
+            "dependsOn": [
+                "^build"
+            ],
+            "inputs": [
+                "default",
+                "^default"
+            ]
+        }
+    },
+    "plugins": [
+        {
+            "plugin": "@nx/rollup/plugin",
+            "options": {
+                "buildTargetName": "build"
+            }
+        },
+        {
+            "plugin": "@nx/eslint/plugin",
+            "options": {
+                "targetName": "lint"
+            }
+        },
+        {
+            "plugin": "@nx/jest/plugin",
+            "options": {
+                "targetName": "test"
+            }
+        },
+        {
+            "plugin": "@nx/webpack/plugin",
+            "options": {
+                "buildTargetName": "build",
+                "serveTargetName": "serve",
+                "previewTargetName": "preview"
+            }
+        }
+    ]
+}

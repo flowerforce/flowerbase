@@ -6,10 +6,10 @@
   "scripts": {
     "test": "npx jest",
     "coverage": "npm run test -- --coverage",
-    "build": "cd packages/flower-db-services && rm -rf dist/ && tsc",
+    "build": "cd packages/flowerbase && rm -rf dist/ && tsc",
     "dev": "nodemon index.ts",
-    "lint:fds": "eslint packages/flower-db-services",
-    "format:fds": "prettier --write 'packages/flower-db-services/**/*.ts'",
+    "lint:fds": "eslint packages/flowerbase",
+    "format:fds": "prettier --write 'packages/flowerbase/**/*.ts'",
     "fix:fds": "npm run format:fds && npm run lint:fds -- --fix"
   },
   "workspaces": [
@@ -25,6 +25,21 @@
     "url": "https://github.com/flowerforce/flower-server/issues"
   },
   "homepage": "https://github.com/flowerforce/flower-server#readme",
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "@nx/eslint": "19.4.1",
+    "@nx/eslint-plugin": "19.4.1",
+    "@nx/jest": "19.4.1",
+    "@nx/js": "19.4.1",
+    "@nx/react": "19.4.1",
+    "@nx/rollup": "19.4.1",
+    "@nx/webpack": "19.4.1"
+  },
+  "devDependencies": {},
+  "optionalDependencies": {
+    "@nx/nx-darwin-arm64": "19.4.1",
+    "@nx/nx-darwin-x64": "19.4.1",
+    "@nx/nx-linux-x64-gnu": "19.4.1",
+    "@nx/nx-win32-x64-msvc": "19.4.1",
+    "@rollup/rollup-linux-x64-gnu": "4.18.0"
+  }
 }
