@@ -1,6 +1,6 @@
 import { EventEmitterAsyncResourceOptions } from 'events'
 import isEqual from 'lodash/isEqual'
-import { Collection, Document, EventsDescription, FindCursor, OptionalId, WithId } from 'mongodb'
+import { Collection, Document, EventsDescription, FindCursor, WithId } from 'mongodb'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
 import { GetOperatorsFunction, MongodbAtlasFunction } from './model'
@@ -134,10 +134,10 @@ const getOperators: GetOperatorsFunction = (
         }, user)
         : { status: true, document: data }
 
-      if (!status || !document) {
+      if (!status || !isEqual(data, document)) {
         throw new Error('Insert not permitted')
       }
-      return collection.insertOne(document, options)
+      return collection.insertOne(data, options)
     }
     // System mode: insert without validation
     return collection.insertOne(data, options)
@@ -166,7 +166,6 @@ const getOperators: GetOperatorsFunction = (
   updateOne: async (query, data, options) => {
     if (!run_as_system) {
       const { filters, roles } = rules[collName] || {}
-
       // Apply access control filters
       const formattedQuery = getFormattedQuery(filters, query, user)
 
@@ -182,9 +181,21 @@ const getOperators: GetOperatorsFunction = (
       const hasOperators = Object.keys(data).some(key => key.startsWith("$"))
 
       // Flatten the update object to extract the actual fields being modified
-      const docToCheck = hasOperators
-        ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
-        : data
+      // const docToCheck = hasOperators
+      //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
+      //   : data
+
+      const pipeline = [
+        {
+          $match: formattedQuery,
+        },
+        {
+          $limit: 1
+        },
+        ...Object.entries(data).map(([key, value]) => ({ [key]: value })),
+      ];
+
+      const [docToCheck] = hasOperators ? await collection.aggregate(pipeline).toArray() : [data] as [Document]
 
       // Validate update permissions
       const { status, document } = winningRole
@@ -205,7 +216,6 @@ const getOperators: GetOperatorsFunction = (
 
       return collection.updateOne(formattedQuery, data, options)
     }
-    // System mode: bypass access control
     return collection.updateOne(query, data, options)
   },
   /**
@@ -388,9 +398,10 @@ const getOperators: GetOperatorsFunction = (
    * Only documents passing validation will be inserted.
    */
   insertMany: async (documents, options) => {
-    const { roles } = rules[collName] || {}
+
 
     if (!run_as_system) {
+      const { roles } = rules[collName] || {}
       // Validate each document against user's roles
       const filteredItems = await Promise.all(documents.map(async (currentDoc) => {
         const winningRole = getWinningRole(currentDoc, user, roles)
@@ -407,19 +418,74 @@ const getOperators: GetOperatorsFunction = (
         return status ? document : undefined
       }))
 
-      const itemsToInsert = filteredItems.filter(Boolean) as OptionalId<Document>[]
+      const canInsert = isEqual(filteredItems, documents)
 
-      if (!itemsToInsert.length) {
+      if (!canInsert) {
         throw new Error('Insert not permitted')
       }
 
-      return collection.insertMany(itemsToInsert, options)
+      return collection.insertMany(documents, options)
     }
     // If system mode is active, insert all documents without validation
     return collection.insertMany(documents, options)
   },
-  //TODO -> add filter & rules in updateMany
-  updateMany: (filter, updates, options) => collection.updateMany(filter, updates, options),
+  updateMany: async (query, data, options) => {
+    if (!run_as_system) {
+      const { filters, roles } = rules[collName] || {}
+      // Apply access control filters
+      const formattedQuery = getFormattedQuery(filters, query, user)
+
+      // Retrieve the document to check permissions before updating
+      const result = await collection.find({ $and: formattedQuery }).toArray()
+      if (!result) {
+        throw new Error('Update not permitted')
+      }
+
+
+      // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
+      const hasOperators = Object.keys(data).some(key => key.startsWith("$"))
+
+      // Flatten the update object to extract the actual fields being modified
+      // const docToCheck = hasOperators
+      //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
+      //   : data
+
+      const pipeline = [
+        {
+          $match: formattedQuery,
+        },
+        ...Object.entries(data).map(([key, value]) => ({ [key]: value })),
+      ];
+
+      const docsToCheck = hasOperators ? await collection.aggregate(pipeline).toArray() : result
+
+      const filteredItems = await Promise.all(docsToCheck.map(async (currentDoc) => {
+        const winningRole = getWinningRole(currentDoc, user, roles)
+
+        const { status, document } = winningRole
+          ? await checkValidation(winningRole, {
+            type: "write",
+            roles,
+            cursor: currentDoc,
+            expansions: {},
+          }, user)
+          : { status: !roles.length, document: currentDoc }
+
+        return status ? document : undefined
+      }))
+
+
+      // Ensure no unauthorized changes are made
+      const areDocumentsEqual = isEqual(docsToCheck, filteredItems)
+
+      if (!areDocumentsEqual) {
+        throw new Error('Update not permitted')
+      }
+
+      return collection.updateMany(formattedQuery, data, options)
+    }
+    return collection.updateMany(query, data, options)
+  },
   /**
    * Deletes multiple documents from a MongoDB collection with role-based access control and validation.
    *
