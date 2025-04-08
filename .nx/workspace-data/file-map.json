@@ -88,68 +88,6 @@
     }
   },
   "fileMap": {
-    "nonProjectFiles": [
-      {
-        "file": ".eslintrc",
-        "hash": "4890099772766365500"
-      },
-      {
-        "file": ".github/workflows/prerelease.yaml",
-        "hash": "263895218858773504"
-      },
-      {
-        "file": ".gitignore",
-        "hash": "12510454605679904704"
-      },
-      {
-        "file": ".npmignore",
-        "hash": "9882982332580877298"
-      },
-      {
-        "file": ".prettierrc",
-        "hash": "7656430364163193455"
-      },
-      {
-        "file": ".vscode/settings.json",
-        "hash": "17816762371917633494"
-      },
-      {
-        "file": "LICENSE",
-        "hash": "12182717254072030367"
-      },
-      {
-        "file": "eslint.config.mjs",
-        "hash": "15816864606171050325"
-      },
-      {
-        "file": "jest.config.ts",
-        "hash": "3494843969422251966"
-      },
-      {
-        "file": "jest.preset.js",
-        "hash": "9430166341120122740"
-      },
-      {
-        "file": "nx.json",
-        "hash": "12754359552520490988"
-      },
-      {
-        "file": "package-lock.json",
-        "hash": "10035661195385136953"
-      },
-      {
-        "file": "package.json",
-        "hash": "14521184725252051541"
-      },
-      {
-        "file": "scripts/prerelease.ts",
-        "hash": "14144003354920194568"
-      },
-      {
-        "file": "tsconfig.base.json",
-        "hash": "11549800608902314440"
-      }
-    ],
     "projectFileMap": {
       "flowerbase": [
         {
@@ -170,49 +108,7 @@
         },
         {
           "file": "packages/flowerbase/package.json",
-          "hash": "1981791728038331527",
-          "deps": [
-            "npm:@babel/cli",
-            "npm:@babel/core",
-            "npm:@babel/preset-env",
-            "npm:@eslint/compat@1.2.8",
-            "npm:@eslint/eslintrc",
-            "npm:@eslint/js",
-            "npm:@types/cors",
-            "npm:@types/jest",
-            "npm:@types/lodash",
-            "npm:@types/node@22.6.1",
-            "npm:@types/node-cron",
-            "npm:@typescript-eslint/eslint-plugin@8.29.1",
-            "npm:@typescript-eslint/parser@8.29.1",
-            "npm:eslint@9.24.0",
-            "npm:eslint-config-prettier",
-            "npm:eslint-plugin-eslint-comments",
-            "npm:eslint-plugin-eslint-plugin",
-            "npm:eslint-plugin-import",
-            "npm:eslint-plugin-prettier",
-            "npm:globals",
-            "npm:jest",
-            "npm:prettier",
-            "npm:ts-jest",
-            "npm:ts-node",
-            "npm:typescript@5.8.3",
-            "npm:typescript-eslint",
-            "npm:@fastify/cors",
-            "npm:@fastify/jwt",
-            "npm:@fastify/mongodb",
-            "npm:aws-sdk",
-            "npm:bson",
-            "npm:dotenv",
-            "npm:fastify",
-            "npm:fastify-mongoose-driver",
-            "npm:fastify-plugin",
-            "npm:lodash",
-            "npm:node-cron",
-            "npm:@sendgrid/mail",
-            "npm:nodemon",
-            "npm:undici"
-          ]
+          "hash": "4239518592606170476"
         },
         {
           "file": "packages/flowerbase/project.json",
@@ -735,6 +631,64 @@
           "hash": "7518117920492327411"
         }
       ]
-    }
+    },
+    "nonProjectFiles": [
+      {
+        "file": ".eslintrc",
+        "hash": "4890099772766365500"
+      },
+      {
+        "file": ".github/workflows/prerelease.yaml",
+        "hash": "1579121106462692968"
+      },
+      {
+        "file": ".gitignore",
+        "hash": "12510454605679904704"
+      },
+      {
+        "file": ".npmignore",
+        "hash": "9882982332580877298"
+      },
+      {
+        "file": ".prettierrc",
+        "hash": "7656430364163193455"
+      },
+      {
+        "file": ".vscode/settings.json",
+        "hash": "17816762371917633494"
+      },
+      {
+        "file": "LICENSE",
+        "hash": "12182717254072030367"
+      },
+      {
+        "file": "eslint.config.mjs",
+        "hash": "15816864606171050325"
+      },
+      {
+        "file": "jest.config.ts",
+        "hash": "3494843969422251966"
+      },
+      {
+        "file": "jest.preset.js",
+        "hash": "9430166341120122740"
+      },
+      {
+        "file": "nx.json",
+        "hash": "9418980942870310400"
+      },
+      {
+        "file": "package.json",
+        "hash": "14521184725252051541"
+      },
+      {
+        "file": "scripts/prerelease.ts",
+        "hash": "14144003354920194568"
+      },
+      {
+        "file": "tsconfig.base.json",
+        "hash": "11549800608902314440"
+      }
+    ]
   }
 }
