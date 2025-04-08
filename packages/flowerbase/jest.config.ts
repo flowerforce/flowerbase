@@ -1,5 +1,5 @@
 module.exports = {
-  preset: 'ts-jest',
+  preset: '../../jest.preset.js',
   transform: {
     '^.+\\.[tj]s$': [
       'ts-jest',
