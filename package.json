@@ -2,9 +2,7 @@
   "name": "flower-server",
   "version": "1.0.0",
   "description": "flower-server-packages",
-  "publishConfig": {
-    "access": "public"
-  },
+  "private": true,
   "scripts": {
     "test": "npx jest",
     "coverage": "npm run test -- --coverage",
