@@ -12,7 +12,8 @@
     "format:fds": "prettier --write 'packages/flowerbase/**/*.ts'",
     "fix:fds": "npm run format:fds && npm run lint:fds -- --fix",
     "prepare:prerelease": "npm run build:packages && ts-node scripts/prerelease",
-    "publish:prerelease": "nx release publish --tag prerelease"
+    "publish:prerelease": "nx release publish --tag prerelease",
+    "build:packages": "nx run-many -t build"
   },
   "workspaces": [
     "packages/*"
