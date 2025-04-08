@@ -1,0 +1,10 @@
+{
+  "name": "flowerbase",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/flowerbase/src",
+  "projectType": "library",
+  "tags": [
+    "flowerbase"
+  ],
+  "targets": {}
+}

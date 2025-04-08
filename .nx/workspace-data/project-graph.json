@@ -1,11 +1,22 @@
 {
   "nodes": {
-    "@flowerforce/flowerbase": {
-      "name": "@flowerforce/flowerbase",
+    "flowerbase": {
+      "name": "flowerbase",
       "type": "lib",
       "data": {
         "root": "packages/flowerbase",
         "targets": {
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "scriptContent": "rm -rf dist/ && tsc",
+              "runCommand": "npm run build"
+            },
+            "configurations": {}
+          },
           "lint": {
             "cache": true,
             "options": {
@@ -66,17 +77,6 @@
             },
             "configurations": {}
           },
-          "build": {
-            "executor": "nx:run-script",
-            "options": {
-              "script": "build"
-            },
-            "metadata": {
-              "scriptContent": "rm -rf dist/ && tsc",
-              "runCommand": "npm run build"
-            },
-            "configurations": {}
-          },
           "start": {
             "executor": "nx:run-script",
             "options": {
@@ -97,10 +97,11 @@
             "configurations": {}
           }
         },
-        "sourceRoot": "packages/flowerbase",
-        "name": "@flowerforce/flowerbase",
+        "sourceRoot": "packages/flowerbase/src",
+        "name": "flowerbase",
         "tags": [
-          "npm:public"
+          "npm:public",
+          "flowerbase"
         ],
         "metadata": {
           "targetGroups": {
@@ -112,6 +113,8 @@
           },
           "description": ""
         },
+        "$schema": "../../node_modules/nx/schemas/project-schema.json",
+        "projectType": "library",
         "implicitDependencies": []
       }
     }
@@ -1186,15 +1189,6 @@
         "version": "7.27.0",
         "packageName": "@babel/runtime",
         "hash": "sha512-VtPOkrdPHZsKc/clNqyi9WUA8TINkZ4cGk63UUE3u4pmB2k+ZMQRDuIOagv8UVd6j7k0T3+RRIb7beKTebNbcw=="
-      }
-    },
-    "npm:@babel/runtime@7.18.9": {
-      "type": "npm",
-      "name": "npm:@babel/runtime@7.18.9",
-      "data": {
-        "version": "7.18.9",
-        "packageName": "@babel/runtime",
-        "hash": "sha512-lkqXDcvlFT5rvEjiu6+QYO+1GXrEHRo2LOtS7E4GtX5ESIZOgepqsZBVIj6Pv+a6zqsya9VCgiK1KAK4BvJDAw=="
       }
     },
     "npm:@babel/template": {
@@ -2986,42 +2980,6 @@
         "version": "10.3.0",
         "packageName": "@sinonjs/fake-timers",
         "hash": "sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA=="
-      }
-    },
-    "npm:@stackhouseos/flower-client-nodejs": {
-      "type": "npm",
-      "name": "npm:@stackhouseos/flower-client-nodejs",
-      "data": {
-        "version": "1.5.1",
-        "packageName": "@stackhouseos/flower-client-nodejs",
-        "hash": "sha512-XMVKJggE4FnP/6bq07wRNrAXcGM+WXPX5wXVVYoJrOLuTy0+3Y+IS5T2swANGO7YwFiuWMwnClvT2RMTQUlioA=="
-      }
-    },
-    "npm:regenerator-runtime@0.13.11": {
-      "type": "npm",
-      "name": "npm:regenerator-runtime@0.13.11",
-      "data": {
-        "version": "0.13.11",
-        "packageName": "regenerator-runtime",
-        "hash": "sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg=="
-      }
-    },
-    "npm:regenerator-runtime": {
-      "type": "npm",
-      "name": "npm:regenerator-runtime",
-      "data": {
-        "version": "0.14.1",
-        "packageName": "regenerator-runtime",
-        "hash": "sha512-dYnhHh0nJoMfnkZs6GmmhFknAGRrLznOu5nc9ML+EJxGvrx6H7teuevqVqCuPcPK//3eDrrjQhehXVx9cnkGdw=="
-      }
-    },
-    "npm:@stackhouseos/json-rules": {
-      "type": "npm",
-      "name": "npm:@stackhouseos/json-rules",
-      "data": {
-        "version": "1.2.9",
-        "packageName": "@stackhouseos/json-rules",
-        "hash": "sha512-CK6AHg4ekCzPtoJTu89P6td03PZoPh8RBosO/yJ4rjtyBW7tHt7HOsv/ASZxwsjQdgcBoVmiCyIUCbNVw/32bw=="
       }
     },
     "npm:@svgr/babel-plugin-add-jsx-attribute": {
@@ -5965,15 +5923,6 @@
         "version": "5.1.0",
         "packageName": "cross-spawn",
         "hash": "sha512-pTgQJ5KC0d2hcY8eyL1IzlBPYjTkyH72XRZPnLyKus2mBfNjQs3klqbJU2VILqZryAZUt9JOb3h/mWMy23/f5A=="
-      }
-    },
-    "npm:crypto-js": {
-      "type": "npm",
-      "name": "npm:crypto-js",
-      "data": {
-        "version": "4.1.1",
-        "packageName": "crypto-js",
-        "hash": "sha512-o2JlM7ydqd3Qk9CA0L4NL6mTzU2sdx96a+oOfPu8Mkl/PK51vSyoi8/rQ8NknZtk44vq15lmhAj9CIAGwgeWKw=="
       }
     },
     "npm:css-declaration-sorter": {
@@ -10494,24 +10443,6 @@
         "hash": "sha512-2eznPJP8z2BFLX50tf0LuODrpINqP1RVIm/CObbTcBRITQgmC/TjcREF1NeTBzIcR5XO/ukWo+YHOjBbFwIupg=="
       }
     },
-    "npm:nanoid": {
-      "type": "npm",
-      "name": "npm:nanoid",
-      "data": {
-        "version": "4.0.0",
-        "packageName": "nanoid",
-        "hash": "sha512-IgBP8piMxe/gf73RTQx7hmnhwz0aaEXYakvqZyE302IXW3HyVNhdNGC+O2MwMAVhLEnvXlvKtGbtJf6wvHihCg=="
-      }
-    },
-    "npm:nanoid@3.3.11": {
-      "type": "npm",
-      "name": "npm:nanoid@3.3.11",
-      "data": {
-        "version": "3.3.11",
-        "packageName": "nanoid",
-        "hash": "sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w=="
-      }
-    },
     "npm:natural-compare": {
       "type": "npm",
       "name": "npm:natural-compare",
@@ -11790,6 +11721,15 @@
         "hash": "sha512-1NNCs6uurfkVbeXG4S8JFT9t19m45ICnif8zWLd5oPSZ50QnwMfK+H3jv408d4jw/7Bttv5axS5IiHoLaVNHeQ=="
       }
     },
+    "npm:nanoid@3.3.11": {
+      "type": "npm",
+      "name": "npm:nanoid@3.3.11",
+      "data": {
+        "version": "3.3.11",
+        "packageName": "nanoid",
+        "hash": "sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w=="
+      }
+    },
     "npm:prelude-ls": {
       "type": "npm",
       "name": "npm:prelude-ls",
@@ -12166,6 +12106,15 @@
         "version": "10.2.0",
         "packageName": "regenerate-unicode-properties",
         "hash": "sha512-DqHn3DwbmmPVzeKj9woBadqmXxLvQoQIwu7nopMc72ztvxVmVk2SBhSnx67zuye5TP+lJsb/TBQsjLKhnDf3MA=="
+      }
+    },
+    "npm:regenerator-runtime": {
+      "type": "npm",
+      "name": "npm:regenerator-runtime",
+      "data": {
+        "version": "0.14.1",
+        "packageName": "regenerator-runtime",
+        "hash": "sha512-dYnhHh0nJoMfnkZs6GmmhFknAGRrLznOu5nc9ML+EJxGvrx6H7teuevqVqCuPcPK//3eDrrjQhehXVx9cnkGdw=="
       }
     },
     "npm:regenerator-transform": {
@@ -14051,70 +14000,215 @@
     }
   },
   "dependencies": {
-    "@flowerforce/flowerbase": [
+    "flowerbase": [
       {
-        "source": "@flowerforce/flowerbase",
-        "target": "npm:bson",
+        "source": "flowerbase",
+        "target": "npm:@babel/cli",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
-        "target": "npm:fastify",
+        "source": "flowerbase",
+        "target": "npm:@babel/core",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
-        "target": "npm:@fastify/jwt",
+        "source": "flowerbase",
+        "target": "npm:@babel/preset-env",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
-        "target": "npm:fastify-plugin",
+        "source": "flowerbase",
+        "target": "npm:@eslint/compat@1.2.8",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
-        "target": "npm:mongodb",
+        "source": "flowerbase",
+        "target": "npm:@eslint/eslintrc",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
-        "target": "npm:@sendgrid/mail",
+        "source": "flowerbase",
+        "target": "npm:@eslint/js",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
-        "target": "npm:node-cron",
+        "source": "flowerbase",
+        "target": "npm:@types/cors",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
-        "target": "npm:dotenv",
+        "source": "flowerbase",
+        "target": "npm:@types/jest",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
-        "target": "npm:undici",
+        "source": "flowerbase",
+        "target": "npm:@types/lodash",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
-        "target": "npm:aws-sdk",
+        "source": "flowerbase",
+        "target": "npm:@types/node@22.6.1",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
-        "target": "npm:lodash",
+        "source": "flowerbase",
+        "target": "npm:@types/node-cron",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
+        "source": "flowerbase",
+        "target": "npm:@typescript-eslint/eslint-plugin@8.29.1",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:@typescript-eslint/parser@8.29.1",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:eslint@9.24.0",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:eslint-config-prettier",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:eslint-plugin-eslint-comments",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:eslint-plugin-eslint-plugin",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:eslint-plugin-import",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:eslint-plugin-prettier",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:globals",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:jest",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:prettier",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:ts-jest",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:ts-node",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:typescript@5.8.3",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:typescript-eslint",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
         "target": "npm:@fastify/cors",
         "type": "static"
       },
       {
-        "source": "@flowerforce/flowerbase",
+        "source": "flowerbase",
+        "target": "npm:@fastify/jwt",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
         "target": "npm:@fastify/mongodb",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:aws-sdk",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:bson",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:dotenv",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:fastify",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:fastify-mongoose-driver",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:fastify-plugin",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:lodash",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:node-cron",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:@sendgrid/mail",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:nodemon",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:undici",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:@nx/rollup",
+        "type": "static"
+      },
+      {
+        "source": "flowerbase",
+        "target": "npm:mongodb",
         "type": "static"
       }
     ],
@@ -18840,47 +18934,6 @@
       {
         "source": "npm:@sinonjs/fake-timers",
         "target": "npm:@sinonjs/commons",
-        "type": "static"
-      }
-    ],
-    "npm:@stackhouseos/flower-client-nodejs": [
-      {
-        "source": "npm:@stackhouseos/flower-client-nodejs",
-        "target": "npm:@babel/runtime@7.18.9",
-        "type": "static"
-      },
-      {
-        "source": "npm:@stackhouseos/flower-client-nodejs",
-        "target": "npm:@stackhouseos/json-rules",
-        "type": "static"
-      },
-      {
-        "source": "npm:@stackhouseos/flower-client-nodejs",
-        "target": "npm:lodash",
-        "type": "static"
-      },
-      {
-        "source": "npm:@stackhouseos/flower-client-nodejs",
-        "target": "npm:nanoid",
-        "type": "static"
-      },
-      {
-        "source": "npm:@stackhouseos/flower-client-nodejs",
-        "target": "npm:ws",
-        "type": "static"
-      }
-    ],
-    "npm:@babel/runtime@7.18.9": [
-      {
-        "source": "npm:@babel/runtime@7.18.9",
-        "target": "npm:regenerator-runtime@0.13.11",
-        "type": "static"
-      }
-    ],
-    "npm:@stackhouseos/json-rules": [
-      {
-        "source": "npm:@stackhouseos/json-rules",
-        "target": "npm:lodash",
         "type": "static"
       }
     ],
