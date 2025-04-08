@@ -17,26 +17,23 @@ export type GetValidRuleParams<T extends Role | Filter> = {
     user: User;
     record?: WithId<Document> | Document | null;
 };
+type Method<T extends keyof Collection<Document>> = Collection<Document>[T];
 export type GetOperatorsFunction = (collection: Collection<Document>, { rules, collName, user, run_as_system, }: {
     user?: User;
     rules?: Rules;
     run_as_system?: boolean;
     collName: string;
 }) => {
-    findOne: (...params: Parameters<Collection<Document>['findOne']>) => ReturnType<Collection<Document>['findOne']>;
-    deleteOne: (...params: Parameters<Collection<Document>['deleteOne']>) => ReturnType<Collection<Document>['deleteOne']>;
-    insertOne: (data: Parameters<Collection<Document>['insertOne']>[0] & {
-        $set: Record<string, string>;
-        $setOnInsert: Record<string, string>;
-    }) => ReturnType<Collection<Document>['insertOne']>;
-    updateOne: (query: Parameters<Collection<Document>['updateOne']>[0], data: Parameters<Collection<Document>['updateOne']>[1] & {
-        $set: Record<string, string>;
-        $setOnInsert: Record<string, string>;
-    }) => ReturnType<Collection<Document>['updateOne']>;
-    find: (...params: Parameters<Collection<Document>['find']>) => FindCursor;
-    watch: (...params: Parameters<Collection<Document>['watch']>) => Promise<ReturnType<Collection<Document>['watch']>>;
-    aggregate: (...params: Parameters<Collection<Document>['aggregate']>) => ReturnType<Collection<Document>['aggregate']>;
-    insertMany: (...params: Parameters<Collection<Document>['insertMany']>) => ReturnType<Collection<Document>['insertMany']>;
-    updateMany: (...params: Parameters<Collection<Document>['updateMany']>) => ReturnType<Collection<Document>['updateMany']>;
+    findOne: (...params: Parameters<Method<"findOne">>) => ReturnType<Method<"findOne">>;
+    deleteOne: (...params: Parameters<Method<"findOne">>) => ReturnType<Method<"findOne">>;
+    insertOne: (...params: Parameters<Method<'insertOne'>>) => ReturnType<Method<'insertOne'>>;
+    updateOne: (...params: Parameters<Method<'updateOne'>>) => ReturnType<Method<'updateOne'>>;
+    find: (...params: Parameters<Method<'find'>>) => FindCursor;
+    watch: (...params: Parameters<Method<'watch'>>) => ReturnType<Method<'watch'>>;
+    aggregate: (...params: Parameters<Method<'aggregate'>>) => ReturnType<Method<'aggregate'>>;
+    insertMany: (...params: Parameters<Method<'insertMany'>>) => ReturnType<Method<'insertMany'>>;
+    updateMany: (...params: Parameters<Method<'updateMany'>>) => ReturnType<Method<'updateMany'>>;
+    deleteMany: (...params: Parameters<Method<'deleteMany'>>) => ReturnType<Method<'deleteMany'>>;
 };
+export {};
 //# sourceMappingURL=model.d.ts.map

@@ -3,7 +3,7 @@ export type FieldPermissionExpression = {
     read?: boolean;
     write?: boolean;
 };
-export interface ReadWritePermissions {
+export interface DocumentFiltersPermissions {
     read?: PermissionExpression;
     write?: PermissionExpression;
 }
@@ -11,7 +11,7 @@ export interface Role {
     name: string;
     apply_when: Record<string, any>;
     search?: PermissionExpression;
-    document_filters?: ReadWritePermissions;
+    document_filters?: DocumentFiltersPermissions;
     read?: PermissionExpression;
     write?: PermissionExpression;
     insert?: PermissionExpression;

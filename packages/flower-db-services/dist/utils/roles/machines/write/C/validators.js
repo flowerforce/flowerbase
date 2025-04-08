@@ -10,12 +10,12 @@ const checkIsValidFieldNameFn = ({ role, params }) => {
     const { fields = {}, additional_fields = {} } = role;
     const rulesOnId = !!(fields["_id"] || additional_fields["_id"]);
     const filteredDocument = Object.entries(cursor).reduce((filteredDocument, [key, value]) => {
-        var _a, _b;
+        var _a;
         if (fields[key]) {
-            return (role.fields[key].read || role.fields[key].write) ? Object.assign(Object.assign({}, filteredDocument), { [key]: value }) : filteredDocument;
+            return role.fields[key].write ? Object.assign(Object.assign({}, filteredDocument), { [key]: value }) : filteredDocument;
         }
         if (additional_fields[key]) {
-            return (((_a = additional_fields[key]) === null || _a === void 0 ? void 0 : _a.read) || ((_b = additional_fields[key]) === null || _b === void 0 ? void 0 : _b.write)) ? Object.assign(Object.assign({}, filteredDocument), { [key]: value }) : filteredDocument;
+            return ((_a = additional_fields[key]) === null || _a === void 0 ? void 0 : _a.write) ? Object.assign(Object.assign({}, filteredDocument), { [key]: value }) : filteredDocument;
         }
         return Object.assign(Object.assign({}, filteredDocument), { [key]: value });
     }, {});

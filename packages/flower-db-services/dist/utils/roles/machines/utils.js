@@ -5,7 +5,7 @@ const utils_1 = require("../../../services/mongodb-atlas/utils");
 /**
  * Determines the first applicable role for a given user and document.
  *
- * @param {WithId<Document> | null} document - The document to check against role conditions.
+ * @param {OptionalId<Document> | null} document - The document to check against role conditions.
  * @param {User} user - The user for whom the role is being determined.
  * @param {Role[]} [roles=[]] - The list of available roles to evaluate.
  *

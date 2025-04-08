@@ -9,12 +9,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.STEP_D_STATES = void 0;
+exports.STEP_C_STATES = void 0;
 const utils_1 = require("../../utils");
 const validators_1 = require("./validators");
-exports.STEP_D_STATES = {
+exports.STEP_C_STATES = {
     checkAdditionalFields: (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, next, endValidation }) {
-        (0, utils_1.logMachineInfo)({ enabled: context.enableLog, machine: "D", step: 1, stepName: "checkAdditionalFields" });
+        (0, utils_1.logMachineInfo)({ enabled: context.enableLog, machine: "C", step: 1, stepName: "checkAdditionalFields" });
         const check = (0, validators_1.checkAdditionalFieldsFn)(context);
         return check ? next('checkIsValidFieldName') : endValidation({ success: false });
     }),

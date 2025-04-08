@@ -10,12 +10,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.STEP_C_STATES = void 0;
+const commonValidators_1 = require("../../commonValidators");
 const utils_1 = require("../../utils");
-const validators_1 = require("./validators");
 exports.STEP_C_STATES = {
     evaluateTopLevelRead: (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, next, endValidation }) {
         (0, utils_1.logMachineInfo)({ enabled: context.enableLog, machine: "C", step: 1, stepName: "evaluateTopLevelRead" });
-        const check = yield (0, validators_1.evaluateTopLevelReadFn)(context);
+        const check = yield (0, commonValidators_1.evaluateTopLevelPermissionsFn)(context, "read");
         return check
             ? endValidation({ success: true })
             : next('evaluateTopLevelWrite', { check });
@@ -23,7 +23,7 @@ exports.STEP_C_STATES = {
     evaluateTopLevelWrite: (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, next, endValidation }) {
         var _b;
         (0, utils_1.logMachineInfo)({ enabled: context.enableLog, machine: "C", step: 2, stepName: "evaluateTopLevelWrite" });
-        const check = yield (0, validators_1.evaluateTopLevelWriteFn)(context);
+        const check = yield (0, commonValidators_1.evaluateTopLevelPermissionsFn)(context, "write");
         if (check)
             return endValidation({ success: true });
         return ((_b = context === null || context === void 0 ? void 0 : context.prevParams) === null || _b === void 0 ? void 0 : _b.check) === false
@@ -32,7 +32,7 @@ exports.STEP_C_STATES = {
     }),
     checkFieldsProperty: (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, goToNextValidationStage }) {
         (0, utils_1.logMachineInfo)({ enabled: context.enableLog, machine: "C", step: 3, stepName: "checkFieldsProperty" });
-        const check = (0, validators_1.checkFieldsPropertyExists)(context);
+        const check = (0, commonValidators_1.checkFieldsPropertyExists)(context);
         return goToNextValidationStage(check ? 'checkIsValidFieldName' : 'checkAdditionalFields');
     })
 };

@@ -1,17 +1,17 @@
-import { Document, WithId } from "mongodb";
+import { Document, OptionalId } from "mongodb";
 import { User } from "../../../auth/dtos";
 import { Role } from "../interface";
 import { LogMachineInfoParams } from "./interface";
 /**
  * Determines the first applicable role for a given user and document.
  *
- * @param {WithId<Document> | null} document - The document to check against role conditions.
+ * @param {OptionalId<Document> | null} document - The document to check against role conditions.
  * @param {User} user - The user for whom the role is being determined.
  * @param {Role[]} [roles=[]] - The list of available roles to evaluate.
  *
  * @returns {Role | null} - Returns the first role that matches the `apply_when` condition, or `null` if none match.
  */
-export declare const getWinningRole: (document: WithId<Document> | null, user: User, roles?: Role[]) => Role | null;
+export declare const getWinningRole: (document: OptionalId<Document> | null, user: User, roles?: Role[]) => Role | null;
 /**
  * Checks if the `apply_when` condition is valid for the given user and document.
  *
@@ -21,7 +21,7 @@ export declare const getWinningRole: (document: WithId<Document> | null, user: U
  *
  * @returns {boolean} - Returns `true` if at least one valid rule is found, otherwise `false`.
  */
-export declare const checkApplyWhen: (apply_when: Role["apply_when"], user: User, document: WithId<Document> | null) => boolean;
+export declare const checkApplyWhen: (apply_when: Role["apply_when"], user: User, document: OptionalId<Document> | null) => boolean;
 /**
  * Logs machine step information if logging is enabled.
  *

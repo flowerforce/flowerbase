@@ -9,27 +9,20 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.STEP_B_STATES = void 0;
+exports.STEP_A_STATES = void 0;
 const commonValidators_1 = require("../../commonValidators");
 const utils_1 = require("../../utils");
-exports.STEP_B_STATES = {
+exports.STEP_A_STATES = {
     checkDocumentsFilters: (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, next, goToNextValidationStage }) {
-        (0, utils_1.logMachineInfo)({ enabled: context.enableLog, machine: "B", step: 1, stepName: "checkDocumentsFilters" });
+        (0, utils_1.logMachineInfo)({ enabled: context.enableLog, machine: "A", step: 1, stepName: "checkDocumentsFilters" });
         const { role } = context;
         if (role.document_filters) {
-            return next('evaluateDocumentsFiltersRead');
+            return next('evaluateDocumentsFiltersWrite');
         }
         return goToNextValidationStage();
     }),
-    evaluateDocumentsFiltersRead: (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, next, goToNextValidationStage }) {
-        (0, utils_1.logMachineInfo)({ enabled: context.enableLog, machine: "B", step: 2, stepName: "evaluateDocumentsFiltersRead" });
-        const hasDocumentFiltersRead = yield (0, commonValidators_1.evaluateDocumentFiltersFn)(context, "read");
-        if (!hasDocumentFiltersRead)
-            return next('evaluateDocumentsFiltersWrite');
-        return goToNextValidationStage();
-    }),
     evaluateDocumentsFiltersWrite: (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, endValidation, goToNextValidationStage }) {
-        (0, utils_1.logMachineInfo)({ enabled: context.enableLog, machine: "B", step: 3, stepName: "evaluateDocumentsFiltersWrite" });
+        (0, utils_1.logMachineInfo)({ enabled: context.enableLog, machine: "B", step: 2, stepName: "evaluateDocumentsFiltersWrite" });
         const check = yield (0, commonValidators_1.evaluateDocumentFiltersFn)(context, "write");
         return check ? goToNextValidationStage() : endValidation({ success: false });
     })

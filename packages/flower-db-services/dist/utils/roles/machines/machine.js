@@ -17,19 +17,16 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StateMachine = void 0;
-const A_1 = require("./read/A");
-const B_1 = require("./read/B");
-const C_1 = require("./read/C");
-const D_1 = require("./read/D");
-const machines = [A_1.STEP_A_STATES, B_1.STEP_B_STATES, C_1.STEP_C_STATES, D_1.STEP_D_STATES];
+const read_1 = require("./read");
+const write_1 = require("./write");
 class StateMachine {
     constructor(role, params, user, enableLog) {
         this._validation = {
             status: null,
             nextInitialStep: null
         };
-        this._machines = machines;
         this._context = { role, params, user, enableLog };
+        this._machines = params.type === "read" ? read_1.READ_MACHINE : write_1.WRITE_MACHINE;
         this._currentStep = {
             names: [],
             states: {},
