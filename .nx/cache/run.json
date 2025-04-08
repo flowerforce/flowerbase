@@ -1,0 +1,21 @@
+{
+  "run": {
+    "command": "nx run-many -t build",
+    "startTime": "2025-04-08T13:26:09.416Z",
+    "endTime": "2025-04-08T13:26:19.989Z",
+    "inner": false
+  },
+  "tasks": [
+    {
+      "taskId": "@flowerforce/flowerbase:build",
+      "target": "build",
+      "projectName": "@flowerforce/flowerbase",
+      "hash": "11896966259229562611",
+      "startTime": "2025-04-08T13:26:09.557Z",
+      "endTime": "2025-04-08T13:26:19.974Z",
+      "params": "",
+      "cacheStatus": "cache-miss",
+      "status": 0
+    }
+  ]
+}

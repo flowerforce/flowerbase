@@ -27,3 +27,4 @@ logs
 
 # Environment variables
 .env*
+dist

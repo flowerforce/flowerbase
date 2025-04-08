@@ -35,7 +35,10 @@
     "@nx/js": "19.4.1",
     "@nx/react": "19.4.1",
     "@nx/rollup": "19.4.1",
-    "@nx/webpack": "19.4.1"
+    "@nx/webpack": "19.4.1",
+    "jest": "^29.4.1",
+    "jest-environment-jsdom": "^29.4.1",
+    "jest-environment-node": "^29.4.1"
   },
   "devDependencies": {},
   "optionalDependencies": {

@@ -1,0 +1,164 @@
+{
+  "packages/flowerbase": {
+    "root": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "name": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "tags": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "tags.npm:public": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "metadata.targetGroups": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "metadata.targetGroups.NPM Scripts": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "metadata.targetGroups.NPM Scripts.0": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "metadata.targetGroups.NPM Scripts.1": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "metadata.targetGroups.NPM Scripts.2": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "metadata.description": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "metadata.js": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "metadata.js.packageName": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "metadata.js.packageMain": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "metadata.js.isInPackageManagerWorkspaces": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.test": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.test.executor": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.test.options": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.test.metadata": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.test.options.script": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.test.metadata.scriptContent": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.test.metadata.runCommand": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.executor": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.options": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.metadata": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.options.script": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.metadata.scriptContent": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.metadata.runCommand": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.start": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.start.executor": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.start.options": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.start.metadata": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.start.options.script": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.start.metadata.scriptContent": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.start.metadata.runCommand": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.nx-release-publish": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.nx-release-publish.executor": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.nx-release-publish.dependsOn": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.nx-release-publish.options": [
+      "packages/flowerbase/package.json",
+      "nx/core/package-json"
+    ]
+  }
+}
