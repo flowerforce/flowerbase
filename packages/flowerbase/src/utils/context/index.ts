@@ -3,6 +3,7 @@ import vm from 'vm'
 import { EJSON } from 'bson'
 import { generateContextData } from './helpers'
 import { GenerateContextParams } from './interface'
+import { createRequire } from 'node:module';
 
 /**
  * > Used to generate the current context
@@ -35,9 +36,10 @@ export async function GenerateContext({
   })
 
   try {
+    const customRequire = createRequire(__dirname);
     vm.runInContext(m.wrap(currentFunction.code), vm.createContext(contextData))(
       exports,
-      require,
+      customRequire,
       module,
       __filename,
       __dirname
