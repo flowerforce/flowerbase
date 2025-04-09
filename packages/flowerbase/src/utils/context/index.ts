@@ -37,6 +37,7 @@ export async function GenerateContext({
 
   try {
     const customRequire = createRequire(__dirname);
+    console.log("Current Dirname Flowerbase: ", __dirname)
     vm.runInContext(m.wrap(currentFunction.code), vm.createContext(contextData))(
       exports,
       customRequire,

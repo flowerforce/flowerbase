@@ -88,68 +88,6 @@
     }
   },
   "fileMap": {
-    "nonProjectFiles": [
-      {
-        "file": ".github/workflows/prerelease.yaml",
-        "hash": "1579121106462692968"
-      },
-      {
-        "file": ".gitignore",
-        "hash": "12510454605679904704"
-      },
-      {
-        "file": "jest.preset.js",
-        "hash": "9430166341120122740"
-      },
-      {
-        "file": ".npmignore",
-        "hash": "9882982332580877298"
-      },
-      {
-        "file": "jest.config.ts",
-        "hash": "3494843969422251966"
-      },
-      {
-        "file": "tsconfig.base.json",
-        "hash": "11549800608902314440"
-      },
-      {
-        "file": ".eslintrc",
-        "hash": "4890099772766365500"
-      },
-      {
-        "file": "package-lock.json",
-        "hash": "14750911654126133176"
-      },
-      {
-        "file": "eslint.config.mjs",
-        "hash": "15816864606171050325"
-      },
-      {
-        "file": ".prettierrc",
-        "hash": "7656430364163193455"
-      },
-      {
-        "file": "package.json",
-        "hash": "14521184725252051541"
-      },
-      {
-        "file": "nx.json",
-        "hash": "9418980942870310400"
-      },
-      {
-        "file": "scripts/prerelease.ts",
-        "hash": "14144003354920194568"
-      },
-      {
-        "file": ".vscode/settings.json",
-        "hash": "17816762371917633494"
-      },
-      {
-        "file": "LICENSE",
-        "hash": "12182717254072030367"
-      }
-    ],
     "projectFileMap": {
       "flowerbase": [
         {
@@ -170,32 +108,33 @@
         },
         {
           "file": "packages/flowerbase/package.json",
-          "hash": "13962979965455592155",
+          "hash": "3900927600209960232",
           "deps": [
             "npm:@babel/cli",
             "npm:@babel/core",
             "npm:@babel/preset-env",
-            "npm:@eslint/eslintrc",
-            "npm:@eslint/js",
+            "npm:@eslint/compat@1.2.8",
+            "npm:@eslint/eslintrc@3.3.1",
+            "npm:@eslint/js@9.24.0",
             "npm:@types/cors",
             "npm:@types/jest",
             "npm:@types/lodash",
-            "npm:@types/node",
+            "npm:@types/node@22.6.1",
             "npm:@types/node-cron",
-            "npm:@typescript-eslint/eslint-plugin",
-            "npm:@typescript-eslint/parser",
-            "npm:eslint",
+            "npm:@typescript-eslint/eslint-plugin@8.29.1",
+            "npm:@typescript-eslint/parser@8.29.1",
+            "npm:eslint@9.24.0",
             "npm:eslint-config-prettier",
             "npm:eslint-plugin-eslint-comments",
             "npm:eslint-plugin-eslint-plugin",
             "npm:eslint-plugin-import",
             "npm:eslint-plugin-prettier",
-            "npm:globals",
+            "npm:globals@15.15.0",
             "npm:jest",
             "npm:prettier",
             "npm:ts-jest",
             "npm:ts-node",
-            "npm:typescript",
+            "npm:typescript@5.8.3",
             "npm:typescript-eslint",
             "npm:@fastify/cors",
             "npm:@fastify/jwt",
@@ -210,7 +149,6 @@
             "npm:lodash",
             "npm:node-cron",
             "npm:nodemon",
-            "npm:pino-pretty",
             "npm:undici"
           ]
         },
@@ -371,11 +309,10 @@
         },
         {
           "file": "packages/flowerbase/src/index.ts",
-          "hash": "7284609008296749503",
+          "hash": "6423257539750650836",
           "deps": [
             "npm:dotenv",
-            "npm:fastify",
-            "npm:pino-pretty"
+            "npm:fastify"
           ]
         },
         {
@@ -592,7 +529,7 @@
         },
         {
           "file": "packages/flowerbase/src/utils/context/index.ts",
-          "hash": "2770257519013910197",
+          "hash": "5952226612100442664",
           "deps": [
             "npm:bson"
           ]
@@ -618,7 +555,7 @@
         },
         {
           "file": "packages/flowerbase/src/utils/initializer/exposeRoutes.ts",
-          "hash": "12180880612916210778",
+          "hash": "1566277013522033027",
           "deps": [
             "npm:fastify"
           ]
@@ -736,6 +673,68 @@
           "hash": "7518117920492327411"
         }
       ]
-    }
+    },
+    "nonProjectFiles": [
+      {
+        "file": ".eslintrc",
+        "hash": "4890099772766365500"
+      },
+      {
+        "file": ".github/workflows/prerelease.yaml",
+        "hash": "1579121106462692968"
+      },
+      {
+        "file": ".gitignore",
+        "hash": "12510454605679904704"
+      },
+      {
+        "file": ".npmignore",
+        "hash": "9882982332580877298"
+      },
+      {
+        "file": ".prettierrc",
+        "hash": "7656430364163193455"
+      },
+      {
+        "file": ".vscode/settings.json",
+        "hash": "17816762371917633494"
+      },
+      {
+        "file": "LICENSE",
+        "hash": "12182717254072030367"
+      },
+      {
+        "file": "eslint.config.mjs",
+        "hash": "15816864606171050325"
+      },
+      {
+        "file": "jest.config.ts",
+        "hash": "3494843969422251966"
+      },
+      {
+        "file": "jest.preset.js",
+        "hash": "9430166341120122740"
+      },
+      {
+        "file": "nx.json",
+        "hash": "9418980942870310400"
+      },
+      {
+        "file": "package-lock.json",
+        "hash": "9797841450491310483"
+      },
+      {
+        "file": "package.json",
+        "hash": "14521184725252051541"
+      },
+      {
+        "file": "scripts/prerelease.ts",
+        "hash": "14144003354920194568"
+      },
+      {
+        "file": "tsconfig.base.json",
+        "hash": "11549800608902314440"
+      }
+    ]
   }
 }
