@@ -18,6 +18,7 @@ type RegisterPluginsParams = {
 }
 
 type RegisterConfig = {
+  pluginName: string
   plugin: RegisterParameters[0]
   options: RegisterParameters[1]
 }
@@ -42,8 +43,16 @@ export const registerPlugins = async ({
       functionsList
     })
 
-    registersConfig.forEach(({ plugin, options }) => {
-      register(plugin, options)
+    registersConfig.forEach(({ plugin, options, pluginName }) => {
+      try {
+        register(plugin, options)
+        console.log("registration COMPLETED --->", pluginName)
+      }
+      catch (e) {
+        console.log("Registration FAILED --->", pluginName)
+        console.log("Error --->", e)
+      }
+
     })
   } catch (e) {
     console.error('Error while registering plugins', (e as Error).message)
@@ -64,6 +73,7 @@ const getRegisterConfig = async ({
 > => {
   return [
     {
+      pluginName: "cors",
       plugin: cors,
       options: {
         origin: '*',
@@ -71,6 +81,7 @@ const getRegisterConfig = async ({
       }
     },
     {
+      pluginName: "fastifyMongodb",
       plugin: fastifyMongodb,
       options: {
         forceClose: true,
@@ -78,16 +89,19 @@ const getRegisterConfig = async ({
       }
     },
     {
+      pluginName: "jwtAuthPlugin",
       plugin: jwtAuthPlugin,
       options: {
         secret: jwtSecret
       }
     },
     {
+      pluginName: "authController",
       plugin: authController,
       options: { prefix: `${API_VERSION}/auth` }
     },
     {
+      pluginName: "localUserPassController",
       plugin: localUserPassController,
       options: {
         prefix: `${API_VERSION}/app/:appId/auth/providers/local-userpass`

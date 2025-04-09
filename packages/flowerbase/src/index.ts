@@ -43,9 +43,13 @@ export async function initialize({
 
 
   const functionsList = await loadFunctions()
+  console.log("Functions LOADED")
   const triggersList = await loadTriggers()
+  console.log("Triggers LOADED")
   const endpointsList = await loadEndpoints()
+  console.log("Endpoints LOADED")
   const rulesList = await loadRules()
+  console.log("Rules LOADED")
   const stateConfig = {
     functions: functionsList,
     triggers: triggersList,
@@ -63,11 +67,14 @@ export async function initialize({
     jwtSecret,
     functionsList
   })
+
+  console.log("Plugins registration COMPLETED")
   await exposeRoutes(fastify)
+  console.log("APP Routes registration COMPLETED")
   await registerFunctions({ app: fastify, functionsList, rulesList })
-
+  console.log("Functions registration COMPLETED")
   await generateEndpoints({ app: fastify, functionsList, endpointsList })
-
+  console.log("HTTP Endpoints registration COMPLETED")
   fastify.ready(() => activateTriggers({ fastify, triggersList, functionsList }))
   await fastify.listen({ port, host })
 
