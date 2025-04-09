@@ -38,9 +38,11 @@ export async function initialize({
   mongodbUrl = DEFAULT_CONFIG.MONGODB_URL
 }: InitializeConfig) {
   const fastify = Fastify({
-    logger: false
+    logger: !!DEFAULT_CONFIG.ENABLE_LOGGER
   })
 
+  console.log("CURRENT PORT", port)
+  console.log("CURRENT HOST", host)
 
   const functionsList = await loadFunctions()
   console.log("Functions LOADED")
@@ -75,7 +77,10 @@ export async function initialize({
   console.log("Functions registration COMPLETED")
   await generateEndpoints({ app: fastify, functionsList, endpointsList })
   console.log("HTTP Endpoints registration COMPLETED")
-  fastify.ready(() => activateTriggers({ fastify, triggersList, functionsList }))
+  fastify.ready(() => {
+    console.log("FASTIFY IS READY")
+    triggersList?.length > 0 && activateTriggers({ fastify, triggersList, functionsList })
+  })
   await fastify.listen({ port, host })
 
   fastify.log.info(`[${projectId}] Server listening on port ${port}`)
