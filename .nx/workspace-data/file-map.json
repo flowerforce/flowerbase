@@ -108,7 +108,7 @@
         },
         {
           "file": "packages/flowerbase/package.json",
-          "hash": "1812051460248084107"
+          "hash": "6818837240268731241"
         },
         {
           "file": "packages/flowerbase/project.json",
@@ -267,11 +267,7 @@
         },
         {
           "file": "packages/flowerbase/src/index.ts",
-          "hash": "10043721520491916237",
-          "deps": [
-            "npm:dotenv",
-            "npm:fastify"
-          ]
+          "hash": "4732740594179357248"
         },
         {
           "file": "packages/flowerbase/src/model.ts",
@@ -520,12 +516,7 @@
         },
         {
           "file": "packages/flowerbase/src/utils/initializer/registerPlugins.ts",
-          "hash": "14724802403047201110",
-          "deps": [
-            "npm:@fastify/cors",
-            "npm:@fastify/mongodb",
-            "npm:fastify"
-          ]
+          "hash": "17775058991846880073"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/helpers.ts",
@@ -676,6 +667,10 @@
       {
         "file": "nx.json",
         "hash": "9418980942870310400"
+      },
+      {
+        "file": "package-lock.json",
+        "hash": "13429599702603254617"
       },
       {
         "file": "package.json",
