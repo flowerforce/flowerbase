@@ -41,16 +41,19 @@ export async function initialize({
     logger: !!DEFAULT_CONFIG.ENABLE_LOGGER
   })
 
+  const basePath = require.main?.path
+  console.log("BASE PATH", basePath)
+
   console.log("CURRENT PORT", port)
   console.log("CURRENT HOST", host)
 
-  const functionsList = await loadFunctions()
+  const functionsList = await loadFunctions(basePath)
   console.log("Functions LOADED")
-  const triggersList = await loadTriggers()
+  const triggersList = await loadTriggers(basePath)
   console.log("Triggers LOADED")
-  const endpointsList = await loadEndpoints()
+  const endpointsList = await loadEndpoints(basePath)
   console.log("Endpoints LOADED")
-  const rulesList = await loadRules()
+  const rulesList = await loadRules(basePath)
   console.log("Rules LOADED")
   const stateConfig = {
     functions: functionsList,

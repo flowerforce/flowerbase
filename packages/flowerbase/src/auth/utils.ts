@@ -1,4 +1,5 @@
 import fs from 'fs'
+import path from 'path'
 
 export const LOGIN_SCHEMA = {
   body: {
@@ -108,7 +109,8 @@ export const PROVIDER_TYPE = 'local-userpass'
  * @testable
  */
 export const loadAuthConfig = (): AuthConfig => {
-  return JSON.parse(fs.readFileSync('auth/providers.json', 'utf-8'))
+  const authPath = path.join(require.main!.path, 'auth/providers.json')
+  return JSON.parse(fs.readFileSync(authPath, 'utf-8'))
 }
 
 /**
@@ -116,7 +118,8 @@ export const loadAuthConfig = (): AuthConfig => {
  * @testable
  */
 export const loadCustomUserData = (): CustomUserDataConfig => {
-  return JSON.parse(fs.readFileSync('auth/custom_user_data.json', 'utf-8'))
+  const userDataPath = path.join(require.main!.path, 'auth/custom_user_data.json')
+  return JSON.parse(fs.readFileSync(userDataPath, 'utf-8'))
 }
 
 
