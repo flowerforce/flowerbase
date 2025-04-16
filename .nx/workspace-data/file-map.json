@@ -88,6 +88,68 @@
     }
   },
   "fileMap": {
+    "nonProjectFiles": [
+      {
+        "file": "scripts/prerelease.ts",
+        "hash": "14144003354920194568"
+      },
+      {
+        "file": ".npmignore",
+        "hash": "9882982332580877298"
+      },
+      {
+        "file": "nx.json",
+        "hash": "9418980942870310400"
+      },
+      {
+        "file": "jest.preset.js",
+        "hash": "9430166341120122740"
+      },
+      {
+        "file": ".eslintrc",
+        "hash": "4890099772766365500"
+      },
+      {
+        "file": ".github/workflows/prerelease.yaml",
+        "hash": "1579121106462692968"
+      },
+      {
+        "file": "package.json",
+        "hash": "14521184725252051541"
+      },
+      {
+        "file": "jest.config.ts",
+        "hash": "3494843969422251966"
+      },
+      {
+        "file": "tsconfig.base.json",
+        "hash": "11549800608902314440"
+      },
+      {
+        "file": ".gitignore",
+        "hash": "12510454605679904704"
+      },
+      {
+        "file": "package-lock.json",
+        "hash": "17662270150310445136"
+      },
+      {
+        "file": ".vscode/settings.json",
+        "hash": "17816762371917633494"
+      },
+      {
+        "file": "eslint.config.mjs",
+        "hash": "15816864606171050325"
+      },
+      {
+        "file": ".prettierrc",
+        "hash": "7656430364163193455"
+      },
+      {
+        "file": "LICENSE",
+        "hash": "12182717254072030367"
+      }
+    ],
     "projectFileMap": {
       "flowerbase": [
         {
@@ -108,28 +170,28 @@
         },
         {
           "file": "packages/flowerbase/package.json",
-          "hash": "5251446954130306283",
+          "hash": "11144605099774582802",
           "deps": [
             "npm:@babel/cli",
             "npm:@babel/core",
             "npm:@babel/preset-env",
             "npm:@eslint/compat@1.2.8",
-            "npm:@eslint/eslintrc@3.3.1",
-            "npm:@eslint/js@9.24.0",
+            "npm:@eslint/eslintrc",
+            "npm:@eslint/js",
             "npm:@types/cors",
             "npm:@types/jest",
             "npm:@types/lodash",
             "npm:@types/node@22.6.1",
             "npm:@types/node-cron",
-            "npm:@typescript-eslint/eslint-plugin@8.29.1",
-            "npm:@typescript-eslint/parser@8.29.1",
+            "npm:@typescript-eslint/eslint-plugin@8.30.1",
+            "npm:@typescript-eslint/parser@8.30.1",
             "npm:eslint@9.24.0",
             "npm:eslint-config-prettier",
             "npm:eslint-plugin-eslint-comments",
             "npm:eslint-plugin-eslint-plugin",
             "npm:eslint-plugin-import",
             "npm:eslint-plugin-prettier",
-            "npm:globals@15.15.0",
+            "npm:globals",
             "npm:jest",
             "npm:prettier",
             "npm:ts-jest",
@@ -309,7 +371,7 @@
         },
         {
           "file": "packages/flowerbase/src/index.ts",
-          "hash": "8404896651795524044",
+          "hash": "10767481657021252660",
           "deps": [
             "npm:dotenv",
             "npm:fastify"
@@ -529,7 +591,7 @@
         },
         {
           "file": "packages/flowerbase/src/utils/context/index.ts",
-          "hash": "17141867531175844163",
+          "hash": "13284387347550843938",
           "deps": [
             "npm:bson"
           ]
@@ -673,64 +735,6 @@
           "hash": "7518117920492327411"
         }
       ]
-    },
-    "nonProjectFiles": [
-      {
-        "file": ".eslintrc",
-        "hash": "4890099772766365500"
-      },
-      {
-        "file": ".github/workflows/prerelease.yaml",
-        "hash": "1579121106462692968"
-      },
-      {
-        "file": ".gitignore",
-        "hash": "12510454605679904704"
-      },
-      {
-        "file": ".npmignore",
-        "hash": "9882982332580877298"
-      },
-      {
-        "file": ".prettierrc",
-        "hash": "7656430364163193455"
-      },
-      {
-        "file": ".vscode/settings.json",
-        "hash": "17816762371917633494"
-      },
-      {
-        "file": "LICENSE",
-        "hash": "12182717254072030367"
-      },
-      {
-        "file": "eslint.config.mjs",
-        "hash": "15816864606171050325"
-      },
-      {
-        "file": "jest.config.ts",
-        "hash": "3494843969422251966"
-      },
-      {
-        "file": "jest.preset.js",
-        "hash": "9430166341120122740"
-      },
-      {
-        "file": "nx.json",
-        "hash": "9418980942870310400"
-      },
-      {
-        "file": "package.json",
-        "hash": "14521184725252051541"
-      },
-      {
-        "file": "scripts/prerelease.ts",
-        "hash": "14144003354920194568"
-      },
-      {
-        "file": "tsconfig.base.json",
-        "hash": "11549800608902314440"
-      }
-    ]
+    }
   }
 }

@@ -82,7 +82,7 @@ export async function initialize({
   console.log("HTTP Endpoints registration COMPLETED")
   fastify.ready(() => {
     console.log("FASTIFY IS READY")
-    triggersList?.length > 0 && activateTriggers({ fastify, triggersList, functionsList })
+    if (triggersList?.length > 0) activateTriggers({ fastify, triggersList, functionsList })
   })
   await fastify.listen({ port, host })
 

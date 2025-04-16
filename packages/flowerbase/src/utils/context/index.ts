@@ -1,9 +1,8 @@
-import m from 'module'
+import { createRequire } from 'node:module';
 import vm from 'vm'
 import { EJSON } from 'bson'
 import { generateContextData } from './helpers'
 import { GenerateContextParams } from './interface'
-import { createRequire } from 'node:module';
 
 /**
  * > Used to generate the current context
@@ -37,9 +36,7 @@ export async function GenerateContext({
 
   try {
     const entryFile = require.main?.filename ?? process.cwd();
-    console.log("🚀 ~ entryFile:", entryFile)
     const customRequire = createRequire(entryFile);
-    console.log("🚀 ~ customRequire:", customRequire)
 
     vm.runInContext(currentFunction.code, vm.createContext({
       ...contextData, require: customRequire,
@@ -48,22 +45,6 @@ export async function GenerateContext({
       __filename: __filename,
       __dirname: __dirname
     }));
-
-    console.log({
-      ...contextData, require: customRequire,
-      exports,
-      module,
-      __filename: __filename,
-      __dirname: __dirname
-    })
-
-    // vm.runInContext(m.wrap(currentFunction.code), vm.createContext(contextData))(
-    //   exports,
-    //   customRequire,
-    //   module,
-    //   __filename,
-    //   __dirname
-    // )
   }
   catch (e) {
     console.log(e)
