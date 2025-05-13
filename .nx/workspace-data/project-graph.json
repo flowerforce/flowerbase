@@ -5052,6 +5052,15 @@
         "hash": "sha512-SEP5kJpfGYqYKpBrj5XU3ahw5p5GOHJ0U5ssOSQ/WBVdwkD2Dzlce95exQTs3jOVWPPKLBN2rlEWkCK7dSmLvg=="
       }
     },
+    "npm:babel-plugin-macros@3.1.0": {
+      "type": "npm",
+      "name": "npm:babel-plugin-macros@3.1.0",
+      "data": {
+        "version": "3.1.0",
+        "packageName": "babel-plugin-macros",
+        "hash": "sha512-Cg7TFGpIr01vOQNODXOOaGz2NpCU5gl8x1qJFbb6hbZxR7XrcE2vtbAsTAbJ7/xwJtUuJEw8K8Zr/AE0LHlesg=="
+      }
+    },
     "npm:cosmiconfig@6.0.0": {
       "type": "npm",
       "name": "npm:cosmiconfig@6.0.0",
@@ -12009,6 +12018,15 @@
         "hash": "sha512-8zGqypfENjCIqGhgXToC8aB2r7YrBX+AQAfIPs/Mlk+BtPTztOvTS01NRW/3Eh60J+a48lt8qsCzirQ6loCVfA=="
       }
     },
+    "npm:react-refresh": {
+      "type": "npm",
+      "name": "npm:react-refresh",
+      "data": {
+        "version": "0.17.0",
+        "packageName": "react-refresh",
+        "hash": "sha512-z6F7K9bV85EfseRCp2bzrpyQ0Gkw1uLoCel9XBVWPg/TjRj94SkJzUTGfOa4bs7iJvBWtQG0Wq7wnI0syw3EBQ=="
+      }
+    },
     "npm:read-cache": {
       "type": "npm",
       "name": "npm:read-cache",
@@ -18647,6 +18665,11 @@
       }
     ],
     "npm:@pmmmwh/react-refresh-webpack-plugin": [
+      {
+        "source": "npm:@pmmmwh/react-refresh-webpack-plugin",
+        "target": "npm:react-refresh",
+        "type": "static"
+      },
       {
         "source": "npm:@pmmmwh/react-refresh-webpack-plugin",
         "target": "npm:type-fest",
@@ -25807,6 +25830,30 @@
       {
         "source": "npm:jest-circus",
         "target": "npm:stack-utils",
+        "type": "static"
+      }
+    ],
+    "npm:babel-plugin-macros@3.1.0": [
+      {
+        "source": "npm:babel-plugin-macros@3.1.0",
+        "target": "npm:@babel/runtime",
+        "type": "static"
+      },
+      {
+        "source": "npm:babel-plugin-macros@3.1.0",
+        "target": "npm:cosmiconfig@7.1.0",
+        "type": "static"
+      },
+      {
+        "source": "npm:babel-plugin-macros@3.1.0",
+        "target": "npm:resolve",
+        "type": "static"
+      }
+    ],
+    "npm:dedent@1.5.3": [
+      {
+        "source": "npm:dedent@1.5.3",
+        "target": "npm:babel-plugin-macros@3.1.0",
         "type": "static"
       }
     ],
