@@ -64,7 +64,9 @@ export async function authController(app: FastifyInstance) {
         throw new Error(`User with ID ${req.user.sub} not found`)
       }
 
-      const user = await db!.collection(userCollection).findOne({ [AUTH_CONFIG.user_id_field]: req.user.sub })
+      const user = await db!
+        .collection(userCollection)
+        .findOne({ [AUTH_CONFIG.user_id_field]: req.user.sub })
 
       res.status(201)
       return {

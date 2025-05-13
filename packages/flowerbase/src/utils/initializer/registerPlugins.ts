@@ -46,13 +46,11 @@ export const registerPlugins = async ({
     registersConfig.forEach(({ plugin, options, pluginName }) => {
       try {
         register(plugin, options)
-        console.log("registration COMPLETED --->", pluginName)
+        console.log('registration COMPLETED --->', pluginName)
+      } catch (e) {
+        console.log('Registration FAILED --->', pluginName)
+        console.log('Error --->', e)
       }
-      catch (e) {
-        console.log("Registration FAILED --->", pluginName)
-        console.log("Error --->", e)
-      }
-
     })
   } catch (e) {
     console.error('Error while registering plugins', (e as Error).message)
@@ -63,7 +61,7 @@ export const registerPlugins = async ({
  * > Used to generate the register congig
  * @param mongodbUrl -> the database connection string
  * @param jwtSecret -> connection jwt
- * @testable  
+ * @testable
  */
 const getRegisterConfig = async ({
   mongodbUrl,
@@ -73,7 +71,7 @@ const getRegisterConfig = async ({
 > => {
   return [
     {
-      pluginName: "cors",
+      pluginName: 'cors',
       plugin: cors,
       options: {
         origin: '*',
@@ -81,7 +79,7 @@ const getRegisterConfig = async ({
       }
     },
     {
-      pluginName: "fastifyMongodb",
+      pluginName: 'fastifyMongodb',
       plugin: fastifyMongodb,
       options: {
         forceClose: true,
@@ -89,19 +87,19 @@ const getRegisterConfig = async ({
       }
     },
     {
-      pluginName: "jwtAuthPlugin",
+      pluginName: 'jwtAuthPlugin',
       plugin: jwtAuthPlugin,
       options: {
         secret: jwtSecret
       }
     },
     {
-      pluginName: "authController",
+      pluginName: 'authController',
       plugin: authController,
       options: { prefix: `${API_VERSION}/auth` }
     },
     {
-      pluginName: "localUserPassController",
+      pluginName: 'localUserPassController',
       plugin: localUserPassController,
       options: {
         prefix: `${API_VERSION}/app/:appId/auth/providers/local-userpass`

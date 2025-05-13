@@ -12,7 +12,7 @@ import { services } from './services'
 import { StateManager } from './state'
 import { exposeRoutes } from './utils/initializer/exposeRoutes'
 import { registerPlugins } from './utils/initializer/registerPlugins'
-export * from "./model";
+export * from './model'
 
 export type InitializeConfig = {
   projectId: string
@@ -41,17 +41,17 @@ export async function initialize({
     logger: !!DEFAULT_CONFIG.ENABLE_LOGGER
   })
 
-  console.log("CURRENT PORT", port)
-  console.log("CURRENT HOST", host)
+  console.log('CURRENT PORT', port)
+  console.log('CURRENT HOST', host)
 
   const functionsList = await loadFunctions()
-  console.log("Functions LOADED")
+  console.log('Functions LOADED')
   const triggersList = await loadTriggers()
-  console.log("Triggers LOADED")
+  console.log('Triggers LOADED')
   const endpointsList = await loadEndpoints()
-  console.log("Endpoints LOADED")
+  console.log('Endpoints LOADED')
   const rulesList = await loadRules()
-  console.log("Rules LOADED")
+  console.log('Rules LOADED')
   const stateConfig = {
     functions: functionsList,
     triggers: triggersList,
@@ -61,7 +61,9 @@ export async function initialize({
     services
   }
 
-  Object.entries(stateConfig).forEach(([key, value]) => StateManager.setData(key as Parameters<typeof StateManager.setData>[0], value))
+  Object.entries(stateConfig).forEach(([key, value]) =>
+    StateManager.setData(key as Parameters<typeof StateManager.setData>[0], value)
+  )
 
   await registerPlugins({
     register: fastify.register,
@@ -70,15 +72,15 @@ export async function initialize({
     functionsList
   })
 
-  console.log("Plugins registration COMPLETED")
+  console.log('Plugins registration COMPLETED')
   await exposeRoutes(fastify)
-  console.log("APP Routes registration COMPLETED")
+  console.log('APP Routes registration COMPLETED')
   await registerFunctions({ app: fastify, functionsList, rulesList })
-  console.log("Functions registration COMPLETED")
+  console.log('Functions registration COMPLETED')
   await generateEndpoints({ app: fastify, functionsList, endpointsList })
-  console.log("HTTP Endpoints registration COMPLETED")
+  console.log('HTTP Endpoints registration COMPLETED')
   fastify.ready(() => {
-    console.log("FASTIFY IS READY")
+    console.log('FASTIFY IS READY')
     triggersList?.length > 0 && activateTriggers({ fastify, triggersList, functionsList })
   })
   await fastify.listen({ port, host })

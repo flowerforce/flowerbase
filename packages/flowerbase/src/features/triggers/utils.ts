@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'node:path'
-import cron from "node-cron"
+import cron from 'node-cron'
 import { AUTH_CONFIG } from '../../constants'
 import { readJsonContent } from '../../utils'
 import { GenerateContext } from '../../utils/context'
@@ -30,7 +30,7 @@ export const loadTriggers = async (rootDir = process.cwd()): Promise<Triggers> =
 
 /**
  * Handles the scheduling of a cron job and triggers the appropriate function.
- * 
+ *
  * @testable
  * @param {Object} params - The parameters for the handler.
  * @param {Object} params.config - Configuration object for the cron trigger.
@@ -40,7 +40,13 @@ export const loadTriggers = async (rootDir = process.cwd()): Promise<Triggers> =
  * @param {Object} params.services - Services available to the handler.
  * @param {Object} params.app - The app instance for context.
  */
-const handleCronTrigger = async ({ config, triggerHandler, functionsList, services, app }: HandlerParams) => {
+const handleCronTrigger = async ({
+  config,
+  triggerHandler,
+  functionsList,
+  services,
+  app
+}: HandlerParams) => {
   cron.schedule(config.schedule, async () => {
     await GenerateContext({
       args: [],
@@ -51,22 +57,35 @@ const handleCronTrigger = async ({ config, triggerHandler, functionsList, servic
       functionsList,
       services
     })
-
-  });
+  })
 }
 
-const handleAuthenticationTrigger = async ({ config, triggerHandler, functionsList, services, app }: HandlerParams) => {
+const handleAuthenticationTrigger = async ({
+  config,
+  triggerHandler,
+  functionsList,
+  services,
+  app
+}: HandlerParams) => {
   const { database } = config
-  const pipeline = [{
-    $match: {
-      operationType: { $in: ["INSERT"] }
+  const pipeline = [
+    {
+      $match: {
+        operationType: { $in: ['INSERT'] }
+      }
     }
-  }]
-  const changeStream = app.mongo.client.db(database).collection(AUTH_CONFIG.authCollection).watch(pipeline, {
-    fullDocument: 'whenAvailable'
-  })
+  ]
+  const changeStream = app.mongo.client
+    .db(database)
+    .collection(AUTH_CONFIG.authCollection)
+    .watch(pipeline, {
+      fullDocument: 'whenAvailable'
+    })
   changeStream.on('change', async function (change) {
-    const document = change["fullDocument" as keyof typeof change] as Record<string, string> //TODO -> define user type
+    const document = change['fullDocument' as keyof typeof change] as Record<
+      string,
+      string
+    > //TODO -> define user type
 
     if (document) {
       delete document.password
@@ -82,16 +101,13 @@ const handleAuthenticationTrigger = async ({ config, triggerHandler, functionsLi
         functionsList,
         services
       })
-
     }
-
   })
-
 }
 
 /**
  * Handles a database trigger by watching changes in a specified collection and triggering the appropriate handler.
- * 
+ *
  * @testable
  * @param {Object} params - The parameters for the handler.
  * @param {Object} params.config - Configuration object for the database trigger.
@@ -107,7 +123,13 @@ const handleAuthenticationTrigger = async ({ config, triggerHandler, functionsLi
  * @param {Object} params.services - Services available to the handler.
  * @param {Object} params.app - The app instance for context.
  */
-const handleDataBaseTrigger = async ({ config, triggerHandler, functionsList, services, app }: HandlerParams) => {
+const handleDataBaseTrigger = async ({
+  config,
+  triggerHandler,
+  functionsList,
+  services,
+  app
+}: HandlerParams) => {
   const {
     database,
     collection: collectionName,
@@ -126,8 +148,8 @@ const handleDataBaseTrigger = async ({ config, triggerHandler, functionsList, se
     },
     Object.keys(project).length
       ? {
-        $project: project
-      }
+          $project: project
+        }
       : undefined
   ].filter(Boolean) as Parameters<typeof collection.watch>[0]
   const changeStream = collection.watch(pipeline, {

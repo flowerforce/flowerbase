@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify'
-import { Document } from "mongodb"
+import { Document } from 'mongodb'
 import { GetOperatorsFunction } from '../../services/mongodb-atlas/model'
 import { Rules } from '../rules/interface'
 

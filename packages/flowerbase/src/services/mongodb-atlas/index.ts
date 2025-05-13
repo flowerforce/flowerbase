@@ -6,8 +6,6 @@ import { getWinningRole } from '../../utils/roles/machines/utils'
 import { GetOperatorsFunction, MongodbAtlasFunction } from './model'
 import { getFormattedQuery } from './utils'
 
-
-
 //TODO aggiungere no-sql inject security
 const getOperators: GetOperatorsFunction = (
   collection,
@@ -40,12 +38,16 @@ const getOperators: GetOperatorsFunction = (
       const winningRole = getWinningRole(result, user, roles)
 
       const { status, document } = winningRole
-        ? await checkValidation(winningRole, {
-          type: "read",
-          roles,
-          cursor: result,
-          expansions: {},
-        }, user)
+        ? await checkValidation(
+            winningRole,
+            {
+              type: 'read',
+              roles,
+              cursor: result,
+              expansions: {}
+            },
+            user
+          )
         : { status: true, document: result }
 
       // Return validated document or empty object if not permitted
@@ -83,12 +85,16 @@ const getOperators: GetOperatorsFunction = (
       const winningRole = getWinningRole(result, user, roles)
 
       const { status } = winningRole
-        ? await checkValidation(winningRole, {
-          type: "delete",
-          roles,
-          cursor: result,
-          expansions: {},
-        }, user)
+        ? await checkValidation(
+            winningRole,
+            {
+              type: 'delete',
+              roles,
+              cursor: result,
+              expansions: {}
+            },
+            user
+          )
         : { status: true }
 
       if (!status) {
@@ -126,12 +132,16 @@ const getOperators: GetOperatorsFunction = (
       const winningRole = getWinningRole(data, user, roles)
 
       const { status, document } = winningRole
-        ? await checkValidation(winningRole, {
-          type: "insert",
-          roles,
-          cursor: data,
-          expansions: {},
-        }, user)
+        ? await checkValidation(
+            winningRole,
+            {
+              type: 'insert',
+              roles,
+              cursor: data,
+              expansions: {}
+            },
+            user
+          )
         : { status: true, document: data }
 
       if (!status || !isEqual(data, document)) {
@@ -178,7 +188,7 @@ const getOperators: GetOperatorsFunction = (
       const winningRole = getWinningRole(result, user, roles)
 
       // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
-      const hasOperators = Object.keys(data).some(key => key.startsWith("$"))
+      const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
 
       // Flatten the update object to extract the actual fields being modified
       // const docToCheck = hasOperators
@@ -187,24 +197,30 @@ const getOperators: GetOperatorsFunction = (
 
       const pipeline = [
         {
-          $match: formattedQuery,
+          $match: formattedQuery
         },
         {
           $limit: 1
         },
-        ...Object.entries(data).map(([key, value]) => ({ [key]: value })),
-      ];
+        ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
+      ]
 
-      const [docToCheck] = hasOperators ? await collection.aggregate(pipeline).toArray() : [data] as [Document]
+      const [docToCheck] = hasOperators
+        ? await collection.aggregate(pipeline).toArray()
+        : ([data] as [Document])
 
       // Validate update permissions
       const { status, document } = winningRole
-        ? await checkValidation(winningRole, {
-          type: "write",
-          roles,
-          cursor: docToCheck,
-          expansions: {},
-        }, user)
+        ? await checkValidation(
+            winningRole,
+            {
+              type: 'write',
+              roles,
+              cursor: docToCheck,
+              expansions: {}
+            },
+            user
+          )
         : { status: true, document: docToCheck }
 
       // Ensure no unauthorized changes are made
@@ -219,22 +235,22 @@ const getOperators: GetOperatorsFunction = (
     return collection.updateOne(query, data, options)
   },
   /**
-  * Finds documents in a MongoDB collection with optional role-based access control and post-query validation.
-  *
-  * @param {Filter<Document>} query - The MongoDB query to filter documents.
-  * @returns {FindCursor} A customized `FindCursor` that includes additional access control logic in its `toArray()` method.
-  *
-  * @description
-  * If `run_as_system` is enabled, the function simply returns a regular MongoDB cursor (`collection.find(query)`).
-  * Otherwise:
-  *  - Combines the user query with role-based filters via `getFormattedQuery`.
-  *  - Executes the query using `collection.find` with a `$and` of all filters.
-  *  - Returns a cloned `FindCursor` where `toArray()`:
-  *    - Applies additional post-query validation using `checkValidation` for each document.
-  *    - Filters out documents the current user is not authorized to read.
-  *
-  * This ensures that both pre-query filtering and post-query validation are applied consistently.
-  */
+   * Finds documents in a MongoDB collection with optional role-based access control and post-query validation.
+   *
+   * @param {Filter<Document>} query - The MongoDB query to filter documents.
+   * @returns {FindCursor} A customized `FindCursor` that includes additional access control logic in its `toArray()` method.
+   *
+   * @description
+   * If `run_as_system` is enabled, the function simply returns a regular MongoDB cursor (`collection.find(query)`).
+   * Otherwise:
+   *  - Combines the user query with role-based filters via `getFormattedQuery`.
+   *  - Executes the query using `collection.find` with a `$and` of all filters.
+   *  - Returns a cloned `FindCursor` where `toArray()`:
+   *    - Applies additional post-query validation using `checkValidation` for each document.
+   *    - Filters out documents the current user is not authorized to read.
+   *
+   * This ensures that both pre-query filtering and post-query validation are applied consistently.
+   */
   find: (query) => {
     if (!run_as_system) {
       const { filters, roles } = rules[collName] || {}
@@ -257,20 +273,26 @@ const getOperators: GetOperatorsFunction = (
       newCursor.toArray = async () => {
         const response = await originalCursor.toArray()
 
-        const filteredResponse = await Promise.all(response.map(async (currentDoc) => {
-          const winningRole = getWinningRole(currentDoc, user, roles)
+        const filteredResponse = await Promise.all(
+          response.map(async (currentDoc) => {
+            const winningRole = getWinningRole(currentDoc, user, roles)
 
-          const { status, document } = winningRole
-            ? await checkValidation(winningRole, {
-              type: "read",
-              roles,
-              cursor: currentDoc,
-              expansions: {},
-            }, user)
-            : { status: !roles.length, document: currentDoc }
+            const { status, document } = winningRole
+              ? await checkValidation(
+                  winningRole,
+                  {
+                    type: 'read',
+                    roles,
+                    cursor: currentDoc,
+                    expansions: {}
+                  },
+                  user
+                )
+              : { status: !roles.length, document: currentDoc }
 
-          return status ? document : undefined
-        }))
+            return status ? document : undefined
+          })
+        )
 
         return filteredResponse.filter(Boolean)
       }
@@ -281,38 +303,38 @@ const getOperators: GetOperatorsFunction = (
     return collection.find(query)
   },
   /**
- * Watches changes on a MongoDB collection with optional role-based filtering of change events.
- *
- * @param {Document[]} [pipeline=[]] - Optional aggregation pipeline stages to apply to the change stream.
- * @param {ChangeStreamOptions} [options] - Optional settings for the change stream, such as `fullDocument`, `resumeAfter`, etc.
- * @returns {ChangeStream} A MongoDB `ChangeStream` instance, optionally enhanced with access control.
- *
- * @description
- * If `run_as_system` is enabled, this function simply returns `collection.watch(pipeline, options)`.
- * Otherwise:
- *  - Applies access control filters via `getFormattedQuery`.
- *  - Prepends a `$match` stage to the pipeline to limit watched changes to authorized documents.
- *  - Overrides the `.on()` method of the returned `ChangeStream` to:
- *    - Validate the `fullDocument` and any `updatedFields` using `checkValidation`.
- *    - Filter out change events the user is not authorized to see.
- *    - Pass only validated and filtered events to the original listener.
- *
- * This allows fine-grained control over what change events a user can observe, based on roles and filters.
- */
-  watch: (
-    pipeline = [],
-    options
-  ) => {
+   * Watches changes on a MongoDB collection with optional role-based filtering of change events.
+   *
+   * @param {Document[]} [pipeline=[]] - Optional aggregation pipeline stages to apply to the change stream.
+   * @param {ChangeStreamOptions} [options] - Optional settings for the change stream, such as `fullDocument`, `resumeAfter`, etc.
+   * @returns {ChangeStream} A MongoDB `ChangeStream` instance, optionally enhanced with access control.
+   *
+   * @description
+   * If `run_as_system` is enabled, this function simply returns `collection.watch(pipeline, options)`.
+   * Otherwise:
+   *  - Applies access control filters via `getFormattedQuery`.
+   *  - Prepends a `$match` stage to the pipeline to limit watched changes to authorized documents.
+   *  - Overrides the `.on()` method of the returned `ChangeStream` to:
+   *    - Validate the `fullDocument` and any `updatedFields` using `checkValidation`.
+   *    - Filter out change events the user is not authorized to see.
+   *    - Pass only validated and filtered events to the original listener.
+   *
+   * This allows fine-grained control over what change events a user can observe, based on roles and filters.
+   */
+  watch: (pipeline = [], options) => {
     if (!run_as_system) {
       const { filters, roles } = rules[collName] || {}
 
       // Apply access filters to initial change stream pipeline
       const formattedQuery = getFormattedQuery(filters, {}, user)
-      const formattedPipeline = [{
-        $match: {
-          $and: formattedQuery
-        }
-      }, ...pipeline]
+      const formattedPipeline = [
+        {
+          $match: {
+            $and: formattedQuery
+          }
+        },
+        ...pipeline
+      ]
 
       const result = collection.watch(formattedPipeline, options)
       const originalOn = result.on.bind(result)
@@ -327,21 +349,29 @@ const getOperators: GetOperatorsFunction = (
         const winningRole = getWinningRole(fullDocument, user, roles)
 
         const { status, document } = winningRole
-          ? await checkValidation(winningRole, {
-            type: "read",
-            roles,
-            cursor: fullDocument,
-            expansions: {},
-          }, user)
+          ? await checkValidation(
+              winningRole,
+              {
+                type: 'read',
+                roles,
+                cursor: fullDocument,
+                expansions: {}
+              },
+              user
+            )
           : { status: true, document: fullDocument }
 
         const { status: updatedFieldsStatus, document: updatedFields } = winningRole
-          ? await checkValidation(winningRole, {
-            type: "read",
-            roles,
-            cursor: updateDescription?.updatedFields,
-            expansions: {},
-          }, user)
+          ? await checkValidation(
+              winningRole,
+              {
+                type: 'read',
+                roles,
+                cursor: updateDescription?.updatedFields,
+                expansions: {}
+              },
+              user
+            )
           : { status: true, document: updateDescription?.updatedFields }
 
         return { status, document, updatedFieldsStatus, updatedFields }
@@ -353,7 +383,8 @@ const getOperators: GetOperatorsFunction = (
         listener: EventsDescription[EventKey]
       ) => {
         return originalOn(eventType, async (change: Document) => {
-          const { status, document, updatedFieldsStatus, updatedFields } = await isValidChange(change)
+          const { status, document, updatedFieldsStatus, updatedFields } =
+            await isValidChange(change)
           if (!status) return
 
           const filteredChange = {
@@ -376,10 +407,7 @@ const getOperators: GetOperatorsFunction = (
     return collection.watch(pipeline, options)
   },
   //TODO -> add filter & rules in aggregate
-  aggregate: (
-    pipeline,
-    options,
-  ) => collection.aggregate(pipeline, options),
+  aggregate: (pipeline, options) => collection.aggregate(pipeline, options),
   /**
    * Inserts multiple documents into a MongoDB collection with optional role-based access control and validation.
    *
@@ -398,25 +426,29 @@ const getOperators: GetOperatorsFunction = (
    * Only documents passing validation will be inserted.
    */
   insertMany: async (documents, options) => {
-
-
     if (!run_as_system) {
       const { roles } = rules[collName] || {}
       // Validate each document against user's roles
-      const filteredItems = await Promise.all(documents.map(async (currentDoc) => {
-        const winningRole = getWinningRole(currentDoc, user, roles)
+      const filteredItems = await Promise.all(
+        documents.map(async (currentDoc) => {
+          const winningRole = getWinningRole(currentDoc, user, roles)
 
-        const { status, document } = winningRole
-          ? await checkValidation(winningRole, {
-            type: "insert",
-            roles,
-            cursor: currentDoc,
-            expansions: {},
-          }, user)
-          : { status: !roles.length, document: currentDoc }
+          const { status, document } = winningRole
+            ? await checkValidation(
+                winningRole,
+                {
+                  type: 'insert',
+                  roles,
+                  cursor: currentDoc,
+                  expansions: {}
+                },
+                user
+              )
+            : { status: !roles.length, document: currentDoc }
 
-        return status ? document : undefined
-      }))
+          return status ? document : undefined
+        })
+      )
 
       const canInsert = isEqual(filteredItems, documents)
 
@@ -441,9 +473,8 @@ const getOperators: GetOperatorsFunction = (
         throw new Error('Update not permitted')
       }
 
-
       // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
-      const hasOperators = Object.keys(data).some(key => key.startsWith("$"))
+      const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
 
       // Flatten the update object to extract the actual fields being modified
       // const docToCheck = hasOperators
@@ -452,28 +483,35 @@ const getOperators: GetOperatorsFunction = (
 
       const pipeline = [
         {
-          $match: formattedQuery,
+          $match: formattedQuery
         },
-        ...Object.entries(data).map(([key, value]) => ({ [key]: value })),
-      ];
+        ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
+      ]
 
-      const docsToCheck = hasOperators ? await collection.aggregate(pipeline).toArray() : result
+      const docsToCheck = hasOperators
+        ? await collection.aggregate(pipeline).toArray()
+        : result
 
-      const filteredItems = await Promise.all(docsToCheck.map(async (currentDoc) => {
-        const winningRole = getWinningRole(currentDoc, user, roles)
+      const filteredItems = await Promise.all(
+        docsToCheck.map(async (currentDoc) => {
+          const winningRole = getWinningRole(currentDoc, user, roles)
 
-        const { status, document } = winningRole
-          ? await checkValidation(winningRole, {
-            type: "write",
-            roles,
-            cursor: currentDoc,
-            expansions: {},
-          }, user)
-          : { status: !roles.length, document: currentDoc }
+          const { status, document } = winningRole
+            ? await checkValidation(
+                winningRole,
+                {
+                  type: 'write',
+                  roles,
+                  cursor: currentDoc,
+                  expansions: {}
+                },
+                user
+              )
+            : { status: !roles.length, document: currentDoc }
 
-        return status ? document : undefined
-      }))
-
+          return status ? document : undefined
+        })
+      )
 
       // Ensure no unauthorized changes are made
       const areDocumentsEqual = isEqual(docsToCheck, filteredItems)
@@ -511,23 +549,31 @@ const getOperators: GetOperatorsFunction = (
       const data = await collection.find({ $and: formattedQuery }).toArray()
 
       // Filter and validate each document based on user's roles
-      const filteredItems = await Promise.all(data.map(async (currentDoc) => {
-        const winningRole = getWinningRole(currentDoc, user, roles)
+      const filteredItems = await Promise.all(
+        data.map(async (currentDoc) => {
+          const winningRole = getWinningRole(currentDoc, user, roles)
 
-        const { status, document } = winningRole
-          ? await checkValidation(winningRole, {
-            type: "delete",
-            roles,
-            cursor: currentDoc,
-            expansions: {},
-          }, user)
-          : { status: !roles.length, document: currentDoc }
+          const { status, document } = winningRole
+            ? await checkValidation(
+                winningRole,
+                {
+                  type: 'delete',
+                  roles,
+                  cursor: currentDoc,
+                  expansions: {}
+                },
+                user
+              )
+            : { status: !roles.length, document: currentDoc }
 
-        return status ? document : undefined
-      }))
+          return status ? document : undefined
+        })
+      )
 
       // Extract IDs of documents that passed validation
-      const elementsToDelete = (filteredItems.filter(Boolean) as WithId<Document>[]).map(({ _id }) => _id)
+      const elementsToDelete = (filteredItems.filter(Boolean) as WithId<Document>[]).map(
+        ({ _id }) => _id
+      )
 
       if (!elementsToDelete.length) {
         return Promise.resolve({
@@ -537,17 +583,13 @@ const getOperators: GetOperatorsFunction = (
       }
       // Build final delete query with access control and ID filter
       const deleteQuery = {
-        $and: [
-          ...formattedQuery,
-          { _id: { $in: elementsToDelete } }
-        ]
-      };
+        $and: [...formattedQuery, { _id: { $in: elementsToDelete } }]
+      }
       return collection.deleteMany(deleteQuery)
     }
     // If running as system, bypass access control and delete directly
     return collection.deleteMany(query)
   }
-
 })
 
 const MongodbAtlas: MongodbAtlasFunction = (

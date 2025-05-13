@@ -3,9 +3,8 @@ import Lambda from 'aws-sdk/clients/lambda'
 import S3 from 'aws-sdk/clients/s3'
 import { PromiseResult } from 'aws-sdk/lib/request'
 
-
-const accessKeyId = "GET_THIS_FROM_CONFIG"
-const secretAccessKey = "GET_THIS_FROM_CONFIG"
+const accessKeyId = 'GET_THIS_FROM_CONFIG'
+const secretAccessKey = 'GET_THIS_FROM_CONFIG'
 
 const Aws = () => {
   return {
@@ -14,13 +13,15 @@ const Aws = () => {
         region: region,
         credentials: {
           accessKeyId,
-          secretAccessKey,
+          secretAccessKey
         }
       }) as Lambda & {
-        Invoke: (...args: Parameters<Lambda["invoke"]>) => Promise<PromiseResult<Lambda.InvocationResponse, AWSError>>
-        InvokeAsync: Lambda["invokeAsync"]
+        Invoke: (
+          ...args: Parameters<Lambda['invoke']>
+        ) => Promise<PromiseResult<Lambda.InvocationResponse, AWSError>>
+        InvokeAsync: Lambda['invokeAsync']
       }
-      lambda.Invoke = async (...args: Parameters<Lambda["invoke"]>) => {
+      lambda.Invoke = async (...args: Parameters<Lambda['invoke']>) => {
         const res = await lambda.invoke(...args).promise()
         return {
           ...res,
@@ -32,16 +33,17 @@ const Aws = () => {
       lambda.InvokeAsync = lambda.invokeAsync
       return lambda
     },
-    s3: (region: string) => new S3({
-      region,
-      apiVersion: '2006-03-01',
-      credentials: {
-        accessKeyId,
-        secretAccessKey,
-      },
-      s3ForcePathStyle: true,
-      signatureVersion: 'v4',
-    })
+    s3: (region: string) =>
+      new S3({
+        region,
+        apiVersion: '2006-03-01',
+        credentials: {
+          accessKeyId,
+          secretAccessKey
+        },
+        s3ForcePathStyle: true,
+        signatureVersion: 'v4'
+      })
   }
 }
 

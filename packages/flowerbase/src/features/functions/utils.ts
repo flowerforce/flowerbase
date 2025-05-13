@@ -16,16 +16,16 @@ export const loadFunctions = async (rootDir = process.cwd()): Promise<Functions>
   }[]
 
   const functions = config.reduce((acc, { name, ...opts }) => {
-    const extensions = ['.js', '.ts'];
-    let code = '';
+    const extensions = ['.js', '.ts']
+    let code = ''
     const fnPath = extensions
-      .map(ext => path.join(rootDir, fnDir, `${name}${ext}`))
-      .find(fs.existsSync);
+      .map((ext) => path.join(rootDir, fnDir, `${name}${ext}`))
+      .find(fs.existsSync)
 
     if (!fnPath) {
-      throw new Error(`File ${name}.js or ${name}.ts not found`);
+      throw new Error(`File ${name}.js or ${name}.ts not found`)
     }
-    code = fs.readFileSync(fnPath, 'utf-8');
+    code = fs.readFileSync(fnPath, 'utf-8')
     acc[name] = { code, ...opts }
 
     return acc
@@ -74,9 +74,8 @@ export const executeQuery = async ({
       ),
     updateMany: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['updateMany'])(
-        EJSON.deserialize(query), EJSON.deserialize(update)
-      ),
-
-
+        EJSON.deserialize(query),
+        EJSON.deserialize(update)
+      )
   }
 }

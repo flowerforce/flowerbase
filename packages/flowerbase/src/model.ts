@@ -1,1 +1,1 @@
-export { Document, WithId } from 'mongodb';
+export { Document, WithId } from 'mongodb'

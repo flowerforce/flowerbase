@@ -20,7 +20,12 @@ const Api = () => ({
   }: PostParams) => {
     const formattedBody = encodeBodyAsJSON ? JSON.stringify(body) : body
     const url = currentUrl ? currentUrl : `${scheme}://${host}/${path}`
-    return makeRequest<T>({ method: 'POST', url, headers: { "Content-Type": "application/json", ...headers, }, body: formattedBody })
+    return makeRequest<T>({
+      method: 'POST',
+      url,
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: formattedBody
+    })
   },
   put: async <T = null>({
     scheme = HTTPS_SCHEMA,

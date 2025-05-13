@@ -1,13 +1,17 @@
 import { loadAuthConfig, loadCustomUserData } from './auth/utils'
 
-const { database_name, collection_name = 'users', user_id_field = "id" } = loadCustomUserData()
+const {
+  database_name,
+  collection_name = 'users',
+  user_id_field = 'id'
+} = loadCustomUserData()
 const { auth_collection = 'auth_users', ...configuration } = loadAuthConfig()
 
 export const DEFAULT_CONFIG = {
   PORT: Number(process.env.PORT) || 3000,
   MONGODB_URL: process.env.MONGODB_URL || '',
   JWT_SECRET: process.env.JWT_SECRET || '',
-  API_VERSION: process.env.API_VERSION || "v2.0",
+  API_VERSION: process.env.API_VERSION || 'v2.0',
   HTTPS_SCHEMA: process.env.HTTPS_SCHEMA || 'https',
   HOST: process.env.HOST || '0.0.0.0',
   ENABLE_LOGGER: process.env.ENABLE_LOGGER
@@ -18,7 +22,7 @@ export const DB_NAME = database_name
 export const AUTH_CONFIG = {
   authCollection: auth_collection,
   userCollection: collection_name,
-  resetPasswordCollection: "reset-password-requests",
+  resetPasswordCollection: 'reset-password-requests',
   resetPasswordConfig: configuration['local-userpass'].config,
   user_id_field
 }

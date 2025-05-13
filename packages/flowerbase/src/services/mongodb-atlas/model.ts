@@ -34,7 +34,7 @@ export type GetOperatorsFunction = (
     rules,
     collName,
     user,
-    run_as_system,
+    run_as_system
   }: {
     user?: User
     rules?: Rules
@@ -42,12 +42,8 @@ export type GetOperatorsFunction = (
     collName: string
   }
 ) => {
-  findOne: (
-    ...params: Parameters<Method<"findOne">>
-  ) => ReturnType<Method<"findOne">>
-  deleteOne: (
-    ...params: Parameters<Method<"findOne">>
-  ) => ReturnType<Method<"findOne">>
+  findOne: (...params: Parameters<Method<'findOne'>>) => ReturnType<Method<'findOne'>>
+  deleteOne: (...params: Parameters<Method<'findOne'>>) => ReturnType<Method<'findOne'>>
   insertOne: (
     ...params: Parameters<Method<'insertOne'>>
   ) => ReturnType<Method<'insertOne'>>
@@ -55,13 +51,17 @@ export type GetOperatorsFunction = (
     ...params: Parameters<Method<'updateOne'>>
   ) => ReturnType<Method<'updateOne'>>
   find: (...params: Parameters<Method<'find'>>) => FindCursor
-  watch: (
-    ...params: Parameters<Method<'watch'>>
-  ) => ReturnType<Method<'watch'>>
+  watch: (...params: Parameters<Method<'watch'>>) => ReturnType<Method<'watch'>>
   aggregate: (
     ...params: Parameters<Method<'aggregate'>>
   ) => ReturnType<Method<'aggregate'>>
-  insertMany: (...params: Parameters<Method<'insertMany'>>) => ReturnType<Method<'insertMany'>>
-  updateMany: (...params: Parameters<Method<'updateMany'>>) => ReturnType<Method<'updateMany'>>
-  deleteMany: (...params: Parameters<Method<'deleteMany'>>) => ReturnType<Method<'deleteMany'>>
+  insertMany: (
+    ...params: Parameters<Method<'insertMany'>>
+  ) => ReturnType<Method<'insertMany'>>
+  updateMany: (
+    ...params: Parameters<Method<'updateMany'>>
+  ) => ReturnType<Method<'updateMany'>>
+  deleteMany: (
+    ...params: Parameters<Method<'deleteMany'>>
+  ) => ReturnType<Method<'deleteMany'>>
 }

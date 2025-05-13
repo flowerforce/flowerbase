@@ -15,7 +15,7 @@ export const activateTriggers = async ({
   triggersList,
   functionsList
 }: ActivateTriggersParams) => {
-  console.log("START ACTIVATION TRIGGERS")
+  console.log('START ACTIVATION TRIGGERS')
   try {
     for await (const trigger of triggersList) {
       const { content } = trigger
@@ -24,13 +24,16 @@ export const activateTriggers = async ({
       const functionName: keyof Functions = event_processors.FUNCTION.config.function_name
       const triggerHandler = functionsList[functionName] as Function
 
-      await TRIGGER_HANDLERS[type]({ config, triggerHandler, app: fastify, services, functionsList })
-
+      await TRIGGER_HANDLERS[type]({
+        config,
+        triggerHandler,
+        app: fastify,
+        services,
+        functionsList
+      })
     }
-    console.log("TRIGGERS ACTIVATION COMPLETED")
+    console.log('TRIGGERS ACTIVATION COMPLETED')
   } catch (e) {
     console.error('Error while activating triggers', (e as Error).message)
   }
 }
-
-

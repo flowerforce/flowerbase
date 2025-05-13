@@ -1,7 +1,7 @@
 export type PermissionExpression = boolean // TODO: add complex condition (%%true: %function)
 
 export type FieldPermissionExpression = {
-  read?: boolean,
+  read?: boolean
   write?: boolean
 }
 
@@ -36,7 +36,6 @@ export interface Params {
   expansions: Record<string, any> // TODO -> define this type
   type: 'insert' | 'read' | 'delete' | 'search' | 'write'
 }
-
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Condition = Record<string, any>

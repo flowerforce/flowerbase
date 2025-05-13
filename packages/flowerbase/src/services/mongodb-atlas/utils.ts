@@ -1,4 +1,3 @@
-
 import { Collection, Document } from 'mongodb'
 import { User } from '../../auth/dtos'
 import { Filter } from '../../features/rules/interface'
@@ -33,8 +32,11 @@ export const getValidRule = <T extends Role | Filter>({
   })
 }
 
-
-export const getFormattedQuery = (filters: Filter[] = [], query: Parameters<Collection<Document>['findOne']>[0], user?: User) => {
+export const getFormattedQuery = (
+  filters: Filter[] = [],
+  query: Parameters<Collection<Document>['findOne']>[0],
+  user?: User
+) => {
   const preFilter = getValidRule({ filters, user })
   const isValidPreFilter = !!preFilter?.length
   return [

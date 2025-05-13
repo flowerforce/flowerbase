@@ -4,7 +4,12 @@ import { logMachineInfo } from '../../utils'
 
 export const STEP_A_STATES: States = {
   checkDocumentsFilters: async ({ context, next, goToNextValidationStage }) => {
-    logMachineInfo({ enabled: context.enableLog, machine: "A", step: 1, stepName: "checkDocumentsFilters" })
+    logMachineInfo({
+      enabled: context.enableLog,
+      machine: 'A',
+      step: 1,
+      stepName: 'checkDocumentsFilters'
+    })
     const { role } = context
     if (role.document_filters) {
       return next('evaluateDocumentsFiltersWrite')
@@ -16,10 +21,13 @@ export const STEP_A_STATES: States = {
     endValidation,
     goToNextValidationStage
   }) => {
-    logMachineInfo({ enabled: context.enableLog, machine: "B", step: 2, stepName: "evaluateDocumentsFiltersWrite" })
-    const check = await evaluateDocumentFiltersFn(context, "write")
+    logMachineInfo({
+      enabled: context.enableLog,
+      machine: 'B',
+      step: 2,
+      stepName: 'evaluateDocumentsFiltersWrite'
+    })
+    const check = await evaluateDocumentFiltersFn(context, 'write')
     return check ? goToNextValidationStage() : endValidation({ success: false })
   }
 }
-
-

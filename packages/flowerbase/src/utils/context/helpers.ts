@@ -34,7 +34,7 @@ export const generateContextData = ({
       tag: process.env.NODE_ENV
     },
     values: {
-      get: (key: string) => process.env[key],
+      get: (key: string) => process.env[key]
     },
     services: {
       get: (serviceName: keyof typeof services) => {

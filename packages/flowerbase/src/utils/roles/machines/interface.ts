@@ -17,7 +17,13 @@ type StateFunction = (
     context: MachineContext
   } & {
     next: (step: string, params?: Record<string, any>) => void
-    endValidation: ({ success, document }: { success: boolean, document?: Document }) => void
+    endValidation: ({
+      success,
+      document
+    }: {
+      success: boolean
+      document?: Document
+    }) => void
     goToNextValidationStage: (initialStep?: string | null) => void
   }
 ) => Promise<void>
@@ -33,10 +39,16 @@ export interface ValidationStatus {
   document?: Document
 }
 
+export interface StepResult {
+  status: boolean | null
+  nextInitialStep: string | null
+  document?: Document
+}
 
-export interface StepResult { status: boolean | null; nextInitialStep: string | null; document?: Document }
-
-export interface EndValidationParams { success: boolean, document?: Document }
+export interface EndValidationParams {
+  success: boolean
+  document?: Document
+}
 
 export type LogMachineInfoParams = {
   enabled?: boolean

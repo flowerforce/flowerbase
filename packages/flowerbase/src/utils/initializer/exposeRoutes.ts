@@ -13,7 +13,7 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
       deployment_model: 'LOCAL',
       location: 'IE',
       hostname: `${DEFAULT_CONFIG.HTTPS_SCHEMA}://${req.headers.host}`,
-      ws_hostname: `${DEFAULT_CONFIG.HTTPS_SCHEMA === "https" ? "wss" : "ws"}://${req.headers.host}`
+      ws_hostname: `${DEFAULT_CONFIG.HTTPS_SCHEMA === 'https' ? 'wss' : 'ws'}://${req.headers.host}`
     }))
 
     fastify.get('/health', async () => ({

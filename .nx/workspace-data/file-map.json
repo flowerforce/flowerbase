@@ -94,64 +94,64 @@
         "hash": "4890099772766365500"
       },
       {
-        "file": ".github/workflows/prerelease.yaml",
-        "hash": "1579121106462692968"
-      },
-      {
-        "file": ".gitignore",
-        "hash": "12510454605679904704"
-      },
-      {
-        "file": ".npmignore",
-        "hash": "9882982332580877298"
-      },
-      {
-        "file": ".prettierrc",
-        "hash": "7656430364163193455"
-      },
-      {
-        "file": ".vscode/settings.json",
-        "hash": "17816762371917633494"
-      },
-      {
-        "file": "LICENSE",
-        "hash": "12182717254072030367"
+        "file": "jest.config.ts",
+        "hash": "3494843969422251966"
       },
       {
         "file": "eslint.config.mjs",
         "hash": "15816864606171050325"
       },
       {
-        "file": "jest.config.ts",
-        "hash": "3494843969422251966"
-      },
-      {
-        "file": "jest.preset.js",
-        "hash": "9430166341120122740"
-      },
-      {
-        "file": "nx.json",
-        "hash": "9418980942870310400"
-      },
-      {
-        "file": "package-lock.json",
-        "hash": "3692886306116829890"
-      },
-      {
-        "file": "package.json",
-        "hash": "14521184725252051541"
+        "file": ".vscode/settings.json",
+        "hash": "17816762371917633494"
       },
       {
         "file": "scripts/prerelease.ts",
         "hash": "14144003354920194568"
       },
       {
+        "file": "tsconfig.base.json",
+        "hash": "11549800608902314440"
+      },
+      {
+        "file": "LICENSE",
+        "hash": "12182717254072030367"
+      },
+      {
+        "file": "jest.preset.js",
+        "hash": "9430166341120122740"
+      },
+      {
+        "file": ".prettierrc",
+        "hash": "7656430364163193455"
+      },
+      {
+        "file": "package.json",
+        "hash": "14521184725252051541"
+      },
+      {
+        "file": ".npmignore",
+        "hash": "9882982332580877298"
+      },
+      {
+        "file": ".gitignore",
+        "hash": "12510454605679904704"
+      },
+      {
+        "file": ".github/workflows/prerelease.yaml",
+        "hash": "1579121106462692968"
+      },
+      {
+        "file": "nx.json",
+        "hash": "9418980942870310400"
+      },
+      {
         "file": "todo.md",
         "hash": "1032565748642913334"
       },
       {
-        "file": "tsconfig.base.json",
-        "hash": "11549800608902314440"
+        "file": "package-lock.json",
+        "hash": "3692886306116829890"
       }
     ],
     "projectFileMap": {
@@ -231,7 +231,7 @@
         },
         {
           "file": "packages/flowerbase/src/auth/controller.ts",
-          "hash": "2155042752213492327",
+          "hash": "9528161386340607314",
           "deps": [
             "npm:bson",
             "npm:fastify"
@@ -252,7 +252,7 @@
         },
         {
           "file": "packages/flowerbase/src/auth/providers/local-userpass/controller.ts",
-          "hash": "18238573066096374064",
+          "hash": "14257683980239091573",
           "deps": [
             "npm:@sendgrid/mail",
             "npm:fastify"
@@ -260,7 +260,7 @@
         },
         {
           "file": "packages/flowerbase/src/auth/providers/local-userpass/dtos.ts",
-          "hash": "10942070551174365896"
+          "hash": "1644823176426115039"
         },
         {
           "file": "packages/flowerbase/src/auth/utils.ts",
@@ -461,7 +461,7 @@
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/STEP_C_STATES.test.ts",
-          "hash": "16285609705218041633"
+          "hash": "14957286937543586928"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/STEP_D_STATES.test.ts",
@@ -473,7 +473,7 @@
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/checkApplyWhen.test.ts",
-          "hash": "14790474110857112760",
+          "hash": "886481851609590178",
           "deps": [
             "npm:mongodb"
           ]
@@ -495,19 +495,19 @@
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/evaluateDocumentsFiltersReadFn.test.ts",
-          "hash": "13018043152463062585"
+          "hash": "436964690846107141"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/evaluateDocumentsFiltersWriteFn.test.ts",
-          "hash": "18333374628917684700"
+          "hash": "18286942551514733013"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/evaluateTopLevelReadFn.test.ts",
-          "hash": "13640006966185935297"
+          "hash": "10510148155002465308"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/evaluateTopLevelWriteFn.test.ts",
-          "hash": "16588460310717849846"
+          "hash": "7257322511470645709"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/exposeRoutes.test.ts",
@@ -595,7 +595,7 @@
         },
         {
           "file": "packages/flowerbase/src/utils/context/index.ts",
-          "hash": "13587286619966796446",
+          "hash": "15541702524925849190",
           "deps": [
             "npm:bson"
           ]

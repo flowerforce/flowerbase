@@ -358,8 +358,8 @@ export enum RulesModes {
 export type RulesObject<T> =
   | RulesValuesType<T>
   | {
-    [K in keyof typeof RulesModes]:
-    | Array<RulesOperatorsInArray<RulesValuesType<T>>>
-    | Array<RulesObject<RulesValuesType<T>>>
-  }
+      [K in keyof typeof RulesModes]:
+        | Array<RulesOperatorsInArray<RulesValuesType<T>>>
+        | Array<RulesObject<RulesValuesType<T>>>
+    }
   | Array<Exclude<RulesOperatorsInArray<RulesValuesType<T>>, undefined>>

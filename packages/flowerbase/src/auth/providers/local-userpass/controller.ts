@@ -1,8 +1,8 @@
-import sendGrid from "@sendgrid/mail"
+import sendGrid from '@sendgrid/mail'
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME } from '../../../constants'
-import { StateManager } from "../../../state"
-import { GenerateContext } from "../../../utils/context"
+import { StateManager } from '../../../state'
+import { GenerateContext } from '../../../utils/context'
 import { comparePassword, generateToken, hashPassword } from '../../../utils/crypto'
 import {
   AUTH_ENDPOINTS,
@@ -14,7 +14,12 @@ import {
   REGISTRATION_SCHEMA,
   RESET_SCHEMA
 } from '../../utils'
-import { ConfirmResetPasswordDto, LoginDto, RegistrationDto, ResetPasswordDto } from './dtos'
+import {
+  ConfirmResetPasswordDto,
+  LoginDto,
+  RegistrationDto,
+  ResetPasswordDto
+} from './dtos'
 
 /**
  * Controller for handling local user registration and login.
@@ -99,7 +104,6 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: LOGIN_SCHEMA
     },
     async function (req) {
-
       const storedUser = await db.collection(authCollection!).findOne({
         email: req.body.username
       })
@@ -127,12 +131,12 @@ export async function localUserPassController(app: FastifyInstance) {
   )
 
   /**
- * Endpoint for reset password.
- *
- * @route {POST} /reset/call
- * @param {ResetPasswordDto} req - The request object with th reset request.
- * @returns {Promise<void>}
- */
+   * Endpoint for reset password.
+   *
+   * @route {POST} /reset/call
+   * @param {ResetPasswordDto} req - The request object with th reset request.
+   * @returns {Promise<void>}
+   */
   app.post<ResetPasswordDto>(
     AUTH_ENDPOINTS.RESET,
     {
@@ -152,16 +156,17 @@ export async function localUserPassController(app: FastifyInstance) {
       const token = generateToken()
       const tokenId = generateToken()
 
-      await db?.collection(resetPasswordCollection).updateOne(
-        { email },
-        { $set: { token, tokenId, email, createdAt: new Date() } },
-        { upsert: true }
-      );
-
+      await db
+        ?.collection(resetPasswordCollection)
+        .updateOne(
+          { email },
+          { $set: { token, tokenId, email, createdAt: new Date() } },
+          { upsert: true }
+        )
 
       if (resetPasswordConfig.runResetFunction && resetPasswordConfig.resetFunctionName) {
-        const functionsList = StateManager.select("functions")
-        const services = StateManager.select("services")
+        const functionsList = StateManager.select('functions')
+        const services = StateManager.select('services')
         const currentFunction = functionsList[resetPasswordConfig.resetFunctionName]
         await GenerateContext({
           args: [{ token, tokenId, email }],
@@ -175,25 +180,28 @@ export async function localUserPassController(app: FastifyInstance) {
         return
       }
 
-      const { from, subject, mailToken, body } = getMailConfig(resetPasswordConfig, token, tokenId)
+      const { from, subject, mailToken, body } = getMailConfig(
+        resetPasswordConfig,
+        token,
+        tokenId
+      )
       sendGrid.setApiKey(mailToken)
       await sendGrid.send({
         to: email,
         from,
         subject,
         html: body
-      });
-
+      })
     }
   )
 
   /**
-* Endpoint for confirm reset password.
-*
-* @route {POST} /reset
-* @param {ConfirmResetPasswordDto} req - The request object with reset data.
-* @returns {Promise<void>}
-*/
+   * Endpoint for confirm reset password.
+   *
+   * @route {POST} /reset
+   * @param {ConfirmResetPasswordDto} req - The request object with reset data.
+   * @returns {Promise<void>}
+   */
   app.post<ConfirmResetPasswordDto>(
     AUTH_ENDPOINTS.CONFIRM_RESET,
     {
@@ -203,24 +211,24 @@ export async function localUserPassController(app: FastifyInstance) {
       const { resetPasswordCollection } = AUTH_CONFIG
       const { token, tokenId, password } = req.body
 
-      const resetRequest = await db?.collection(resetPasswordCollection).findOne(
-        { token, tokenId },
-      );
+      const resetRequest = await db
+        ?.collection(resetPasswordCollection)
+        .findOne({ token, tokenId })
 
       if (!resetRequest) {
         throw new Error(AUTH_ERRORS.INVALID_RESET_PARAMS)
       }
       const hashedPassword = await hashPassword(password)
-      await db.collection(authCollection!).updateOne({ email: resetRequest.email, }, {
-        $set: {
-          password: hashedPassword
+      await db.collection(authCollection!).updateOne(
+        { email: resetRequest.email },
+        {
+          $set: {
+            password: hashedPassword
+          }
         }
-      })
+      )
 
-      await db?.collection(resetPasswordCollection).deleteOne(
-        { _id: resetRequest._id },
-      );
-
+      await db?.collection(resetPasswordCollection).deleteOne({ _id: resetRequest._id })
     }
   )
 }

@@ -24,10 +24,10 @@ const rulesMatcherUtils: RulesMatcherUtils = {
     const valueRef =
       value && String(value).indexOf('$ref:') === 0
         ? _get(
-          data,
-          rulesMatcherUtils.getPath(value.replace('$ref:', ''), prefix),
-          undefined
-        )
+            data,
+            rulesMatcherUtils.getPath(value.replace('$ref:', ''), prefix),
+            undefined
+          )
         : value
 
     if (!operators[op]) {
@@ -40,10 +40,14 @@ const rulesMatcherUtils: RulesMatcherUtils = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getKey: (block: RulesObject<any>, keys, options) => {
     if (Object.prototype.hasOwnProperty.call(block, '$and')) {
-      return block.$and.map((item: unknown) => rulesMatcherUtils.getKey(item, keys, options))
+      return block.$and.map((item: unknown) =>
+        rulesMatcherUtils.getKey(item, keys, options)
+      )
     }
     if (Object.prototype.hasOwnProperty.call(block, '$or')) {
-      return block.$or.map((item: unknown) => rulesMatcherUtils.getKey(item, keys, options))
+      return block.$or.map((item: unknown) =>
+        rulesMatcherUtils.getKey(item, keys, options)
+      )
     }
 
     const { prefix } = options || {}

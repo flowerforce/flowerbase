@@ -22,7 +22,6 @@ export const RESET_SCHEMA = {
   }
 }
 
-
 export const CONFIRM_RESET_SCHEMA = {
   body: {
     type: 'object',
@@ -34,7 +33,6 @@ export const CONFIRM_RESET_SCHEMA = {
     required: ['password', 'token', 'tokenId']
   }
 }
-
 
 export const REGISTRATION_SCHEMA = {
   body: {
@@ -53,7 +51,7 @@ export enum AUTH_ENDPOINTS {
   PROFILE = '/profile',
   SESSION = '/session',
   RESET = '/reset/call',
-  CONFIRM_RESET = "/reset"
+  CONFIRM_RESET = '/reset'
 }
 
 export enum AUTH_ERRORS {
@@ -119,21 +117,25 @@ export const loadCustomUserData = (): CustomUserDataConfig => {
   return JSON.parse(fs.readFileSync('auth/custom_user_data.json', 'utf-8'))
 }
 
-
-
-export const getMailConfig = (resetPasswordConfig: Config, token: string, tokenId: string) => {
+export const getMailConfig = (
+  resetPasswordConfig: Config,
+  token: string,
+  tokenId: string
+) => {
   const { mailConfig, resetPasswordUrl } = resetPasswordConfig
-  const ENV_PREFIX = "ENV"
+  const ENV_PREFIX = 'ENV'
   const { from, subject, mailToken } = mailConfig
 
-  const [fromPrefix, fromPath] = from.split(".")
-  const currentSender = (fromPrefix === ENV_PREFIX ? process.env[fromPath] : from) ?? ""
-  const [subjectPrefix, subjectPath] = subject.split(".")
-  const currentSubject = (subjectPrefix === ENV_PREFIX ? process.env[subjectPath] : subject) ?? ""
-  const [mailTokenPrefix, mailTokenPath] = mailToken.split(".")
-  const currentMailToken = (mailTokenPrefix === "ENV" ? process.env[mailTokenPath] : mailToken) ?? ""
+  const [fromPrefix, fromPath] = from.split('.')
+  const currentSender = (fromPrefix === ENV_PREFIX ? process.env[fromPath] : from) ?? ''
+  const [subjectPrefix, subjectPath] = subject.split('.')
+  const currentSubject =
+    (subjectPrefix === ENV_PREFIX ? process.env[subjectPath] : subject) ?? ''
+  const [mailTokenPrefix, mailTokenPath] = mailToken.split('.')
+  const currentMailToken =
+    (mailTokenPrefix === 'ENV' ? process.env[mailTokenPath] : mailToken) ?? ''
 
-  const link = `${resetPasswordUrl}/${token}/${tokenId}`;
+  const link = `${resetPasswordUrl}/${token}/${tokenId}`
   const body = `<body style="font-family: Arial, sans-serif; background-color: #f4f4f4; text-align: center; padding: 20px;">
   <table width="100%" cellspacing="0" cellpadding="0">
       <tr>
@@ -157,7 +159,7 @@ export const getMailConfig = (resetPasswordConfig: Config, token: string, tokenI
   </table>
 </body>`
   return {
-    from: currentSender ?? "",
+    from: currentSender ?? '',
     subject: currentSubject,
     mailToken: currentMailToken,
     body

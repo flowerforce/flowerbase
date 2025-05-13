@@ -1,4 +1,4 @@
-import { Document } from "mongodb"
+import { Document } from 'mongodb'
 import { Arguments } from '../../auth/dtos'
 import { GetOperatorsFunction } from '../../services/mongodb-atlas/model'
 
@@ -6,14 +6,14 @@ type MethodName = Exclude<keyof ReturnType<GetOperatorsFunction>, 'match'>
 
 export type FunctionCallDto =
   | {
-    name: MethodName
-    arguments: ArgumentsData
-  }
+      name: MethodName
+      arguments: ArgumentsData
+    }
   | {
-    arguments: ArgumentsData
-    name: MethodName
-    service: 'mongodb-atlas'
-  }
+      arguments: ArgumentsData
+      name: MethodName
+      service: 'mongodb-atlas'
+    }
 
 export type FunctionCallBase64Dto = {
   baas_request?: string
@@ -27,7 +27,6 @@ type ArgumentsData = Arguments<{
   update: Document
   document: Document
 }>
-
 
 export type Base64Function = {
   name: string

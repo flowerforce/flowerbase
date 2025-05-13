@@ -4,7 +4,12 @@ import { logMachineInfo } from '../../utils'
 
 export const STEP_B_STATES: States = {
   checkDocumentsFilters: async ({ context, next, goToNextValidationStage }) => {
-    logMachineInfo({ enabled: context.enableLog, machine: "B", step: 1, stepName: "checkDocumentsFilters" })
+    logMachineInfo({
+      enabled: context.enableLog,
+      machine: 'B',
+      step: 1,
+      stepName: 'checkDocumentsFilters'
+    })
     const { role } = context
     if (role.document_filters) {
       return next('evaluateDocumentsFiltersRead')
@@ -12,8 +17,13 @@ export const STEP_B_STATES: States = {
     return goToNextValidationStage()
   },
   evaluateDocumentsFiltersRead: async ({ context, next, goToNextValidationStage }) => {
-    logMachineInfo({ enabled: context.enableLog, machine: "B", step: 2, stepName: "evaluateDocumentsFiltersRead" })
-    const hasDocumentFiltersRead = await evaluateDocumentFiltersFn(context, "read")
+    logMachineInfo({
+      enabled: context.enableLog,
+      machine: 'B',
+      step: 2,
+      stepName: 'evaluateDocumentsFiltersRead'
+    })
+    const hasDocumentFiltersRead = await evaluateDocumentFiltersFn(context, 'read')
     if (!hasDocumentFiltersRead) return next('evaluateDocumentsFiltersWrite')
     return goToNextValidationStage()
   },
@@ -22,10 +32,13 @@ export const STEP_B_STATES: States = {
     endValidation,
     goToNextValidationStage
   }) => {
-    logMachineInfo({ enabled: context.enableLog, machine: "B", step: 3, stepName: "evaluateDocumentsFiltersWrite" })
-    const check = await evaluateDocumentFiltersFn(context, "write")
+    logMachineInfo({
+      enabled: context.enableLog,
+      machine: 'B',
+      step: 3,
+      stepName: 'evaluateDocumentsFiltersWrite'
+    })
+    const check = await evaluateDocumentFiltersFn(context, 'write')
     return check ? goToNextValidationStage() : endValidation({ success: false })
   }
 }
-
-

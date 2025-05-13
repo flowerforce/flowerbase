@@ -1,6 +1,6 @@
-import { FastifyInstance } from "fastify"
-import { Services } from "../../services/interface"
-import { Function, Functions } from "../functions/interface"
+import { FastifyInstance } from 'fastify'
+import { Services } from '../../services/interface'
+import { Function, Functions } from '../functions/interface'
 
 export interface Trigger {
   name: string
@@ -31,14 +31,13 @@ type Config = {
   schedule: string
 }
 
-export type TriggerType = "SCHEDULED" | "DATABASE" | "AUTHENTICATION"
+export type TriggerType = 'SCHEDULED' | 'DATABASE' | 'AUTHENTICATION'
 export type Triggers = { fileName: string; content: Trigger }[]
 
-
 export type HandlerParams = {
-  config: Config,
-  triggerHandler: Function,
-  app: FastifyInstance,
-  services: Services,
+  config: Config
+  triggerHandler: Function
+  app: FastifyInstance
+  services: Services
   functionsList: Functions
 }

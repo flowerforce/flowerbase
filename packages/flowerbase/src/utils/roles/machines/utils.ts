@@ -1,9 +1,9 @@
-import { Document, OptionalId } from "mongodb"
-import { User } from "../../../auth/dtos";
-import { Filter } from "../../../features/rules/interface";
-import { getValidRule } from "../../../services/mongodb-atlas/utils";
-import { Role } from "../interface"
-import { LogMachineInfoParams } from "./interface";
+import { Document, OptionalId } from 'mongodb'
+import { User } from '../../../auth/dtos'
+import { Filter } from '../../../features/rules/interface'
+import { getValidRule } from '../../../services/mongodb-atlas/utils'
+import { Role } from '../interface'
+import { LogMachineInfoParams } from './interface'
 
 /**
  * Determines the first applicable role for a given user and document.
@@ -14,11 +14,15 @@ import { LogMachineInfoParams } from "./interface";
  *
  * @returns {Role | null} - Returns the first role that matches the `apply_when` condition, or `null` if none match.
  */
-export const getWinningRole = (document: OptionalId<Document> | null, user: User, roles: Role[] = []): Role | null => {
+export const getWinningRole = (
+  document: OptionalId<Document> | null,
+  user: User,
+  roles: Role[] = []
+): Role | null => {
   if (!roles.length) return null
   for (const role of roles) {
     if (checkApplyWhen(role.apply_when, user, document)) {
-      return role;
+      return role
     }
   }
   return null
@@ -30,11 +34,19 @@ export const getWinningRole = (document: OptionalId<Document> | null, user: User
  * @param {Role["apply_when"]} apply_when - The rule condition to evaluate.
  * @param {User} user - The user for whom the condition is being checked.
  * @param {WithId<Document> | null} document - The document to check against the condition.
- * 
+ *
  * @returns {boolean} - Returns `true` if at least one valid rule is found, otherwise `false`.
  */
-export const checkApplyWhen = (apply_when: Role["apply_when"], user: User, document: OptionalId<Document> | null) => {
-  const validRule = getValidRule({ filters: [{ apply_when } as Filter], user, record: document })
+export const checkApplyWhen = (
+  apply_when: Role['apply_when'],
+  user: User,
+  document: OptionalId<Document> | null
+) => {
+  const validRule = getValidRule({
+    filters: [{ apply_when } as Filter],
+    user,
+    record: document
+  })
   return !!validRule.length
 }
 
@@ -49,6 +61,11 @@ export const checkApplyWhen = (apply_when: Role["apply_when"], user: User, docum
  *
  * @returns {void}
  */
-export const logMachineInfo = ({ enabled, machine, step, stepName }: LogMachineInfoParams) => {
+export const logMachineInfo = ({
+  enabled,
+  machine,
+  step,
+  stepName
+}: LogMachineInfoParams) => {
   if (enabled) console.log(`MACHINE ${machine} -> STEP ${step}: ${stepName}`)
 }
