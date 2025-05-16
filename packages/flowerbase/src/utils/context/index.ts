@@ -37,9 +37,7 @@ export async function GenerateContext({
 
   try {
     const entryFile = require.main?.filename ?? process.cwd()
-    console.log('🚀 ~ entryFile:', entryFile)
     const customRequire = createRequire(entryFile)
-    console.log('🚀 ~ customRequire:', customRequire)
     vm.runInContext(m.wrap(currentFunction.code), vm.createContext(contextData))(
       exports,
       customRequire,

@@ -16,5 +16,5 @@ Gestire il reset della password
 [x] auth trigger 
 [x] check mail 
 [ ] gestire isPending login 
-[ ] triggerare il trigger authCreate dopo login o dopo register (?) 
-[ ] passare anche _id Object id a GenereateContext
+[x] triggerare il trigger authCreate dopo register (dopo login al momento non c'è) 
+[x] passare anche _id Object id a GenereateContext

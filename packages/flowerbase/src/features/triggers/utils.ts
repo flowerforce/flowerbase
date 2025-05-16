@@ -148,8 +148,8 @@ const handleDataBaseTrigger = async ({
     },
     Object.keys(project).length
       ? {
-          $project: project
-        }
+        $project: project
+      }
       : undefined
   ].filter(Boolean) as Parameters<typeof collection.watch>[0]
   const changeStream = collection.watch(pipeline, {
