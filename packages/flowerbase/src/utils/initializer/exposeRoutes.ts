@@ -1,6 +1,9 @@
 import { uptime } from 'node:process'
 import { FastifyInstance } from 'fastify'
-import { API_VERSION, DEFAULT_CONFIG } from '../../constants'
+import { RegistrationDto } from '../../auth/providers/local-userpass/dtos'
+import { AUTH_ENDPOINTS, PROVIDER_TYPE, REGISTRATION_SCHEMA } from '../../auth/utils'
+import { API_VERSION, AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../constants'
+import { hashPassword } from '../crypto'
 
 /**
  * > Used to expose all app routes
@@ -20,7 +23,58 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
       status: 'ok',
       uptime: uptime()
     }))
+
+    fastify.post<RegistrationDto>(AUTH_ENDPOINTS.FIRST_USER, {
+      schema: REGISTRATION_SCHEMA
+    }, async function (req, res) {
+      const { authCollection } = AUTH_CONFIG
+      const db = fastify.mongo.client.db(DB_NAME)
+      const { email, password } = req.body
+      const hashedPassword = await hashPassword(password)
+
+      const users = db.collection(authCollection!).find()
+
+      const list = await users?.toArray()
+
+      if (list?.length) {
+        res.status(409)
+        return {
+          error: `The ${authCollection} collection is not empty`
+        }
+      }
+
+      const result = await db.collection(authCollection!).insertOne({
+        email: email,
+        password: hashedPassword,
+        custom_data: {}
+      })
+
+      await db?.collection(authCollection!).updateOne(
+        {
+          email: email
+        },
+        {
+          $set: {
+            identities: [
+              {
+                id: result?.insertedId.toString(),
+                provider_id: result?.insertedId.toString(),
+                provider_type: PROVIDER_TYPE,
+                provider_data: { email }
+              }
+            ]
+          }
+        }
+      )
+
+      res.status(201)
+      return {
+        userId: result?.insertedId
+      }
+    })
   } catch (e) {
     console.error('Error while exposing routes', (e as Error).message)
   }
 }
+
+

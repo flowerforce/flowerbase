@@ -54,7 +54,8 @@ export enum AUTH_ENDPOINTS {
   PROFILE = '/profile',
   SESSION = '/session',
   RESET = '/reset/call',
-  CONFIRM_RESET = "/reset"
+  CONFIRM_RESET = "/reset",
+  FIRST_USER = '/setup/first-user'
 }
 
 export enum AUTH_ERRORS {
