@@ -1,12 +1,38 @@
 # flowerbase
 
-> **A serverless-native MongoDB package designed for modern cloud applications. Lightweight. Fast. Pay-as-you-go.**
+> **A serverless-native MongoDB package designed for modern cloud applications**
+
+Unlike MongoDB Realm or other cloud platforms, we do not offer a graphical interface where you can configure services through a dashboard.
+Instead, everything is code-based and developer-driven, offering full flexibility through configuration files and source code.
+
+This documentation is structured to guide both experienced Realm users and newcomers alike — whether you’re migrating or starting clean.
+
+#### 🧠 Features Summary
+| Feature                  | Status                                  |
+|--------------------------|-----------------------------------------|
+| Realm-compatible schema  | ✅ Supported (unchanged)                 |
+| Authentication strategy  | ✅ Local Email/Password only             |
+| OAuth / API Keys / etc.  | 🚫 Not supported (for now)               |
+| User data accessibility  | ✅ Stored in your main DB                |
+| Device Sync  | 🚫 Not supported (for now)                           |
+| Functions  | ✅ Supported (unchanged)                               |
+| Triggers  | ✅ Supported (unchanged)                                |
+| HTTP Endpoints  | ✅ Supported (unchanged)                          |
 
 
 
-## 🗂️ MongoDB Atlas Migration Guide
+> ⚠️ **Already have an existing Realm project?**  
+> You can skip ahead to the [Migration Guide](#migration) to quickly adapt your project to Flowerbase.
 
-This guide walks you through the process of setting up a Node.js backend application and integrating the `@flowerforce/flowerbase` library to connect with MongoDB Atlas.
+
+## 🚀 Creating a New Project from Scratch
+
+If you're starting fresh, you’ll learn how to:
+
+ - Scaffold a minimal Node.js + TypeScript backend
+ - Install and configure `@flowerforce/flowerbase`
+ - Set up authentication, data models, rules, and custom logic
+ - Deploy your app and connect it to any frontend (React, Vue, mobile, etc.)
 
 ## 📁 1. Project Setup
 
@@ -42,32 +68,23 @@ touch src/index.ts
 ## 🌿 3. Environment Variables
 Ensure the following environment variables are set in your .env file or deployment environment:
 
+
+| Variable               | Description                                                                 | Example                                            |
+| ---------------------- | --------------------------------------------------------------------------- | -------------------------------------------------- |
+| `PROJECT_ID`           | A unique ID to identify your project. This value can be freely invented — it's preserved mainly for compatibility with the old Realm-style project structure.                     | `my-flowerbase-app`                                |
+| `PORT`                 | The port on which the server will run.                                      | `3000`                                             |
+| `DB_CONNECTION_STRING` | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
+| `APP_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
+| `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
+
+
+Example:
 ```env
 PROJECT_ID=your-project-id
 PORT=3000
 DB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/dbname
 APP_SECRET=your-jwt-secret
 HOST=0.0.0.0
-```
-
-#### 🔹 projectId
-- `Purpose`: Serves as a unique identifier for your project within the Flowerbase ecosystem.
-
-- `Requirement`: This value is user-defined; you must create a unique string to identify your project.
-
-> Example:
-```env
-PROJECT_ID=my-cool-app-5678
-```
-
-#### 🔹 jwtSecret
-- `Purpose`: Used as the secret key for signing and verifying JSON Web Tokens (JWTs) in your application, ensuring secure authentication.
-
-- `Requirement`: This is a user-defined secret; you must generate a secure, random string.
-
-> Example:
-```env
-APP_SECRET=supersecurejwtsecret987
 ```
 
 🛡️ Note: Never commit .env files to source control. Use a .gitignore file to exclude it.
@@ -79,7 +96,7 @@ In your index.ts file, import the initialize function from the `@flowerforce/flo
 ```ts
 // src/index.ts
 
-import { initialize } from '@flowerforc/flowerbase';
+import { initialize } from '@flowerforce/flowerbase';
 
 initialize({
   projectId: process.env.PROJECT_ID,
@@ -143,68 +160,17 @@ After setting up the base Flowerbase integration, you can now configure advanced
 └── 📄 .env
 ```
 
-If your previous project followed the MongoDB Realm scaffold, you're in luck:
-Flowerbase was designed to mirror Realm’s structure, making migration simple and straightforward.
-
-## 🚀 6. Build & Deploy the Server
-
-Once your migration is complete, it’s time to build and deploy the backend so it can be accessed by your frontend or external clients.
-
-### 🔧 Build the App
-
-If you're using TypeScript:
-
-```bash
-npx tsc
-```
-
-Or if you're using a bundler like esbuild:
-
-```bash
-npx esbuild src/index.ts --bundle --outfile=dist/index.js
-```
-
-You can deploy the application using any Node.js-compatible platform.
-Once deployed, you'll receive a public URL (e.g. https://your-app-name.up.example.app).
-
->This URL should be used as the base URL in your frontend application, as explained in the next section.
-
-## 🌐 7. Frontend Setup – Realm SDK in React (Example)
-
-You can use the official `realm-web` SDK to integrate MongoDB Realm into a React application.
-This serves as a sample setup — similar logic can be applied using other official Realm SDKs **(e.g. React Native, Node, or Flutter)**.
-
-### 📦 Install Realm SDK
-
-```bash
-npm install realm-web
-```
-
-### ⚙️ Configure Realm in React
-
-Create a file to initialize and export the Realm App instance:
-
-```ts
-// src/realm/realmApp.ts
-
-import * as Realm from "realm-web";
-
-// Replace with your actual Realm App ID and your deployed backend URL
-const app = new Realm.App({
-  id: "your-realm-app-id", // e.g., my-app-abcde
-  baseUrl: "https://your-deployed-backend-url.com" // e.g., https://your-app-name.up.example.app
-});
-
-export default app;
-
-```
-
->🔗 The baseUrl should point to the backend URL you deployed earlier using Flowerbase.
-This tells the frontend SDK where to send authentication and data requests.
+#### 📖 Structure summary
+| Area                   | Description                                            | Link                                                                                      |
+| ---------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| 🧠 Functions           | Overview of server-side functions in Realm             | [Functions Documentation](https://www.mongodb.com/docs/atlas/app-services/functions/)     |
+| ⏰ Triggers             | Triggers that run on database events or schedules      | [Triggers Documentation](https://www.mongodb.com/docs/atlas/app-services/triggers/)       |
+| 👤 User Management     | Managing users, authentication, and providers          | [Users Documentation](https://www.mongodb.com/docs/atlas/app-services/users/)             |
+| 🌐 Custom Endpoints    | HTTP endpoints to expose backend functionality via API | [Custom Endpoints](http://mongodb.com/docs/atlas/app-services/data-api/custom-endpoints/) |
+| 🔐 Rules & Permissions | Define fine-grained access control for collections     | [Rules Documentation](https://www.mongodb.com/docs/atlas/app-services/rules/)             |
 
 
-
-## 🔐 8. Authentication – Local Email/Password (User-Pass)
+## 🔐 6. Authentication – Local Email/Password (User-Pass)
 
 The authentication system in `@flowerforce/flowerbase` reimplements the classic **email/password** login method (called local-userpass), similar to the one used by MongoDB Realm.
 
@@ -277,11 +243,128 @@ Example
 }
 
 ```
-#### 🧠 Summary
-| Feature                  | Status                                  |
-|--------------------------|-----------------------------------------|
-| Realm-compatible schema  | ✅ Supported (unchanged)                 |
-| Authentication strategy  | ✅ Local Email/Password only             |
-| OAuth / API Keys / etc.  | 🚫 Not supported (for now)               |
-| User data accessibility  | ✅ Stored in your main DB                |
+If you're configuring the project from scratch, you can skip ahead to the [Build](#build) step.
+
+--------
+
+
+<a id="migration"></a>
+## 🔄 [Migration Guide](#migration) - Migrating Your Realm Project
+
+Follow these steps to rebuild your backend in a clean and modern Node.js environment:
+
+## 🪜 Step-by-Step Migration
+Initialize a new Node.js project
+
+In your existing project folder, run:
+
+```bash
+npm init -y
+```
+Install Flowerbase
+
+```bash
+npm install @flowerforce/flowerbase
+```
+Create an index.ts file
+
+Inside your project, create index.ts:
+
+```bash
+touch index.ts
+```
+
+Initialize the Flowerbase App
+
+In index.ts, add:
+
+```ts
+import { initialize } from "@flowerforce/flowerbase";
+
+initialize({
+  projectId: process.env.PROJECT_ID,
+  port: Number(process.env.PORT),
+  mongodbUrl: process.env.DB_CONNECTION_STRING,
+  jwtSecret: process.env.APP_SECRET,
+  host: process.env.HOST
+});
+```
+
+Ensure the following environment variables are set in your .env file or deployment environment:
+
+
+| Variable               | Description                                                                 | Example                                            |
+| ---------------------- | --------------------------------------------------------------------------- | -------------------------------------------------- |
+| `PROJECT_ID`           | A unique ID to identify your project. This value can be freely invented — it's preserved mainly for compatibility with the old Realm-style project structure.                     | `my-flowerbase-app`                                |
+| `PORT`                 | The port on which the server will run.                                      | `3000`                                             |
+| `DB_CONNECTION_STRING` | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
+| `APP_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
+| `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
+
+
+Example:
+```env
+PROJECT_ID=your-project-id
+PORT=3000
+DB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/dbname
+APP_SECRET=your-jwt-secret
+HOST=0.0.0.0
+```
+
+🛡️ Note: Never commit .env files to source control. Use a .gitignore file to exclude it.
+
+
+<a id="build"></a>
+## 🚀 Build & Deploy the Server
+
+Once your migration or first configuration is complete, it’s time to build and deploy the backend so it can be accessed by your frontend or external clients.
+
+### 🔧 Build the App
+
+If you're using for example TypeScript:
+
+```bash
+npx tsc
+```
+
+
+You can deploy the application using any Node.js-compatible platform.
+Once deployed, you'll receive a public URL (e.g. https://your-app-name.up.example.app).
+
+>This URL should be used as the base URL in your frontend application, as explained in the next section.
+
+## 🌐 Frontend Setup – Realm SDK in React (Example)
+
+You can use the official `realm-web` SDK to integrate MongoDB Realm into a React application.
+This serves as a sample setup — similar logic can be applied using other official Realm SDKs **(e.g. React Native, Node, or Flutter)**.
+
+### 📦 Install Realm SDK
+
+```bash
+npm install realm-web
+```
+
+### ⚙️ Configure Realm in React
+
+Create a file to initialize and export the Realm App instance:
+
+```ts
+// src/realm/realmApp.ts
+
+import * as Realm from "realm-web";
+
+// Replace with your actual Realm App ID and your deployed backend URL
+const app = new Realm.App({
+  id: "your-realm-app-id", // e.g., my-app-abcde
+  baseUrl: "https://your-deployed-backend-url.com" // e.g., https://your-app-name.up.example.app
+});
+
+export default app;
+
+```
+
+>🔗 The baseUrl should point to the backend URL you deployed earlier using Flowerbase.
+This tells the frontend SDK where to send authentication and data requests.
+
+
 
