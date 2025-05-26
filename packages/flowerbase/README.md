@@ -196,11 +196,9 @@ The only authentication mode currently re-implemented in `@flowerforce/flowerbas
 > Other methods (OAuth, API key, anonymous, etc.) are not supported yet.
 
 ####  Example user:
-```json
+```js
 {
-  "_id": {
-    "$oid": "example-user-id"
-  },
+  "_id": ObjectId("2scgsb3gev99gsty2ev3g2g323d2hs"),
   "email": "myuser@flowerbase.example",
   "password": "your-encrypted-password",
   "status": "confirmed",
@@ -254,9 +252,61 @@ If you're configuring the project from scratch, you can skip ahead to the [Build
 Follow these steps to rebuild your backend in a clean and modern Node.js environment:
 
 ## 🪜 Step-by-Step Migration
-Initialize a new Node.js project
 
-In your existing project folder, run:
+### 📥 Download Your Realm App from MongoDB Atlas
+
+Follow these steps to export and download your Realm app from MongoDB Cloud.
+
+---
+
+#### 1. Log In to MongoDB Cloud
+
+Go to [https://cloud.mongodb.com/](https://cloud.mongodb.com/) and sign in with your credentials.
+
+---
+
+#### 2. Select Your Project
+
+From the dashboard, choose the **project** that contains the Realm app you want to download.
+
+---
+
+#### 3. Open the Realm App List
+
+- In the left-hand sidebar, under the **Services** section, click on **"Triggers"**.
+- Then click the **"View All Apps"** button in the top-right corner.
+
+---
+
+#### 4. Select the Desired App
+
+From the list of applications, click on the **app name** you wish to export.
+
+---
+
+#### 5. Go to Deployment
+
+In the left sidebar, under the **Manage** section, click on **"Deployment"**.
+
+---
+
+#### 6. Export the App
+
+Click on the **"Export App"** tab at the top of the page.
+
+---
+
+#### 7. Download the App
+
+Scroll to the bottom and click the **"Download App"** button.
+
+This will download a `.zip` file containing your Realm app's full structure and configuration.
+
+---
+
+✅ You are now ready to migrate or inspect your Realm app locally!
+
+In your existing project folder, initialize a new Node.js project, Run:
 
 ```bash
 npm init -y
