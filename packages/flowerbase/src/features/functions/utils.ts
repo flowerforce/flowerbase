@@ -44,7 +44,8 @@ export const executeQuery = async ({
   currentMethod,
   query,
   update,
-  document
+  document,
+  documents
 }: ExecuteQueryParams) => {
   return {
     find: async () =>
@@ -70,7 +71,7 @@ export const executeQuery = async ({
       ),
     insertMany: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['insertMany'])(
-        EJSON.deserialize(query)
+        EJSON.deserialize(documents)
       ),
     updateMany: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['updateMany'])(

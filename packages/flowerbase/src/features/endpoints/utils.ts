@@ -1,4 +1,5 @@
 import fs from 'fs'
+import path from 'node:path'
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { services } from '../../services'
@@ -10,10 +11,11 @@ import { Endpoints, GenerateHandlerParams } from './interface'
  * > Loads the endpoint config json file
  * @testable
  */
-export const loadEndpoints = async (): Promise<Endpoints> => {
-  const config: Endpoints<'*'> = JSON.parse(
-    fs.readFileSync('http_endpoints/config.json', 'utf-8')
-  )
+export const loadEndpoints = async (rootDir = process.cwd()): Promise<Endpoints> => {
+  const endpointsDir = 'http_endpoints'
+  const endPointsFile = path.join(rootDir, endpointsDir, 'config.json')
+  const config: Endpoints<'*'> = JSON.parse(fs.readFileSync(endPointsFile, 'utf-8'))
+
   return config.map(({ http_method, ...endpoint }) => ({
     http_method: http_method === '*' ? 'ALL' : http_method,
     ...endpoint

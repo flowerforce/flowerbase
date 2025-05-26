@@ -25,6 +25,7 @@ export type ExecuteQueryParams = {
   query: Parameters<GetOperatorsFunction>
   update: Document
   document: Document
+  documents: Document[]
 }
 
 type FunctionsControllerOptions = {

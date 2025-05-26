@@ -26,6 +26,7 @@ type ArgumentsData = Arguments<{
   query: Parameters<GetOperatorsFunction>
   update: Document
   document: Document
+  documents: Document[]
 }>
 
 export type Base64Function = {

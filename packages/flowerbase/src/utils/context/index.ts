@@ -1,4 +1,3 @@
-import m from 'module'
 import { createRequire } from 'node:module'
 import vm from 'vm'
 import { EJSON } from 'bson'
@@ -36,16 +35,18 @@ export async function GenerateContext({
   })
 
   try {
-    const entryFile = require.main?.filename ?? process.cwd()
-    const customRequire = createRequire(entryFile)
-    vm.runInContext(m.wrap(currentFunction.code), vm.createContext(contextData))(
+    const entryFile = require.main?.filename ?? process.cwd();
+    const customRequire = createRequire(entryFile);
+
+    vm.runInContext(currentFunction.code, vm.createContext({
+      ...contextData, require: customRequire,
       exports,
-      customRequire,
       module,
-      __filename,
-      __dirname
-    )
-  } catch (e) {
+      __filename: __filename,
+      __dirname: __dirname
+    }));
+  }
+  catch (e) {
     console.log(e)
   }
 

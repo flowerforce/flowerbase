@@ -41,17 +41,20 @@ export async function initialize({
     logger: !!DEFAULT_CONFIG.ENABLE_LOGGER
   })
 
-  console.log('CURRENT PORT', port)
-  console.log('CURRENT HOST', host)
+  const basePath = require.main?.path
+  console.log("BASE PATH", basePath)
 
-  const functionsList = await loadFunctions()
-  console.log('Functions LOADED')
-  const triggersList = await loadTriggers()
-  console.log('Triggers LOADED')
-  const endpointsList = await loadEndpoints()
-  console.log('Endpoints LOADED')
-  const rulesList = await loadRules()
-  console.log('Rules LOADED')
+  console.log("CURRENT PORT", port)
+  console.log("CURRENT HOST", host)
+
+  const functionsList = await loadFunctions(basePath)
+  console.log("Functions LOADED")
+  const triggersList = await loadTriggers(basePath)
+  console.log("Triggers LOADED")
+  const endpointsList = await loadEndpoints(basePath)
+  console.log("Endpoints LOADED")
+  const rulesList = await loadRules(basePath)
+  console.log("Rules LOADED")
   const stateConfig = {
     functions: functionsList,
     triggers: triggersList,
@@ -80,8 +83,8 @@ export async function initialize({
   await generateEndpoints({ app: fastify, functionsList, endpointsList })
   console.log('HTTP Endpoints registration COMPLETED')
   fastify.ready(() => {
-    console.log('FASTIFY IS READY')
-    triggersList?.length > 0 && activateTriggers({ fastify, triggersList, functionsList })
+    console.log("FASTIFY IS READY")
+    if (triggersList?.length > 0) activateTriggers({ fastify, triggersList, functionsList })
   })
   await fastify.listen({ port, host })
 
