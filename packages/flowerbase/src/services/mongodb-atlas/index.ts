@@ -39,15 +39,15 @@ const getOperators: GetOperatorsFunction = (
 
       const { status, document } = winningRole
         ? await checkValidation(
-            winningRole,
-            {
-              type: 'read',
-              roles,
-              cursor: result,
-              expansions: {}
-            },
-            user
-          )
+          winningRole,
+          {
+            type: 'read',
+            roles,
+            cursor: result,
+            expansions: {}
+          },
+          user
+        )
         : { status: true, document: result }
 
       // Return validated document or empty object if not permitted
@@ -81,27 +81,27 @@ const getOperators: GetOperatorsFunction = (
       const formattedQuery = getFormattedQuery(filters, query, user)
 
       // Retrieve the document to check permissions before deleting
-      const result = await collection.findOne(formattedQuery)
+      const result = await collection.findOne({ $and: formattedQuery })
       const winningRole = getWinningRole(result, user, roles)
 
       const { status } = winningRole
         ? await checkValidation(
-            winningRole,
-            {
-              type: 'delete',
-              roles,
-              cursor: result,
-              expansions: {}
-            },
-            user
-          )
+          winningRole,
+          {
+            type: 'delete',
+            roles,
+            cursor: result,
+            expansions: {}
+          },
+          user
+        )
         : { status: true }
 
       if (!status) {
         throw new Error('Delete not permitted')
       }
 
-      return collection.deleteOne(formattedQuery)
+      return collection.deleteOne({ $and: formattedQuery })
     }
     // System mode: bypass access control
     return collection.deleteOne(query)
@@ -133,15 +133,15 @@ const getOperators: GetOperatorsFunction = (
 
       const { status, document } = winningRole
         ? await checkValidation(
-            winningRole,
-            {
-              type: 'insert',
-              roles,
-              cursor: data,
-              expansions: {}
-            },
-            user
-          )
+          winningRole,
+          {
+            type: 'insert',
+            roles,
+            cursor: data,
+            expansions: {}
+          },
+          user
+        )
         : { status: true, document: data }
 
       if (!status || !isEqual(data, document)) {
@@ -181,6 +181,7 @@ const getOperators: GetOperatorsFunction = (
 
       // Retrieve the document to check permissions before updating
       const result = await collection.findOne({ $and: formattedQuery })
+
       if (!result) {
         throw new Error('Update not permitted')
       }
@@ -194,10 +195,10 @@ const getOperators: GetOperatorsFunction = (
       // const docToCheck = hasOperators
       //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
       //   : data
-
+      const [matchQuery] = formattedQuery;
       const pipeline = [
         {
-          $match: formattedQuery
+          $match: matchQuery
         },
         {
           $limit: 1
@@ -208,19 +209,18 @@ const getOperators: GetOperatorsFunction = (
       const [docToCheck] = hasOperators
         ? await collection.aggregate(pipeline).toArray()
         : ([data] as [Document])
-
       // Validate update permissions
       const { status, document } = winningRole
         ? await checkValidation(
-            winningRole,
-            {
-              type: 'write',
-              roles,
-              cursor: docToCheck,
-              expansions: {}
-            },
-            user
-          )
+          winningRole,
+          {
+            type: 'write',
+            roles,
+            cursor: docToCheck,
+            expansions: {}
+          },
+          user
+        )
         : { status: true, document: docToCheck }
 
       // Ensure no unauthorized changes are made
@@ -229,8 +229,7 @@ const getOperators: GetOperatorsFunction = (
       if (!status || !areDocumentsEqual) {
         throw new Error('Update not permitted')
       }
-
-      return collection.updateOne(formattedQuery, data, options)
+      return collection.updateOne({ $and: formattedQuery }, data, options)
     }
     return collection.updateOne(query, data, options)
   },
@@ -279,15 +278,15 @@ const getOperators: GetOperatorsFunction = (
 
             const { status, document } = winningRole
               ? await checkValidation(
-                  winningRole,
-                  {
-                    type: 'read',
-                    roles,
-                    cursor: currentDoc,
-                    expansions: {}
-                  },
-                  user
-                )
+                winningRole,
+                {
+                  type: 'read',
+                  roles,
+                  cursor: currentDoc,
+                  expansions: {}
+                },
+                user
+              )
               : { status: !roles.length, document: currentDoc }
 
             return status ? document : undefined
@@ -350,28 +349,28 @@ const getOperators: GetOperatorsFunction = (
 
         const { status, document } = winningRole
           ? await checkValidation(
-              winningRole,
-              {
-                type: 'read',
-                roles,
-                cursor: fullDocument,
-                expansions: {}
-              },
-              user
-            )
+            winningRole,
+            {
+              type: 'read',
+              roles,
+              cursor: fullDocument,
+              expansions: {}
+            },
+            user
+          )
           : { status: true, document: fullDocument }
 
         const { status: updatedFieldsStatus, document: updatedFields } = winningRole
           ? await checkValidation(
-              winningRole,
-              {
-                type: 'read',
-                roles,
-                cursor: updateDescription?.updatedFields,
-                expansions: {}
-              },
-              user
-            )
+            winningRole,
+            {
+              type: 'read',
+              roles,
+              cursor: updateDescription?.updatedFields,
+              expansions: {}
+            },
+            user
+          )
           : { status: true, document: updateDescription?.updatedFields }
 
         return { status, document, updatedFieldsStatus, updatedFields }
@@ -435,15 +434,15 @@ const getOperators: GetOperatorsFunction = (
 
           const { status, document } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: 'insert',
-                  roles,
-                  cursor: currentDoc,
-                  expansions: {}
-                },
-                user
-              )
+              winningRole,
+              {
+                type: 'insert',
+                roles,
+                cursor: currentDoc,
+                expansions: {}
+              },
+              user
+            )
             : { status: !roles.length, document: currentDoc }
 
           return status ? document : undefined
@@ -498,15 +497,15 @@ const getOperators: GetOperatorsFunction = (
 
           const { status, document } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: 'write',
-                  roles,
-                  cursor: currentDoc,
-                  expansions: {}
-                },
-                user
-              )
+              winningRole,
+              {
+                type: 'write',
+                roles,
+                cursor: currentDoc,
+                expansions: {}
+              },
+              user
+            )
             : { status: !roles.length, document: currentDoc }
 
           return status ? document : undefined
@@ -555,15 +554,15 @@ const getOperators: GetOperatorsFunction = (
 
           const { status, document } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: 'delete',
-                  roles,
-                  cursor: currentDoc,
-                  expansions: {}
-                },
-                user
-              )
+              winningRole,
+              {
+                type: 'delete',
+                roles,
+                cursor: currentDoc,
+                expansions: {}
+              },
+              user
+            )
             : { status: !roles.length, document: currentDoc }
 
           return status ? document : undefined
