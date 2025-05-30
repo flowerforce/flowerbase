@@ -29,15 +29,29 @@ export const AuthenticationProvider: React.FC<AuthenticationProviderProps> = ({ 
 
   const logout = useCallback(async (): Promise<void> => {
     if (user) {
-      await user.logOut();
+      await app.currentUser?.logOut();
       setUser(null);
       navigate(APP_ROUTES.INDEX)
     }
   }, [navigate, user]);
 
+
+  const loadUser = useCallback(async () => {
+    const user = app.currentUser
+    try {
+      await user?.refreshAccessToken();
+    } catch (err) {
+      console.warn("Invalid token", err);
+      await app.currentUser?.logOut();
+    }
+    finally {
+      setUser(app.currentUser);
+    }
+  }, [])
+
   useEffect(() => {
-    setUser(app.currentUser);
-  }, []);
+    loadUser()
+  }, [loadUser]);
 
   const value: AuthenticationContextType = {
     user,
