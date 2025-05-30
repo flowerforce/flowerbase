@@ -75,7 +75,7 @@ const getRegisterConfig = async ({
       plugin: cors,
       options: {
         origin: '*',
-        methods: ['POST', 'GET']
+        methods: ['POST', 'GET', 'DELETE']
       }
     },
     {
