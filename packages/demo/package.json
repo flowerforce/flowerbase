@@ -1,0 +1,18 @@
+{
+  "name": "flowerbase-demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\"",
+    "start:frontend": "cd packages/frontend && npm run dev",
+    "start:backend": "cd packages/backend && npm run start",
+    "build:backend": "cd packages/backend && npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

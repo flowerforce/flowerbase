@@ -1,0 +1,18 @@
+{
+    "api-key": {
+        "name": "api-key",
+        "type": "api-key",
+        "disabled": true
+    },
+    "local-userpass": {
+        "name": "local-userpass",
+        "type": "local-userpass",
+        "disabled": false,
+        "config": {
+            "autoConfirm": true,
+            "resetPasswordSubject": "reset",
+            "resetPasswordUrl": "http://localhost:5173/password-reset",
+            "runConfirmationFunction": false
+        }
+    }
+}

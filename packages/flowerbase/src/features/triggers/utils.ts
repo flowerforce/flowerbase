@@ -15,17 +15,23 @@ import { HandlerParams, Trigger, Triggers } from './interface'
  * @returns {Promise<Triggers>} A promise that resolves to an array of trigger objects.
  */
 export const loadTriggers = async (rootDir = process.cwd()): Promise<Triggers> => {
-  const triggersPath = path.join(rootDir, 'triggers')
-  const files = fs.readdirSync(triggersPath)
+  try {
+    const triggersPath = path.join(rootDir, 'triggers')
+    const files = fs.readdirSync(triggersPath)
 
-  const triggers = files
-    .filter((fileName) => fileName.endsWith('.json'))
-    .map((fileName) => ({
-      fileName,
-      content: readJsonContent(path.join(triggersPath, fileName)) as Trigger
-    }))
+    const triggers = files
+      .filter((fileName) => fileName.endsWith('.json'))
+      .map((fileName) => ({
+        fileName,
+        content: readJsonContent(path.join(triggersPath, fileName)) as Trigger
+      }))
 
-  return triggers
+    return triggers
+  } catch (e: unknown) {
+    console.log("TRIGGERS NOT FOUND ->", (e as { message: string }).message)
+    return []
+  }
+
 }
 
 /**
