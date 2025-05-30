@@ -6,16 +6,16 @@ const searchTodos = async ({ page, pageSize = 10 }: { page?: number; pageSize?: 
     .collection("todos");
 
   if (page) {
-    const totalCount = (await todosCollection.find({}).toArray()).length;
-    const results = await todosCollection
-      .find({})
-      .skip((page - 1) * pageSize)
-      .limit(pageSize)
-      .toArray();
+    const items = (await todosCollection.find({}).toArray());
+
+    const start = pageSize * (page - 1)
+    const end = start + pageSize
+
+    const results = items.slice(start, end)
 
     return {
       currentPage: page,
-      total: totalCount,
+      total: items.length,
       todos: results,
     };
   }

@@ -11,10 +11,10 @@ const COLUMN_TITLES = {
 };
 
 const COLUMN_TITLES_COLORS = {
-  backlog: "danger",   
-  todo: "warning",     
-  progress: "info",    
-  done: "success",    
+    backlog: "danger",
+    todo: "warning",
+    progress: "info",
+    done: "success",
 } as const;
 
 const COLUMN_ORDER = ["backlog", "todo", "progress", "done"] as Todo["status"][];
@@ -94,7 +94,7 @@ export const TaskBoard = ({
                                                         borderRadius: "8px",
                                                         cursor: "pointer",
                                                         fontWeight: "600",
-                                                        padding: "0.5rem 1rem"
+                                                        padding: "3px 6px"
                                                     }}
                                                 >
                                                     {`Back to ${getPrevStatus(status)}`}
@@ -110,7 +110,7 @@ export const TaskBoard = ({
                                                         borderRadius: "8px",
                                                         cursor: "pointer",
                                                         fontWeight: "600",
-                                                        padding: "0.5rem 1rem"
+                                                        padding: "3px 6px"
                                                     }}
                                                 >
                                                     {`Move to ${getNextStatus(status)}`}

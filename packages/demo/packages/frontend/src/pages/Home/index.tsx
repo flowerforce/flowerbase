@@ -55,12 +55,12 @@ export const Home = () => {
   const handleDelete = useCallback(async (id: string) => {
     try {
       await db().collection("todos").deleteOne({ _id: new Realm.BSON.ObjectId(id) })
-      setPagination((prevPagination) => ({ ...prevPagination, todos: prevPagination.todos.filter(({ _id }) => _id !== id) }))
+      fetchTodos(isKanban ? undefined : pagination.todos.length > 1 ? pagination.currentPage : pagination.currentPage - 1)
     }
     catch (e) {
       console.log(e)
     }
-  }, [])
+  }, [fetchTodos, isKanban, pagination])
 
   const handleUpdate = useCallback(async (id: string, newStatus: Todo["status"]) => {
     try {
@@ -120,7 +120,7 @@ export const Home = () => {
             modal
           >
             <NewTask onClose={() => {
-              fetchTodos()
+              fetchTodos(isKanban ? undefined : pagination.todos.length === 10 ? pagination.currentPage + 1 : pagination.currentPage)
               setShowModal(false)
             }} />
           </Dialog>
