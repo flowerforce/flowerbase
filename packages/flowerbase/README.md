@@ -53,6 +53,26 @@ Install the `@flowerforce/flowerbase` library, which provides the tools required
 npm install @flowerforce/flowerbase
 ```
 
+Add Typescript
+
+```bash
+npm install --save-dev typescript @types/node ts-node
+```
+
+Add `tsconfig.json` file
+
+```bash
+npx tsc --init
+```
+
+In your `packages.json`, inside the script section add this: 
+
+```json
+{
+  "start": "ts-node index.ts"
+}
+```
+
 ## 🏗️ 2. Create the Project Structure
 Inside your project root, create the main source directory:
 
@@ -76,6 +96,7 @@ Ensure the following environment variables are set in your .env file or deployme
 | `DB_CONNECTION_STRING` | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
 | `APP_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
 | `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
+| `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
 
 
 Example:
@@ -85,6 +106,7 @@ PORT=3000
 DB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/dbname
 APP_SECRET=your-jwt-secret
 HOST=0.0.0.0
+HTTPS_SCHEMA=http
 ```
 
 🛡️ Note: Never commit .env files to source control. Use a .gitignore file to exclude it.
@@ -95,16 +117,21 @@ In your index.ts file, import the initialize function from the `@flowerforce/flo
 
 ```ts
 // src/index.ts
-
 import { initialize } from '@flowerforce/flowerbase';
 
+const projectId = process.env.PROJECT_ID ?? "my-project-id"
+const port = process.env.PORT ? Number(process.env.PORT) : undefined
+const mongodbUrl = process.env.DB_CONNECTION_STRING
+const jwtSecret = process.env.APP_SECRET
+const host = process.env.HOST
+
 initialize({
-  projectId: process.env.PROJECT_ID,
-  port: Number(process.env.PORT),
-  mongodbUrl: process.env.DB_CONNECTION_STRING,
-  jwtSecret: process.env.APP_SECRET,
-  host: process.env.HOST
-});
+    projectId,
+    port,
+    mongodbUrl,
+    jwtSecret,
+    host
+})
 ```
 
 This initializes the Flowerbase integration, connecting your application to MongoDB Atlas.
@@ -306,17 +333,31 @@ This will download a `.zip` file containing your Realm app's full structure and 
 
 ✅ You are now ready to migrate or inspect your Realm app locally!
 
-In your existing project folder, initialize a new Node.js project, Run:
+1) In your existing project folder, initialize a new Node.js project, Run:
 
 ```bash
 npm init -y
 ```
-Install Flowerbase
+2) Install Flowerbase
 
 ```bash
 npm install @flowerforce/flowerbase
 ```
-Create an index.ts file
+
+3) Add Typescript
+
+```bash
+npm install --save-dev typescript @types/node ts-node
+```
+
+
+4) Add `tsconfig.json` file
+
+```bash
+npx tsc --init
+```
+
+5) Create an index.ts file
 
 Inside your project, create index.ts:
 
@@ -324,20 +365,35 @@ Inside your project, create index.ts:
 touch index.ts
 ```
 
+6) In your `packages.json`, inside the script section add this: 
+
+```json
+{
+  "start": "ts-node index.ts"
+}
+```
+
 Initialize the Flowerbase App
 
 In index.ts, add:
 
 ```ts
-import { initialize } from "@flowerforce/flowerbase";
+import { initialize } from '@flowerforce/flowerbase';
+
+const projectId = process.env.PROJECT_ID ?? "my-project-id"
+const port = process.env.PORT ? Number(process.env.PORT) : undefined
+const mongodbUrl = process.env.DB_CONNECTION_STRING
+const jwtSecret = process.env.APP_SECRET
+const host = process.env.HOST
 
 initialize({
-  projectId: process.env.PROJECT_ID,
-  port: Number(process.env.PORT),
-  mongodbUrl: process.env.DB_CONNECTION_STRING,
-  jwtSecret: process.env.APP_SECRET,
-  host: process.env.HOST
-});
+    projectId,
+    port,
+    mongodbUrl,
+    jwtSecret,
+    host
+})
+
 ```
 
 Ensure the following environment variables are set in your .env file or deployment environment:
@@ -350,6 +406,7 @@ Ensure the following environment variables are set in your .env file or deployme
 | `DB_CONNECTION_STRING` | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
 | `APP_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
 | `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
+| `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
 
 
 Example:
@@ -359,6 +416,7 @@ PORT=3000
 DB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/dbname
 APP_SECRET=your-jwt-secret
 HOST=0.0.0.0
+HTTPS_SCHEMA=http
 ```
 
 🛡️ Note: Never commit .env files to source control. Use a .gitignore file to exclude it.
