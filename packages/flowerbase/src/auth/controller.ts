@@ -77,4 +77,13 @@ export async function authController(app: FastifyInstance) {
       }
     }
   )
+  /**
+     * Endpoint to destroy the existing session.  
+     */
+  app.delete(
+    AUTH_ENDPOINTS.SESSION,
+    async function () {
+      return { status: "ok" }
+    }
+  )
 }

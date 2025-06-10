@@ -1,0 +1,8 @@
+[
+    {
+        "name": "searchTodos",
+        "private": false,
+        "run_as_system": false,
+        "disable_arg_logs": true
+    }
+]

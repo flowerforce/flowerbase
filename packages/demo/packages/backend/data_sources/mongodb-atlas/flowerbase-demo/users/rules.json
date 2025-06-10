@@ -1,0 +1,15 @@
+{
+    "database": "flowerbase-demo",
+    "collection": "users",
+    "roles": [
+        {
+            "name": "denyAllAccess",
+            "apply_when": {},
+            "insert": false,
+            "delete": false,
+            "search": false,
+            "read": false,
+            "write": false
+        }
+    ]
+}

@@ -1,0 +1,14 @@
+{
+  "database": "flowerbase-demo",
+  "collection": "todos",
+  "filters": [
+    {
+      "name": "onlyReadOwnTodos",
+      "apply_when": {},
+      "query": {
+        "userId": "%%user.id"
+      }
+    }
+  ],
+  "roles": []
+}

@@ -11,6 +11,7 @@
     "lint:fds": "eslint packages/flowerbase",
     "format:fds": "prettier --write 'packages/flowerbase/**/*.ts'",
     "fix:fds": "npm run format:fds && npm run lint:fds -- --fix",
+    "start:demo": "cd packages/demo && npm start",
     "prepare:prerelease": "npm run build:packages && ts-node scripts/prerelease",
     "publish:prerelease": "nx release publish --tag prerelease",
     "build:packages": "nx run-many -t build"

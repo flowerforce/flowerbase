@@ -1,0 +1,7 @@
+{
+    "enabled": true,
+    "mongo_service_name": "mongodb-atlas",
+    "database_name": "flowerbase-demo",
+    "collection_name": "users",
+    "user_id_field": "id"
+}
