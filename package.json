@@ -1,7 +1,7 @@
 {
-  "name": "flower-server",
+  "name": "flowerbase",
   "version": "1.0.0",
-  "description": "flower-server-packages",
+  "description": "flowerbase-packages",
   "private": true,
   "scripts": {
     "test": "npx jest",
@@ -21,14 +21,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/flowerforce/flower-server.git"
+    "url": "git+https://github.com/flowerforce/flowerbase.git"
   },
   "author": "Stackhouse SRL",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/flowerforce/flower-server/issues"
+    "url": "https://github.com/flowerforce/flowerbase/issues"
   },
-  "homepage": "https://github.com/flowerforce/flower-server#readme",
+  "homepage": "https://github.com/flowerforce/flowerbase#readme",
   "dependencies": {},
   "devDependencies": {
     "@babel/core": "^7.24.5",
