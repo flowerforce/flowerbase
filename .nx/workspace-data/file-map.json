@@ -90,71 +90,296 @@
   "fileMap": {
     "nonProjectFiles": [
       {
-        "file": ".eslintrc",
-        "hash": "4890099772766365500"
-      },
-      {
         "file": "jest.config.ts",
         "hash": "3494843969422251966"
       },
       {
-        "file": "eslint.config.mjs",
-        "hash": "15816864606171050325"
+        "file": ".eslintrc",
+        "hash": "4890099772766365500"
       },
       {
-        "file": ".vscode/settings.json",
-        "hash": "17816762371917633494"
-      },
-      {
-        "file": "scripts/prerelease.ts",
-        "hash": "14144003354920194568"
-      },
-      {
-        "file": "tsconfig.base.json",
-        "hash": "11549800608902314440"
-      },
-      {
-        "file": "LICENSE",
-        "hash": "12182717254072030367"
-      },
-      {
-        "file": "jest.preset.js",
-        "hash": "9430166341120122740"
-      },
-      {
-        "file": ".prettierrc",
-        "hash": "7656430364163193455"
-      },
-      {
-        "file": "package.json",
-        "hash": "14521184725252051541"
-      },
-      {
-        "file": ".npmignore",
-        "hash": "9882982332580877298"
-      },
-      {
-        "file": ".gitignore",
-        "hash": "12510454605679904704"
+        "file": "DOCS.md",
+        "hash": "2756621401304838524"
       },
       {
         "file": ".github/workflows/prerelease.yaml",
         "hash": "1579121106462692968"
       },
       {
+        "file": ".npmignore",
+        "hash": "9882982332580877298"
+      },
+      {
+        "file": "package-lock.json",
+        "hash": "3676292613274544332"
+      },
+      {
+        "file": ".gitignore",
+        "hash": "12510454605679904704"
+      },
+      {
         "file": "nx.json",
         "hash": "9418980942870310400"
       },
       {
-        "file": "todo.md",
-        "hash": "1032565748642913334"
+        "file": ".github/workflows/release.yaml",
+        "hash": "5668715174629061208"
       },
       {
-        "file": "package-lock.json",
-        "hash": "3692886306116829890"
+        "file": "package.json",
+        "hash": "9247982261855955756"
+      },
+      {
+        "file": ".vscode/settings.json",
+        "hash": "17816762371917633494"
+      },
+      {
+        "file": "tsconfig.base.json",
+        "hash": "11549800608902314440"
+      },
+      {
+        "file": "scripts/prerelease.ts",
+        "hash": "14144003354920194568"
+      },
+      {
+        "file": ".prettierrc",
+        "hash": "7656430364163193455"
+      },
+      {
+        "file": "jest.preset.js",
+        "hash": "9430166341120122740"
+      },
+      {
+        "file": "eslint.config.mjs",
+        "hash": "15816864606171050325"
+      },
+      {
+        "file": "LICENSE",
+        "hash": "12182717254072030367"
+      },
+      {
+        "file": ".github/workflows/checks.yaml",
+        "hash": "15811896887820413211"
       }
     ],
     "projectFileMap": {
+      "frontend": [
+        {
+          "file": "packages/demo/packages/frontend/.gitignore",
+          "hash": "13046175384202504187"
+        },
+        {
+          "file": "packages/demo/packages/frontend/README.md",
+          "hash": "13160460843517416105"
+        },
+        {
+          "file": "packages/demo/packages/frontend/eslint.config.js",
+          "hash": "16145672096969245511"
+        },
+        {
+          "file": "packages/demo/packages/frontend/index.html",
+          "hash": "4025202329384162906"
+        },
+        {
+          "file": "packages/demo/packages/frontend/package-lock.json",
+          "hash": "4932292718093455468"
+        },
+        {
+          "file": "packages/demo/packages/frontend/package.json",
+          "hash": "2630108362905442116",
+          "deps": [
+            "npm:typescript@5.8.3"
+          ]
+        },
+        {
+          "file": "packages/demo/packages/frontend/public/vite.svg",
+          "hash": "16046085400642193116"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/App.css",
+          "hash": "3739391659270974612"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/App.tsx",
+          "hash": "1989732526986445183"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/api/client.ts",
+          "hash": "11827492391897522812"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/appRoutes.ts",
+          "hash": "6744697892634064487"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/assets/react.svg",
+          "hash": "16069471864800376455"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/EmptyState/index.tsx",
+          "hash": "13818087902908550141"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/Layout/index.tsx",
+          "hash": "9208038598266246320"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/Loader/index.tsx",
+          "hash": "5439699450597759093"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/NewTask/index.tsx",
+          "hash": "16179991392904483125"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/Pagination/index.tsx",
+          "hash": "15784848270396726706"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/TaskBoard/index.tsx",
+          "hash": "7496398157237751950"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/TaskTable/index.tsx",
+          "hash": "15200496161907260446"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/context/Authentication.tsx",
+          "hash": "6615975624568309645"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/hooks/useAuthentication.ts",
+          "hash": "6290839895112002736"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/index.css",
+          "hash": "8688147797407610842"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/main.tsx",
+          "hash": "15503771049540406531"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/pages/Home/index.tsx",
+          "hash": "12195795209109929614"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/pages/Login/index.tsx",
+          "hash": "16267190739117165768"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/pages/Registration/index.tsx",
+          "hash": "12840201238792842803"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/pages/Welcome/index.tsx",
+          "hash": "4928837705085028779"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/vite-env.d.ts",
+          "hash": "12946363841406869089"
+        },
+        {
+          "file": "packages/demo/packages/frontend/tsconfig.app.json",
+          "hash": "709621094284831163"
+        },
+        {
+          "file": "packages/demo/packages/frontend/tsconfig.json",
+          "hash": "2365188958523842680"
+        },
+        {
+          "file": "packages/demo/packages/frontend/tsconfig.node.json",
+          "hash": "2201964403257550573"
+        },
+        {
+          "file": "packages/demo/packages/frontend/vite.config.ts",
+          "hash": "16225914092815047172"
+        }
+      ],
+      "backend": [
+        {
+          "file": "packages/demo/packages/backend/auth/custom_user_data.json",
+          "hash": "3927028957925870881"
+        },
+        {
+          "file": "packages/demo/packages/backend/auth/providers.json",
+          "hash": "14630975639843143327"
+        },
+        {
+          "file": "packages/demo/packages/backend/data_sources/mongodb-atlas/config.json",
+          "hash": "5961588033991081983"
+        },
+        {
+          "file": "packages/demo/packages/backend/data_sources/mongodb-atlas/flowerbase-demo/todos/rules.json",
+          "hash": "10012275371433218987"
+        },
+        {
+          "file": "packages/demo/packages/backend/data_sources/mongodb-atlas/flowerbase-demo/users/rules.json",
+          "hash": "12610595509922332041"
+        },
+        {
+          "file": "packages/demo/packages/backend/functions/config.json",
+          "hash": "12162700482727257434"
+        },
+        {
+          "file": "packages/demo/packages/backend/functions/searchTodos.ts",
+          "hash": "12062627583008359396"
+        },
+        {
+          "file": "packages/demo/packages/backend/global.d.ts",
+          "hash": "196340667037983804",
+          "deps": [
+            "flowerbase"
+          ]
+        },
+        {
+          "file": "packages/demo/packages/backend/http_endpoints/config.json",
+          "hash": "5079120912223948982"
+        },
+        {
+          "file": "packages/demo/packages/backend/index.ts",
+          "hash": "16755263692504617323",
+          "deps": [
+            "flowerbase"
+          ]
+        },
+        {
+          "file": "packages/demo/packages/backend/package-lock.json",
+          "hash": "10928816809470949623"
+        },
+        {
+          "file": "packages/demo/packages/backend/package.json",
+          "hash": "11759045349700533240",
+          "deps": [
+            "npm:@types/node",
+            "npm:nodemon",
+            "npm:ts-node",
+            "npm:typescript",
+            "flowerbase"
+          ]
+        },
+        {
+          "file": "packages/demo/packages/backend/tsconfig.json",
+          "hash": "13542890855063395180"
+        }
+      ],
+      "flowerbase-demo": [
+        {
+          "file": "packages/demo/README.md",
+          "hash": "10793297036395519946"
+        },
+        {
+          "file": "packages/demo/package-lock.json",
+          "hash": "2096834049677913296"
+        },
+        {
+          "file": "packages/demo/package.json",
+          "hash": "7323055674015837798",
+          "deps": [
+            "npm:concurrently"
+          ]
+        }
+      ],
       "flowerbase": [
         {
           "file": "packages/flowerbase/CHANGELOG.md",
@@ -166,7 +391,7 @@
         },
         {
           "file": "packages/flowerbase/README.md",
-          "hash": "13731472083967181879"
+          "hash": "15950364827485381646"
         },
         {
           "file": "packages/flowerbase/jest.config.ts",
@@ -174,28 +399,28 @@
         },
         {
           "file": "packages/flowerbase/package.json",
-          "hash": "5822345521732280271",
+          "hash": "3968302081809293340",
           "deps": [
             "npm:@babel/cli",
             "npm:@babel/core",
             "npm:@babel/preset-env",
-            "npm:@eslint/compat@1.2.8",
-            "npm:@eslint/eslintrc@3.3.1",
-            "npm:@eslint/js@9.24.0",
+            "npm:@eslint/compat@1.2.9",
+            "npm:@eslint/eslintrc",
+            "npm:@eslint/js",
             "npm:@types/cors",
             "npm:@types/jest",
             "npm:@types/lodash",
             "npm:@types/node@22.6.1",
             "npm:@types/node-cron",
-            "npm:@typescript-eslint/eslint-plugin@8.29.1",
-            "npm:@typescript-eslint/parser@8.29.1",
-            "npm:eslint@9.24.0",
+            "npm:@typescript-eslint/eslint-plugin@8.34.0",
+            "npm:@typescript-eslint/parser@8.34.0",
+            "npm:eslint@9.28.0",
             "npm:eslint-config-prettier",
             "npm:eslint-plugin-eslint-comments",
             "npm:eslint-plugin-eslint-plugin",
             "npm:eslint-plugin-import",
             "npm:eslint-plugin-prettier",
-            "npm:globals@15.15.0",
+            "npm:globals",
             "npm:jest",
             "npm:prettier",
             "npm:ts-jest",
@@ -231,7 +456,7 @@
         },
         {
           "file": "packages/flowerbase/src/auth/controller.ts",
-          "hash": "9528161386340607314",
+          "hash": "9502512979046153021",
           "deps": [
             "npm:bson",
             "npm:fastify"
@@ -264,7 +489,7 @@
         },
         {
           "file": "packages/flowerbase/src/auth/utils.ts",
-          "hash": "2134420872550574705"
+          "hash": "16532693549601921769"
         },
         {
           "file": "packages/flowerbase/src/babel.config.json",
@@ -272,7 +497,7 @@
         },
         {
           "file": "packages/flowerbase/src/constants.ts",
-          "hash": "15335059024952717182"
+          "hash": "15332673479788837016"
         },
         {
           "file": "packages/flowerbase/src/fastify.d.ts",
@@ -294,21 +519,21 @@
         },
         {
           "file": "packages/flowerbase/src/features/endpoints/utils.ts",
-          "hash": "16258772732408556907",
+          "hash": "11472936155210349180",
           "deps": [
             "npm:fastify"
           ]
         },
         {
           "file": "packages/flowerbase/src/features/functions/controller.ts",
-          "hash": "13210531705908858340",
+          "hash": "6386459322280123765",
           "deps": [
             "npm:bson"
           ]
         },
         {
           "file": "packages/flowerbase/src/features/functions/dtos.ts",
-          "hash": "16474766210165264610",
+          "hash": "6057490863033497507",
           "deps": [
             "npm:mongodb"
           ]
@@ -319,7 +544,7 @@
         },
         {
           "file": "packages/flowerbase/src/features/functions/interface.ts",
-          "hash": "6536213471116414506",
+          "hash": "10523203435227851676",
           "deps": [
             "npm:fastify",
             "npm:mongodb"
@@ -327,7 +552,7 @@
         },
         {
           "file": "packages/flowerbase/src/features/functions/utils.ts",
-          "hash": "1694330494815312998",
+          "hash": "12819340312788544475",
           "deps": [
             "npm:bson"
           ]
@@ -353,29 +578,29 @@
         },
         {
           "file": "packages/flowerbase/src/features/triggers/index.ts",
-          "hash": "482478244878371492"
+          "hash": "1248982878963613136"
         },
         {
           "file": "packages/flowerbase/src/features/triggers/interface.ts",
-          "hash": "17263378653300491714",
+          "hash": "16360644002465208188",
           "deps": [
             "npm:fastify"
           ]
         },
         {
           "file": "packages/flowerbase/src/features/triggers/utils.ts",
-          "hash": "9175671216947164385",
+          "hash": "12897967977649159525",
           "deps": [
             "npm:node-cron"
           ]
         },
         {
-          "file": "packages/flowerbase/src/global.d.ts",
-          "hash": "3244421341483603138"
+          "file": "packages/flowerbase/src/global.ts",
+          "hash": "14381761140991733809"
         },
         {
           "file": "packages/flowerbase/src/index.ts",
-          "hash": "6423257539750650836",
+          "hash": "15849391788067266141",
           "deps": [
             "npm:dotenv",
             "npm:fastify"
@@ -383,14 +608,14 @@
         },
         {
           "file": "packages/flowerbase/src/model.ts",
-          "hash": "12119930945294233710",
+          "hash": "9933800582847598013",
           "deps": [
             "npm:mongodb"
           ]
         },
         {
           "file": "packages/flowerbase/src/services/api/index.ts",
-          "hash": "18047833155382747849"
+          "hash": "13154803586196965911"
         },
         {
           "file": "packages/flowerbase/src/services/api/model.ts",
@@ -408,7 +633,7 @@
         },
         {
           "file": "packages/flowerbase/src/services/aws/index.ts",
-          "hash": "11825491534624463932",
+          "hash": "8623043682952178476",
           "deps": [
             "npm:aws-sdk"
           ]
@@ -423,7 +648,7 @@
         },
         {
           "file": "packages/flowerbase/src/services/mongodb-atlas/index.ts",
-          "hash": "14831085493152242907",
+          "hash": "5946749177094543419",
           "deps": [
             "npm:lodash",
             "npm:mongodb"
@@ -431,7 +656,7 @@
         },
         {
           "file": "packages/flowerbase/src/services/mongodb-atlas/model.ts",
-          "hash": "8075648205605295021",
+          "hash": "5394900792655197847",
           "deps": [
             "npm:fastify",
             "npm:mongodb"
@@ -439,25 +664,25 @@
         },
         {
           "file": "packages/flowerbase/src/services/mongodb-atlas/utils.ts",
-          "hash": "8692778654660361353",
+          "hash": "8636379604639619643",
           "deps": [
             "npm:mongodb"
           ]
         },
         {
           "file": "packages/flowerbase/src/state.ts",
-          "hash": "16873367128824288846",
+          "hash": "353851505670162145",
           "deps": [
             "npm:fastify"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/STEP_A_STATES.test.ts",
-          "hash": "6797205868659186986"
+          "hash": "12771726917679948298"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/STEP_B_STATES.test.ts",
-          "hash": "3872327555215220127"
+          "hash": "2472460417322068958"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/STEP_C_STATES.test.ts",
@@ -465,11 +690,11 @@
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/STEP_D_STATES.test.ts",
-          "hash": "16879902765876755841"
+          "hash": "8414570595457472503"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/checkAdditionalFieldsFn.test.ts",
-          "hash": "2662755460650900803"
+          "hash": "6847274657629075504"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/checkApplyWhen.test.ts",
@@ -480,18 +705,18 @@
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/checkFieldsPropertyExists.test.ts",
-          "hash": "11081782960763363522"
+          "hash": "6088490956166517033"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/checkIsValidFieldNameFn.test.ts",
-          "hash": "3369715445345711218",
+          "hash": "5910250222175867508",
           "deps": [
             "npm:bson"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/comparePassword.test.ts",
-          "hash": "15639867704395254597"
+          "hash": "16256280454203247453"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/evaluateDocumentsFiltersReadFn.test.ts",
@@ -511,60 +736,60 @@
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/exposeRoutes.test.ts",
-          "hash": "3689385938990858718",
+          "hash": "3453904008457732140",
           "deps": [
             "npm:fastify"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/generateContextData.test.ts",
-          "hash": "2071705058237041503",
+          "hash": "5001812508298556322",
           "deps": [
             "npm:fastify"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/getDefaultRule.test.ts",
-          "hash": "8564062095472301024"
+          "hash": "17079252952120240621"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/getKey.test.ts",
-          "hash": "17670227019991208827"
+          "hash": "16261181128484962150"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/getKeys.test.ts",
-          "hash": "689977657698666628"
+          "hash": "1583398920654457342"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/getWinningRole.test.ts",
-          "hash": "3090733268491807276",
+          "hash": "17957185894835402346",
           "deps": [
             "npm:mongodb"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/hashPassword.test.ts",
-          "hash": "1355717054367434286"
+          "hash": "16868586567477499577"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/isEmpty.test.ts",
-          "hash": "3581617972377948428"
+          "hash": "13386864030006141680"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/logMachineInfo.test.ts",
-          "hash": "2157361710885952792"
+          "hash": "3930112581374074626"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/operators.test.ts",
-          "hash": "6800936370339450586"
+          "hash": "737247346650156978"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/readFileContent.test.ts",
-          "hash": "6125706237607838117"
+          "hash": "9516863734886548829"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/registerPlugins.test.ts",
-          "hash": "13396889730130058279",
+          "hash": "14517754102404212625",
           "deps": [
             "npm:@fastify/cors",
             "npm:@fastify/mongodb"
@@ -572,30 +797,30 @@
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/rule.test.ts",
-          "hash": "15332772112510017022"
+          "hash": "13846791803692241119"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/rulesMatcherInterfaces.test.ts",
-          "hash": "17770075625391542252"
+          "hash": "8277642502108062568"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/rulesMatcherUtils.test.ts",
-          "hash": "16240790807845091324"
+          "hash": "12217532665956299674"
         },
         {
           "file": "packages/flowerbase/src/utils/__tests__/someAsync.test.ts",
-          "hash": "6600675645205865131"
+          "hash": "10715783994192959431"
         },
         {
           "file": "packages/flowerbase/src/utils/context/helpers.ts",
-          "hash": "3910123847171400708",
+          "hash": "12365619637936967486",
           "deps": [
             "npm:@fastify/mongodb"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/context/index.ts",
-          "hash": "15541702524925849190",
+          "hash": "18272130124239141105",
           "deps": [
             "npm:bson"
           ]
@@ -609,11 +834,11 @@
         },
         {
           "file": "packages/flowerbase/src/utils/crypto/index.ts",
-          "hash": "11239992129127144223"
+          "hash": "4287239720043797558"
         },
         {
           "file": "packages/flowerbase/src/utils/helpers/someAsync.ts",
-          "hash": "15574556631497445855"
+          "hash": "8511962983285339382"
         },
         {
           "file": "packages/flowerbase/src/utils/index.ts",
@@ -621,14 +846,14 @@
         },
         {
           "file": "packages/flowerbase/src/utils/initializer/exposeRoutes.ts",
-          "hash": "1566277013522033027",
+          "hash": "8924106175409292219",
           "deps": [
             "npm:fastify"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/initializer/registerPlugins.ts",
-          "hash": "17775058991846880073",
+          "hash": "7686917695407076207",
           "deps": [
             "npm:@fastify/cors",
             "npm:@fastify/mongodb",
@@ -637,99 +862,99 @@
         },
         {
           "file": "packages/flowerbase/src/utils/roles/helpers.ts",
-          "hash": "6689558756396237153"
+          "hash": "4715217800917884970"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/interface.ts",
-          "hash": "9826225722716675127"
+          "hash": "9900039487793824388"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/commonValidators.ts",
-          "hash": "9712538517058193168"
+          "hash": "16990573617405740601"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/index.ts",
-          "hash": "17552111136459329009"
+          "hash": "3588966735388496807"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/interface.ts",
-          "hash": "9502567038803528530",
+          "hash": "16029979874182546790",
           "deps": [
             "npm:mongodb"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/machine.ts",
-          "hash": "10802194324710069186",
+          "hash": "4640363897035653147",
           "deps": [
             "npm:mongodb"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/read/A/index.ts",
-          "hash": "5821731331188662614"
+          "hash": "10632355100054753226"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/read/B/index.ts",
-          "hash": "13862602617866863325"
+          "hash": "1232917088788722329"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/read/C/index.ts",
-          "hash": "2389160871818459523"
+          "hash": "11686321366675128533"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/read/D/index.ts",
-          "hash": "9812623090803210245"
+          "hash": "13410150708427807132"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/read/D/validators.ts",
-          "hash": "18148991987650957382"
+          "hash": "3411955667969110242"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/read/index.ts",
-          "hash": "8378930688893158870"
+          "hash": "12021818629831284344"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/utils.ts",
-          "hash": "1998914116853198381",
+          "hash": "8240055977509838668",
           "deps": [
             "npm:mongodb"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/write/A/index.ts",
-          "hash": "10027608425622282266"
+          "hash": "11441765069073719739"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/write/B/index.ts",
-          "hash": "7449003889805800349"
+          "hash": "6203730291867258876"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/write/C/index.ts",
-          "hash": "4278315464001847675"
+          "hash": "12809294906169962132"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/write/C/validators.ts",
-          "hash": "16082864723650412311"
+          "hash": "13965181226886448129"
         },
         {
           "file": "packages/flowerbase/src/utils/roles/machines/write/index.ts",
-          "hash": "6527585218897680820"
+          "hash": "18434840143054956208"
         },
         {
           "file": "packages/flowerbase/src/utils/rules-matcher/interface.ts",
-          "hash": "12856189365590954629"
+          "hash": "447979335739269941"
         },
         {
           "file": "packages/flowerbase/src/utils/rules-matcher/utils.ts",
-          "hash": "5835451088553631103",
+          "hash": "7462657605369593355",
           "deps": [
             "npm:lodash"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/rules.ts",
-          "hash": "12342964533050024844",
+          "hash": "3369226066370644364",
           "deps": [
             "npm:lodash"
           ]

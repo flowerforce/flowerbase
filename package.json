@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "test": "npx jest",
+    "tsc:noemit": "nx run-many -t tsc:noemit",
+    "lint:check": "nx run-many -t lint --fix --quiet --exclude=demo",
     "coverage": "npm run test -- --coverage",
     "build": "cd packages/flowerbase && rm -rf dist/ && tsc",
     "dev": "nodemon index.ts",
@@ -14,7 +16,9 @@
     "start:demo": "cd packages/demo && npm start",
     "prepare:prerelease": "npm run build:packages && ts-node scripts/prerelease",
     "publish:prerelease": "nx release publish --tag prerelease",
-    "build:packages": "nx run-many -t build"
+    "build:packages": "nx run-many -t build",
+    "prepare:release": "npm run build:packages && nx release --skip-publish",
+    "publish:release": "nx release publish"
   },
   "workspaces": [
     "packages/*"

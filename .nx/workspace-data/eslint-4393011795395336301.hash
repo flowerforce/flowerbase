@@ -2318,5 +2318,54 @@
         }
       }
     }
-  }
+  },
+  "17208426693374882183": {},
+  "10527828709447434659": {
+    "packages/flowerbase": {
+      "targets": {
+        "lint": {
+          "command": "eslint .",
+          "cache": true,
+          "options": {
+            "cwd": "packages/flowerbase"
+          },
+          "inputs": [
+            "default",
+            "^default",
+            "{workspaceRoot}/.eslintrc",
+            "{workspaceRoot}/tools/eslint-rules/**/*",
+            {
+              "externalDependencies": [
+                "eslint"
+              ]
+            }
+          ],
+          "outputs": [
+            "{options.outputFile}"
+          ],
+          "metadata": {
+            "technologies": [
+              "eslint"
+            ],
+            "description": "Runs ESLint on project",
+            "help": {
+              "command": "npx eslint --help",
+              "example": {
+                "options": {
+                  "max-warnings": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "1548504645313308458": {},
+  "2015053283902321393": {},
+  "7128081036638159998": {},
+  "1507108643637412136": {},
+  "17476265866126633468": {},
+  "10084522765172973126": {},
+  "5747048075044811945": {}
 }
