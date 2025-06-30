@@ -20,7 +20,6 @@ This documentation is structured to guide both experienced Realm users and newco
 | HTTP Endpoints  | ✅ Supported (unchanged)                          |
 
 
-
 > ⚠️ **Already have an existing Realm project?**  
 > You can skip ahead to the [Migration Guide](#migration) to quickly adapt your project to Flowerbase.
 
