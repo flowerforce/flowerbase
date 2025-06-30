@@ -7,6 +7,10 @@
   "publishConfig": {
     "access": "public"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flowerforce/flowerbase.git"
+  },
   "scripts": {
     "test": "npx jest",
     "build": "rm -rf dist/ && tsc",
@@ -14,7 +18,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@fastify/cors": "^10.0.1",
     "@fastify/jwt": "^9.0.1",
