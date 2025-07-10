@@ -66,7 +66,7 @@ export async function localUserPassController(app: FastifyInstance) {
         email: email,
         password: hashedPassword,
         custom_data: {
-          // todo li faremo arrivare
+          // TODO da aggiungere in fase di registrazione utente, funzionalità utile che realm non permetteva
         }
       })
 
@@ -88,13 +88,15 @@ export async function localUserPassController(app: FastifyInstance) {
         }
       )
 
-      if (on_user_creation_function_name && functionsList[on_user_creation_function_name]) {
+      if (result && on_user_creation_function_name && functionsList[on_user_creation_function_name]) {
+        const user = await db.collection(authCollection!).findOne({ _id: result?.insertedId })
+        delete user?.password
         try {
           const response = await GenerateContext({
             args: [{
               operationType: 'CREATE',
               providers: 'local-userpass',
-              user: result,
+              user,
               time: new Date().getTime()
             }],
             app,
@@ -113,6 +115,7 @@ export async function localUserPassController(app: FastifyInstance) {
       }
 
       res.status(201)
+
       return {
         userId: result?.insertedId
       }
