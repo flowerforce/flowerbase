@@ -1,7 +1,7 @@
 [
     {
-        "http_method": "POST",
-        "route": "/webhooks/searchTodos",
+        "http_method": "GET",
+        "route": "/webhooks/route",
         "function_name": "searchTodos",
         "validation_method": "NO_VALIDATION",
         "respond_result": true,
