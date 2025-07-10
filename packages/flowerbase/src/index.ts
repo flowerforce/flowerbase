@@ -68,6 +68,24 @@ export async function initialize({
     StateManager.setData(key as Parameters<typeof StateManager.setData>[0], value)
   )
 
+  await fastify.register(import('@fastify/swagger'))
+
+  await fastify.register(import('@fastify/swagger-ui'), {
+    routePrefix: '/documentation',
+    uiConfig: {
+      docExpansion: 'full',
+      deepLinking: false
+    },
+    uiHooks: {
+      onRequest: function (request, reply, next) { next() },
+      preHandler: function (request, reply, next) { next() }
+    },
+    staticCSP: true,
+    transformStaticCSP: (header) => header,
+    transformSpecification: (swaggerObject,) => { return swaggerObject },
+    transformSpecificationClone: true
+  })
+
   await registerPlugins({
     register: fastify.register,
     mongodbUrl,
