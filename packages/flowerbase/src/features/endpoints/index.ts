@@ -19,7 +19,7 @@ export const generateEndpoints = async ({
     if (disabled || !currentFunction) return
 
     const handler = generateHandler({ app, currentFunction, functionsList })
-    const currentMethod = getMethodsConfig(app, handler, `/app/:appId/endpoint/${route}`)[
+    const currentMethod = getMethodsConfig(app, handler, `/app/:appId/endpoint/${route.replace(/\//, "")}`)[
       http_method
     ]
     currentMethod()
