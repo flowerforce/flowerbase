@@ -1,6 +1,7 @@
 import sendGrid from '@sendgrid/mail'
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME } from '../../../constants'
+import { services } from '../../../services'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
 import { comparePassword, generateToken, hashPassword } from '../../../utils/crypto'
@@ -27,7 +28,10 @@ import {
  * @param {FastifyInstance} app - The Fastify instance.
  */
 export async function localUserPassController(app: FastifyInstance) {
-  const { authCollection } = AUTH_CONFIG
+
+  const functionsList = StateManager.select('functions')
+
+  const { authCollection, userCollection, user_id_field, on_user_creation_function_name } = AUTH_CONFIG
   const db = app.mongo.client.db(DB_NAME)
 
   /**
@@ -84,6 +88,30 @@ export async function localUserPassController(app: FastifyInstance) {
         }
       )
 
+      if (on_user_creation_function_name && functionsList[on_user_creation_function_name]) {
+        try {
+          const response = await GenerateContext({
+            args: [{
+              operationType: 'CREATE',
+              providers: 'local-userpass',
+              user: result,
+              time: new Date().getTime()
+            }],
+            app,
+            rules: {},
+            user: undefined,
+            currentFunction: functionsList[on_user_creation_function_name],
+            functionsList,
+            services
+          })
+          console.log("🚀 ~ response:", response)
+        } catch (error) {
+          console.log("🚀 ~ error:", error)
+        }
+      } else {
+        console.error('Error function on_user_creation_function_name: ', on_user_creation_function_name)
+      }
+
       res.status(201)
       return {
         userId: result?.insertedId
@@ -121,9 +149,15 @@ export async function localUserPassController(app: FastifyInstance) {
         throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
       }
 
+      const user = user_id_field && userCollection
+        ? (await db!.collection(userCollection).findOne({ [user_id_field]: storedUser._id.toString() }))
+        : {}
+
+      const userWithCustomData = { ...storedUser, user_data: user }
+
       return {
-        access_token: this.createAccessToken(storedUser),
-        refresh_token: this.createRefreshToken(storedUser),
+        access_token: this.createAccessToken(userWithCustomData),
+        refresh_token: this.createRefreshToken(userWithCustomData),
         device_id: '',
         user_id: storedUser._id.toString()
       }

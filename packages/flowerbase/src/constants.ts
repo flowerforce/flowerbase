@@ -3,7 +3,8 @@ import { loadAuthConfig, loadCustomUserData } from './auth/utils'
 const {
   database_name,
   collection_name = 'users',
-  user_id_field = 'id'
+  user_id_field = 'id',
+  on_user_creation_function_name
 } = loadCustomUserData()
 const { auth_collection = 'auth_users', ...configuration } = loadAuthConfig()
 
@@ -24,5 +25,6 @@ export const AUTH_CONFIG = {
   userCollection: collection_name,
   resetPasswordCollection: 'reset-password-requests',
   resetPasswordConfig: configuration['local-userpass'].config,
-  user_id_field
+  user_id_field,
+  on_user_creation_function_name
 }
