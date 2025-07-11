@@ -1,6 +1,6 @@
 import { EventEmitterAsyncResourceOptions } from 'events'
 import isEqual from 'lodash/isEqual'
-import { Collection, Document, EventsDescription, FindCursor, WithId } from 'mongodb'
+import { AggregationCursor, Collection, Document, EventsDescription, FindCursor, WithId } from 'mongodb'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
 import { GetOperatorsFunction, MongodbAtlasFunction } from './model'
@@ -256,8 +256,8 @@ const getOperators: GetOperatorsFunction = (
 
       // Pre-query filtering based on access control rules
       const formattedQuery = getFormattedQuery(filters, query, user)
+      // aggiunto filter per evitare questo errore: $and argument's entries must be objects
       const originalCursor = collection.find({ $and: formattedQuery })
-
       // Clone the cursor to override `toArray` with post-query validation
       const client = originalCursor[
         'client' as keyof typeof originalCursor
@@ -406,7 +406,60 @@ const getOperators: GetOperatorsFunction = (
     return collection.watch(pipeline, options)
   },
   //TODO -> add filter & rules in aggregate
-  aggregate: (pipeline, options) => collection.aggregate(pipeline, options),
+  aggregate: (pipeline, options) => {
+
+    if (!run_as_system) {
+      const { filters, roles } = rules[collName] || {}
+
+      const formattedQuery = getFormattedQuery(filters, {}, user)
+      const originalCursor = collection.aggregate([
+        { $match: { $and: formattedQuery } },
+        ...(pipeline || [])
+      ], options)
+
+      // Clone the cursor to override `toArray` with post-query validation
+      const client = originalCursor[
+        'client' as keyof typeof originalCursor
+      ] as EventEmitterAsyncResourceOptions
+      const newCursor = new AggregationCursor(client)
+
+      /**
+       * Overridden `toArray` method that validates each document for read access.
+       *
+       * @returns {Promise<Document[]>} An array of documents the user is authorized to read.
+       */
+      newCursor.toArray = async () => {
+        const response = await originalCursor.toArray()
+
+        const filteredResponse = await Promise.all(
+          response.map(async (currentDoc) => {
+            const winningRole = getWinningRole(currentDoc, user, roles)
+
+            const { status, document } = winningRole
+              ? await checkValidation(
+                winningRole,
+                {
+                  type: 'read',
+                  roles,
+                  cursor: currentDoc,
+                  expansions: {}
+                },
+                user
+              )
+              : { status: !roles.length, document: currentDoc }
+
+            return status ? document : undefined
+          })
+        )
+
+        return filteredResponse.filter(Boolean)
+      }
+
+      return newCursor
+    }
+
+    return collection.aggregate(pipeline, options)
+  },
   /**
    * Inserts multiple documents into a MongoDB collection with optional role-based access control and validation.
    *

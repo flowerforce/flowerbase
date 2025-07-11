@@ -55,6 +55,7 @@ export async function initialize({
   console.log("Endpoints LOADED")
   const rulesList = await loadRules(basePath)
   console.log("Rules LOADED")
+
   const stateConfig = {
     functions: functionsList,
     triggers: triggersList,
@@ -98,7 +99,7 @@ export async function initialize({
   console.log('APP Routes registration COMPLETED')
   await registerFunctions({ app: fastify, functionsList, rulesList })
   console.log('Functions registration COMPLETED')
-  await generateEndpoints({ app: fastify, functionsList, endpointsList })
+  await generateEndpoints({ app: fastify, functionsList, endpointsList, rulesList })
   console.log('HTTP Endpoints registration COMPLETED')
   fastify.ready(() => {
     console.log("FASTIFY IS READY")

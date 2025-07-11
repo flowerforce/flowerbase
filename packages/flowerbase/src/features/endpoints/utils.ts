@@ -63,23 +63,30 @@ export const getMethodsConfig = (
 export const generateHandler = ({
   app,
   currentFunction,
-  functionsList
+  functionsList,
+  rulesList
 }: GenerateHandlerParams) => {
   return async (req: FastifyRequest, res: FastifyReply) => {
     try {
+
+      // TODO gestire tramite http_method le args da passare
+
       const response = await GenerateContext({
-        args: [req],
+        args: [], // TODO passare solo body e query ???
         app,
-        rules: {}, //TODO -> check rules
+        rules: rulesList,
         user: req.user,
         currentFunction,
         functionsList,
         services
       })
-      res.send(response)
+
+      return res.send(response)
+
     } catch (e) {
       console.log(e)
     }
+
     return {}
   }
 }
