@@ -18,3 +18,49 @@ export const loadRules = async (rootDir = process.cwd()): Promise<Rules> => {
 
   return rulesByCollection
 }
+
+// export const getNestedPipelines = (pipeline: AggregationPipelineStage[]) => {
+//   return pipeline.reduce(
+//     (acc, stage) => {
+//       const [stageKey] = Object.keys(stage);
+//       const stageValue = stage[stageKey as keyof typeof stage];
+//       const pipeline = stageValue?.["pipeline"]
+
+//       if (stageKey === '$lookup') {
+//         acc.pipelines.push(stageValue);
+//         if (pipeline) {
+//           const { collections, pipelines } = getNestedPipelines(pipeline);
+//           acc.collections.push(...new Set([(stageValue as LookupStage).from, ...collections]));
+//           acc.pipelines.push(...pipelines);
+//         }
+//       }
+
+//       if (stageKey === '$facet') {
+//         for (const subPipeline of Object.values(stageValue)) {
+//           const { collections, pipelines } = getNestedPipelines(subPipeline as AggregationPipelineStage[]);
+//           acc.collections.push(...collections);
+//           acc.pipelines.push(...pipelines);
+//         }
+//       }
+
+//       if (
+//         stageKey === '$unionWith' &&
+//         typeof stageValue === 'object' &&
+//         pipeline
+//       ) {
+//         const { collections, pipelines } = getNestedPipelines(pipeline);
+//         acc.collections.push(...new Set([(stageValue as UnionWithStage).coll, ...collections]));
+//         acc.pipelines.push(...pipelines);
+//       }
+
+//       return acc;
+//     },
+//     {
+//       collections: [],
+//       pipelines: [],
+//     } as {
+//       collections: string[],
+//       pipelines: AggregationPipelineStage[]
+//     }
+//   );
+// }
