@@ -11,15 +11,16 @@ import { generateHandler, getMethodsConfig } from './utils'
 export const generateEndpoints = async ({
   app,
   functionsList,
-  endpointsList
+  endpointsList,
+  rulesList
 }: GenerateEndpointsParams) => {
   endpointsList.forEach(({ http_method, route, disabled, function_name }) => {
     const currentFunction = functionsList[function_name]
 
     if (disabled || !currentFunction) return
 
-    const handler = generateHandler({ app, currentFunction, functionsList })
-    const currentMethod = getMethodsConfig(app, handler, `/app/:appId/endpoint/${route}`)[
+    const handler = generateHandler({ app, rulesList, currentFunction, functionsList, http_method })
+    const currentMethod = getMethodsConfig(app, handler, `/app/:appId/endpoint/${route.replace(/^\//, "")}`)[
       http_method
     ]
     currentMethod()

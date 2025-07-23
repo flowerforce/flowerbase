@@ -12,14 +12,24 @@ import { Endpoints, GenerateHandlerParams } from './interface'
  * @testable
  */
 export const loadEndpoints = async (rootDir = process.cwd()): Promise<Endpoints> => {
-  const endpointsDir = 'http_endpoints'
-  const endPointsFile = path.join(rootDir, endpointsDir, 'config.json')
-  const config: Endpoints<'*'> = JSON.parse(fs.readFileSync(endPointsFile, 'utf-8'))
+  const endpoints: Endpoints = []
+  const folders = ['https_endpoints', 'http_endpoints'] as const
 
-  return config.map(({ http_method, ...endpoint }) => ({
-    http_method: http_method === '*' ? 'ALL' : http_method,
-    ...endpoint
-  }))
+  folders.forEach((endpointsDir) => {
+    const endPointsFile = path.join(rootDir, endpointsDir, 'config.json')
+
+    if (fs.existsSync(endPointsFile)) {
+      const config: Endpoints<'*'> = JSON.parse(fs.readFileSync(endPointsFile, 'utf-8'))
+      const configRemap: Endpoints = config.map(({ http_method, ...endpoint }) => ({
+        http_method: http_method === '*' ? 'ALL' : http_method,
+        ...endpoint
+      }))
+
+      endpoints.push(...configRemap)
+    }
+  })
+
+  return endpoints
 }
 
 /**
@@ -52,23 +62,30 @@ export const getMethodsConfig = (
 export const generateHandler = ({
   app,
   currentFunction,
-  functionsList
+  functionsList,
+  rulesList
 }: GenerateHandlerParams) => {
   return async (req: FastifyRequest, res: FastifyReply) => {
     try {
+
+      // TODO gestire tramite http_method le args da passare
+
       const response = await GenerateContext({
-        args: [req],
+        args: [], // TODO passare solo body e query ???
         app,
-        rules: {}, //TODO -> check rules
+        rules: rulesList,
         user: req.user,
         currentFunction,
         functionsList,
         services
       })
-      res.send(response)
+
+      return res.send(response)
+
     } catch (e) {
       console.log(e)
     }
+
     return {}
   }
 }

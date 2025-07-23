@@ -68,7 +68,7 @@ export const executeQuery = async ({
     aggregate: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['aggregate'])(
         EJSON.deserialize(query)
-      ),
+      ).toArray(),
     insertMany: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['insertMany'])(
         EJSON.deserialize(documents)

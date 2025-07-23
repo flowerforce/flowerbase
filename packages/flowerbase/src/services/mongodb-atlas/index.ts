@@ -3,8 +3,8 @@ import isEqual from 'lodash/isEqual'
 import { Collection, Document, EventsDescription, FindCursor, WithId } from 'mongodb'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
-import { GetOperatorsFunction, MongodbAtlasFunction } from './model'
-import { getFormattedQuery } from './utils'
+import { CRUD_OPERATIONS, GetOperatorsFunction, MongodbAtlasFunction } from './model'
+import { applyAccessControlToPipeline, checkDenyOperation, getFormattedProjection, getFormattedQuery } from './utils'
 
 //TODO aggiungere no-sql inject security
 const getOperators: GetOperatorsFunction = (
@@ -28,6 +28,7 @@ const getOperators: GetOperatorsFunction = (
    */
   findOne: async (query) => {
     if (!run_as_system) {
+      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.READ)
       const { filters, roles } = rules[collName] || {}
 
       // Apply access control filters to the query
@@ -75,6 +76,7 @@ const getOperators: GetOperatorsFunction = (
    */
   deleteOne: async (query = {}) => {
     if (!run_as_system) {
+      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.DELETE)
       const { filters, roles } = rules[collName] || {}
 
       // Apply access control filters
@@ -129,6 +131,7 @@ const getOperators: GetOperatorsFunction = (
     const { roles } = rules[collName] || {}
 
     if (!run_as_system) {
+      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.CREATE)
       const winningRole = getWinningRole(data, user, roles)
 
       const { status, document } = winningRole
@@ -175,6 +178,7 @@ const getOperators: GetOperatorsFunction = (
    */
   updateOne: async (query, data, options) => {
     if (!run_as_system) {
+      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
       const { filters, roles } = rules[collName] || {}
       // Apply access control filters
       const formattedQuery = getFormattedQuery(filters, query, user)
@@ -252,12 +256,13 @@ const getOperators: GetOperatorsFunction = (
    */
   find: (query) => {
     if (!run_as_system) {
+      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.READ)
       const { filters, roles } = rules[collName] || {}
 
       // Pre-query filtering based on access control rules
       const formattedQuery = getFormattedQuery(filters, query, user)
+      // aggiunto filter per evitare questo errore: $and argument's entries must be objects
       const originalCursor = collection.find({ $and: formattedQuery })
-
       // Clone the cursor to override `toArray` with post-query validation
       const client = originalCursor[
         'client' as keyof typeof originalCursor
@@ -322,6 +327,7 @@ const getOperators: GetOperatorsFunction = (
    */
   watch: (pipeline = [], options) => {
     if (!run_as_system) {
+      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.READ)
       const { filters, roles } = rules[collName] || {}
 
       // Apply access filters to initial change stream pipeline
@@ -406,7 +412,51 @@ const getOperators: GetOperatorsFunction = (
     return collection.watch(pipeline, options)
   },
   //TODO -> add filter & rules in aggregate
-  aggregate: (pipeline, options) => collection.aggregate(pipeline, options),
+  aggregate: async (pipeline = [], options) => {
+
+    if (run_as_system) {
+      return collection.aggregate(pipeline, options);
+    }
+    checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.READ)
+
+    const { filters = [], roles = [] } = rules[collection.collectionName] || {};
+    const formattedQuery = getFormattedQuery(filters, {}, user);
+    const projection = getFormattedProjection(filters);
+
+
+    const guardedPipeline = [
+      ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
+      ...(projection ? [{ $project: projection }] : []),
+      ...applyAccessControlToPipeline(pipeline, rules, user)
+    ];
+
+    // const pipelineCollections = getCollectionsFromPipeline(pipeline)
+
+    // console.log(pipelineCollections)
+
+    // pipelineCollections.every((collection) => checkDenyOperation(rules, collection, CRUD_OPERATIONS.READ))
+
+    const originalCursor = collection.aggregate(guardedPipeline, options);
+    const newCursor = Object.create(originalCursor);
+
+    newCursor.toArray = async () => {
+      const results = await originalCursor.toArray();
+
+      const filtered = await Promise.all(
+        results.map(async (doc) => {
+          const role = getWinningRole(doc, user, roles);
+          const { status, document } = role
+            ? await checkValidation(role, { type: 'read', roles, cursor: doc, expansions: {} }, user)
+            : { status: !roles?.length, document: doc };
+          return status ? document : undefined;
+        })
+      );
+
+      return filtered.filter(Boolean);
+    };
+
+    return newCursor;
+  },
   /**
    * Inserts multiple documents into a MongoDB collection with optional role-based access control and validation.
    *
@@ -426,6 +476,7 @@ const getOperators: GetOperatorsFunction = (
    */
   insertMany: async (documents, options) => {
     if (!run_as_system) {
+      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.CREATE)
       const { roles } = rules[collName] || {}
       // Validate each document against user's roles
       const filteredItems = await Promise.all(
@@ -462,6 +513,7 @@ const getOperators: GetOperatorsFunction = (
   },
   updateMany: async (query, data, options) => {
     if (!run_as_system) {
+      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
       const { filters, roles } = rules[collName] || {}
       // Apply access control filters
       const formattedQuery = getFormattedQuery(filters, query, user)
@@ -539,6 +591,7 @@ const getOperators: GetOperatorsFunction = (
    */
   deleteMany: async (query = {}) => {
     if (!run_as_system) {
+      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.DELETE)
       const { filters, roles } = rules[collName] || {}
 
       // Apply access control filters
@@ -601,7 +654,9 @@ const MongodbAtlas: MongodbAtlasFunction = (
         const collection: Collection<Document> = app.mongo.client
           .db(dbName)
           .collection(collName)
-        return getOperators(collection, { rules, collName, user, run_as_system })
+        return getOperators(collection, {
+          rules, collName, user, run_as_system
+        })
       }
     }
   }

@@ -3,5 +3,6 @@
     "mongo_service_name": "mongodb-atlas",
     "database_name": "flowerbase-demo",
     "collection_name": "users",
-    "user_id_field": "id"
+    "user_id_field": "id",
+    "on_user_creation_function_name": "searchTodos"
 }

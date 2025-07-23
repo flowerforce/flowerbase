@@ -1,16 +1,20 @@
 import { FastifyInstance } from 'fastify'
 import { Function, Functions } from '../functions/interface'
+import { Rules } from '../rules/interface'
 
 export type GenerateEndpointsParams = {
   app: FastifyInstance
   functionsList: Functions
   endpointsList: Endpoints
+  rulesList: Rules
 }
 
 export type GenerateHandlerParams = {
   app: FastifyInstance
   currentFunction: Function
   functionsList: Functions
+  http_method: string
+  rulesList: Rules
 }
 
 type HTTP_METHOD<T> = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | T

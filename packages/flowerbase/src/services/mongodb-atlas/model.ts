@@ -54,7 +54,7 @@ export type GetOperatorsFunction = (
   watch: (...params: Parameters<Method<'watch'>>) => ReturnType<Method<'watch'>>
   aggregate: (
     ...params: Parameters<Method<'aggregate'>>
-  ) => ReturnType<Method<'aggregate'>>
+  ) => Promise<ReturnType<Method<'aggregate'>>>
   insertMany: (
     ...params: Parameters<Method<'insertMany'>>
   ) => ReturnType<Method<'insertMany'>>
@@ -64,4 +64,13 @@ export type GetOperatorsFunction = (
   deleteMany: (
     ...params: Parameters<Method<'deleteMany'>>
   ) => ReturnType<Method<'deleteMany'>>
+}
+
+
+export enum CRUD_OPERATIONS {
+  CREATE = "CREATE",
+  READ = "READ",
+  UPDATE = "UPDATE",
+  DELETE = "DELETE"
+
 }

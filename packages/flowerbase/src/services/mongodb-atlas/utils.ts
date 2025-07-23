@@ -1,10 +1,10 @@
 import { Collection, Document } from 'mongodb'
 import { User } from '../../auth/dtos'
-import { Filter } from '../../features/rules/interface'
+import { AggregationPipeline, AggregationPipelineStage, Filter, LookupStage, Projection, Rules, STAGES_TO_SEARCH, UnionWithStage } from '../../features/rules/interface'
 import { Role } from '../../utils/roles/interface'
 import { expandQuery } from '../../utils/rules'
 import rulesMatcherUtils from '../../utils/rules-matcher/utils'
-import { GetValidRuleParams } from './model'
+import { CRUD_OPERATIONS, GetValidRuleParams } from './model'
 
 export const getValidRule = <T extends Role | Filter>({
   filters = [],
@@ -44,3 +44,130 @@ export const getFormattedQuery = (
     query
   ].filter(Boolean)
 }
+
+export const getFormattedProjection = (filters: Filter[] = [], user?: User): Projection | null => {
+  const projections = filters.filter((filter) => {
+    if (filter.projection) {
+      const preFilter = getValidRule({ filters, user })
+      const isValidPreFilter = !!preFilter?.length
+      return isValidPreFilter
+    }
+    return false
+  }).map(f => f.projection)
+  if (!projections.length) return null;
+  return Object.assign({}, ...projections);
+}
+
+
+export const applyAccessControlToPipeline = (
+  pipeline: AggregationPipeline,
+  rules: Record<string, {
+    filters?: Filter[];
+    roles?: Role[];
+  }>,
+  user: User
+): AggregationPipeline => {
+  return pipeline.map((stage) => {
+    const [stageName] = Object.keys(stage);
+    const value = stage[stageName as keyof typeof stage];
+
+    // CASE LOOKUP
+    if (stageName === STAGES_TO_SEARCH.LOOKUP) {
+      const lookUpStage = value as LookupStage
+      const currentCollection = lookUpStage.from
+      const lookupRules = rules[currentCollection] || {};
+      const formattedQuery = getFormattedQuery(lookupRules.filters, {}, user);
+      const projection = getFormattedProjection(lookupRules.filters);
+
+      return {
+        $lookup: {
+          ...lookUpStage,
+          pipeline: [
+            ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
+            ...(projection ? [{ $project: projection }] : []),
+            ...applyAccessControlToPipeline(lookUpStage.pipeline || [], rules, user)
+          ]
+        }
+      };
+    }
+
+    // CASE LOOKUP
+    if (stageName === STAGES_TO_SEARCH.UNION_WITH) {
+      const unionWithStage = value as UnionWithStage
+      const isSimpleStage = typeof unionWithStage === "string"
+      const currentCollection = isSimpleStage ? unionWithStage : unionWithStage.coll;
+      const unionRules = rules[currentCollection] || {};
+      const formattedQuery = getFormattedQuery(unionRules.filters, {}, user);
+      const projection = getFormattedProjection(unionRules.filters);
+
+      const nestedPipeline = isSimpleStage ? [] : (unionWithStage.pipeline || [])
+
+      return {
+        $unionWith: {
+          coll: currentCollection,
+          pipeline: [
+            ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
+            ...(projection ? [{ $project: projection }] : []),
+            ...applyAccessControlToPipeline((nestedPipeline), rules, user)
+          ]
+        }
+      };
+    }
+
+    // CASE FACET
+    if (stageName === STAGES_TO_SEARCH.FACET) {
+      const modifiedFacets = Object.fromEntries(
+        (Object.entries(value) as [string, AggregationPipelineStage[]][]).map(([facetKey, facetPipeline]) => {
+          return [
+            facetKey,
+            applyAccessControlToPipeline(facetPipeline, rules, user)
+          ];
+        })
+      );
+
+      return { $facet: modifiedFacets };
+    }
+
+    return stage;
+  });
+}
+
+export const checkDenyOperation = (rules: Rules, collectionName: string, operation: CRUD_OPERATIONS) => {
+  const collectionRules = rules[collectionName]
+  if (!collectionRules) {
+    throw new Error(`${operation} FORBIDDEN!`)
+  }
+}
+export const getCollectionsFromPipeline = (pipeline: Document[]) => {
+  return pipeline.reduce<string[]>((acc, stage) => {
+    const [stageKey] = Object.keys(stage);
+    const stageValue = stage[stageKey];
+    const subPipeline = stageValue?.pipeline;
+
+    if (stageKey === STAGES_TO_SEARCH.LOOKUP) {
+      acc.push(...[stageValue.from, ...acc]);
+      if (subPipeline) {
+        const collections = getCollectionsFromPipeline(subPipeline);
+        acc.push(...[stageValue.from, ...collections]);
+      }
+    }
+
+    if (stageKey === STAGES_TO_SEARCH.FACET) {
+      for (const sub of Object.values(stageValue) as Document[][]) {
+        const collections = getCollectionsFromPipeline(sub);
+        acc.push(...collections);
+      }
+    }
+
+    if (
+      stageKey === STAGES_TO_SEARCH.UNION_WITH &&
+      typeof stageValue === 'object' &&
+      subPipeline
+    ) {
+      const collections = getCollectionsFromPipeline(subPipeline);
+      acc.push(...[stageValue.coll, ...collections]);
+    }
+
+    return acc;
+  }, []);
+};

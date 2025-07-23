@@ -99,6 +99,7 @@ export interface CustomUserDataConfig {
   database_name: string
   collection_name: string
   user_id_field: string
+  on_user_creation_function_name: string
 }
 
 export const PROVIDER_TYPE = 'local-userpass'

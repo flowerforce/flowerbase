@@ -12,9 +12,9 @@ export function expandQuery(
 
     const callback = (match: string, path: string) => {
       const value = get(objs, `%%${path}`) // Recupera il valore annidato da values
-      const finalValue =
-        typeof value === 'string' ? `"${value}"` : value && JSON.stringify(value)
-      return `:${value !== undefined ? finalValue : match}` // Sostituisci se esiste, altrimenti lascia il placeholder
+      const finalValue = typeof value === 'string' ? `"${value}"` : value && JSON.stringify(value)
+      // TODO tolto i primi : creava questo tipo di oggetto {"userId"::"%%user.id"}
+      return value !== undefined ? finalValue : match // Sostituisci se esiste, altrimenti lascia il placeholder
     }
 
     expandedQuery = expandedQuery.replace(

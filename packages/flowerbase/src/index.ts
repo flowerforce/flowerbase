@@ -55,6 +55,7 @@ export async function initialize({
   console.log("Endpoints LOADED")
   const rulesList = await loadRules(basePath)
   console.log("Rules LOADED")
+
   const stateConfig = {
     functions: functionsList,
     triggers: triggersList,
@@ -68,6 +69,24 @@ export async function initialize({
     StateManager.setData(key as Parameters<typeof StateManager.setData>[0], value)
   )
 
+  await fastify.register(import('@fastify/swagger'))
+
+  await fastify.register(import('@fastify/swagger-ui'), {
+    routePrefix: '/documentation',
+    uiConfig: {
+      docExpansion: 'full',
+      deepLinking: false
+    },
+    uiHooks: {
+      onRequest: function (request, reply, next) { next() },
+      preHandler: function (request, reply, next) { next() }
+    },
+    staticCSP: true,
+    transformStaticCSP: (header) => header,
+    transformSpecification: (swaggerObject,) => { return swaggerObject },
+    transformSpecificationClone: true
+  })
+
   await registerPlugins({
     register: fastify.register,
     mongodbUrl,
@@ -80,7 +99,7 @@ export async function initialize({
   console.log('APP Routes registration COMPLETED')
   await registerFunctions({ app: fastify, functionsList, rulesList })
   console.log('Functions registration COMPLETED')
-  await generateEndpoints({ app: fastify, functionsList, endpointsList })
+  await generateEndpoints({ app: fastify, functionsList, endpointsList, rulesList })
   console.log('HTTP Endpoints registration COMPLETED')
   fastify.ready(() => {
     console.log("FASTIFY IS READY")
