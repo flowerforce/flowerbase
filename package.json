@@ -8,7 +8,7 @@
     "tsc:noemit": "nx run-many -t tsc:noemit",
     "lint:check": "nx run-many -t lint --fix --quiet --exclude=demo",
     "coverage": "npm run test -- --coverage",
-    "build:flowerbase": "cd packages/flowerbase && rm -rf dist/ && tsc",
+    "build": "cd packages/flowerbase && rm -rf dist/ && tsc",
     "dev": "nodemon index.ts",
     "lint:fds": "eslint packages/flowerbase",
     "format:fds": "prettier --write 'packages/flowerbase/**/*.ts'",
