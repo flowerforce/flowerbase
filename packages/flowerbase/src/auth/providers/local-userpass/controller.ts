@@ -127,16 +127,28 @@ export async function localUserPassController(app: FastifyInstance) {
         throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
       }
 
-      const user = user_id_field && userCollection && (await db!.collection(userCollection).findOne({ [user_id_field]: storedUser._id.toString() }))
-
-      if (!user) {
-        throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
-      }
+      const user = user_id_field && userCollection
+        ? (await db!.collection(userCollection).findOne({ [user_id_field]: storedUser._id.toString() }))
+        : {}
 
       const userWithCustomData = { ...storedUser, user_data: user }
 
-      if (user && user.status === 'pending' && on_user_creation_function_name && functionsList[on_user_creation_function_name]) {
-        delete user?.password
+      if (storedUser && storedUser.status === 'pending') {
+        try {
+          await db?.collection(authCollection!).updateOne({ _id: storedUser._id },
+            {
+              $set: {
+                status: 'confirmed'
+              }
+            }
+          )
+        } catch (error) {
+          console.log(">>> 🚀 ~ localUserPassController ~ error:", error)
+        }
+      }
+
+      if (storedUser && on_user_creation_function_name && functionsList[on_user_creation_function_name]) {
+        delete storedUser?.password
         try {
           await GenerateContext({
             args: [{
@@ -152,14 +164,6 @@ export async function localUserPassController(app: FastifyInstance) {
             functionsList,
             services
           })
-          await db?.collection(authCollection!).updateOne({ _id: user._id },
-            {
-              $set: {
-                status: 'confirmed'
-              }
-            }
-          )
-
         } catch (error) {
           console.log("🚀 ~ error:", error)
         }
