@@ -147,7 +147,7 @@ export async function localUserPassController(app: FastifyInstance) {
         }
       }
 
-      if (storedUser && on_user_creation_function_name && functionsList[on_user_creation_function_name]) {
+      if (storedUser && storedUser.status === 'pending' && on_user_creation_function_name && functionsList[on_user_creation_function_name]) {
         delete storedUser?.password
         try {
           await GenerateContext({
