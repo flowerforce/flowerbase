@@ -1,5 +1,9 @@
 import get from 'lodash/get'
 
+const removeExtraColons = (val: unknown) => {
+  return val?.toString().replace(/:+/g, ":")
+}
+
 // Funzione che espande dinamicamente i placeholder con supporto per percorsi annidati
 export function expandQuery(
   template: Record<string, unknown>,
@@ -14,7 +18,8 @@ export function expandQuery(
       const value = get(objs, `%%${path}`) // Recupera il valore annidato da values
       const finalValue = typeof value === 'string' ? `"${value}"` : value && JSON.stringify(value)
       // TODO tolto i primi : creava questo tipo di oggetto {"userId"::"%%user.id"}
-      return value !== undefined ? finalValue : match // Sostituisci se esiste, altrimenti lascia il placeholder
+      const val = `:${value !== undefined ? finalValue : match}`; // Sostituisci se esiste, altrimenti lascia il placeholder
+      return removeExtraColons(val)
     }
 
     expandedQuery = expandedQuery.replace(

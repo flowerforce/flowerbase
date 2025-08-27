@@ -65,6 +65,7 @@ export async function localUserPassController(app: FastifyInstance) {
       const result = await db.collection(authCollection!).insertOne({
         email: email,
         password: hashedPassword,
+        status: 'pending',
         custom_data: {
           // TODO da aggiungere in fase di registrazione utente, funzionalità utile che realm non permetteva
         }
@@ -87,32 +88,6 @@ export async function localUserPassController(app: FastifyInstance) {
           }
         }
       )
-
-      if (result && on_user_creation_function_name && functionsList[on_user_creation_function_name]) {
-        const user = await db.collection(authCollection!).findOne({ _id: result?.insertedId })
-        delete user?.password
-        try {
-          const response = await GenerateContext({
-            args: [{
-              operationType: 'CREATE',
-              providers: 'local-userpass',
-              user,
-              time: new Date().getTime()
-            }],
-            app,
-            rules: {},
-            user: undefined,
-            currentFunction: functionsList[on_user_creation_function_name],
-            functionsList,
-            services
-          })
-          console.log("🚀 ~ response:", response)
-        } catch (error) {
-          console.log("🚀 ~ error:", error)
-        }
-      } else {
-        console.error('Error function on_user_creation_function_name: ', on_user_creation_function_name)
-      }
 
       res.status(201)
 
@@ -157,6 +132,44 @@ export async function localUserPassController(app: FastifyInstance) {
         : {}
 
       const userWithCustomData = { ...storedUser, user_data: user }
+
+      if (storedUser && storedUser.status === 'pending') {
+        try {
+          await db?.collection(authCollection!).updateOne({ _id: storedUser._id },
+            {
+              $set: {
+                status: 'confirmed'
+              }
+            }
+          )
+        } catch (error) {
+          console.log(">>> 🚀 ~ localUserPassController ~ error:", error)
+        }
+      }
+
+      if (storedUser && storedUser.status === 'pending' && on_user_creation_function_name && functionsList[on_user_creation_function_name]) {
+        delete storedUser?.password
+        try {
+          await GenerateContext({
+            args: [{
+              operationType: 'CREATE',
+              providers: 'local-userpass',
+              user,
+              time: new Date().getTime()
+            }],
+            app,
+            rules: {},
+            user: undefined,
+            currentFunction: functionsList[on_user_creation_function_name],
+            functionsList,
+            services
+          })
+        } catch (error) {
+          console.log("🚀 ~ error:", error)
+        }
+      } else {
+        console.error('Error function on_user_creation_function_name: ', on_user_creation_function_name)
+      }
 
       return {
         access_token: this.createAccessToken(userWithCustomData),
