@@ -77,6 +77,10 @@ export const executeQuery = async ({
       (currentMethod as ReturnType<GetOperatorsFunction>['updateMany'])(
         EJSON.deserialize(query),
         EJSON.deserialize(update)
+      ),
+    deleteMany: () =>
+      (currentMethod as ReturnType<GetOperatorsFunction>['deleteMany'])(
+        EJSON.deserialize(query)
       )
   }
 }
