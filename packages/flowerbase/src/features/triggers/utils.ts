@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'node:path'
 import cron from 'node-cron'
-import { AUTH_CONFIG } from '../../constants'
+import { AUTH_CONFIG, DB_NAME } from '../../constants'
 import { readJsonContent } from '../../utils'
 import { GenerateContext } from '../../utils/context'
 import { HandlerParams, Trigger, Triggers } from './interface'
@@ -77,12 +77,12 @@ const handleAuthenticationTrigger = async ({
   const pipeline = [
     {
       $match: {
-        operationType: { $in: ['INSERT'] }
+        operationType: { $in: ['insert'] }
       }
     }
   ]
   const changeStream = app.mongo.client
-    .db(database)
+    .db(database || DB_NAME)
     .collection(AUTH_CONFIG.authCollection)
     .watch(pipeline, {
       fullDocument: 'whenAvailable'
@@ -99,7 +99,12 @@ const handleAuthenticationTrigger = async ({
       const currentUser = { ...document }
       delete currentUser.password
       await GenerateContext({
-        args: [{ user: currentUser }],
+        args: [{
+          user: {
+            ...currentUser,
+            id: currentUser._id.toString()
+          }
+        }],
         app,
         rules: {},
         user: {},
