@@ -199,7 +199,7 @@ const getOperators: GetOperatorsFunction = (
       // const docToCheck = hasOperators
       //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
       //   : data
-      const [matchQuery] = formattedQuery;
+      const [matchQuery] = formattedQuery;  // TODO da chiedere/capire perchè è solo uno. tutti gli altri { $match: { $and: formattedQuery } }
       const pipeline = [
         {
           $match: matchQuery
@@ -534,7 +534,7 @@ const getOperators: GetOperatorsFunction = (
 
       const pipeline = [
         {
-          $match: formattedQuery
+          $match: { $and: formattedQuery }
         },
         ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
       ]
@@ -571,7 +571,7 @@ const getOperators: GetOperatorsFunction = (
         throw new Error('Update not permitted')
       }
 
-      return collection.updateMany(formattedQuery, data, options)
+      return collection.updateMany({ $and: formattedQuery }, data, options)
     }
     return collection.updateMany(query, data, options)
   },
