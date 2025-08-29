@@ -49,7 +49,7 @@ export const getFormattedQuery = (
   return [
     isValidPreFilter && expandQuery(preFilter[0].query, { '%%user': user }),
     query
-  ].filter(Boolean)
+  ].filter(Boolean).filter(r => Object.keys(r).length > 0)
 }
 
 export const getFormattedProjection = (filters: Filter[] = [], user?: User): Projection | null => {
