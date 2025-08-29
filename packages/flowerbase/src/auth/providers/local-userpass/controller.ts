@@ -109,17 +109,17 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: LOGIN_SCHEMA
     },
     async function (req) {
-      const storedUser = await db.collection(authCollection!).findOne({
+      const authUser = await db.collection(authCollection!).findOne({
         email: req.body.username
       })
 
-      if (!storedUser) {
+      if (!authUser) {
         throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
       }
 
       const passwordMatches = await comparePassword(
         req.body.password,
-        storedUser.password
+        authUser.password
       )
 
       if (!passwordMatches) {
@@ -130,16 +130,16 @@ export async function localUserPassController(app: FastifyInstance) {
         user_id_field && userCollection
           ? await db!
             .collection(userCollection)
-            .findOne({ [user_id_field]: storedUser._id.toString() })
+            .findOne({ [user_id_field]: authUser._id.toString() })
           : {}
-      delete storedUser?.password
+      delete authUser?.password
 
-      const userWithCustomData = { ...storedUser, user_data: user }
+      const userWithCustomData = { ...authUser, user_data: user }
 
-      if (storedUser && storedUser.status === 'pending') {
+      if (authUser && authUser.status === 'pending') {
         try {
           await db?.collection(authCollection!).updateOne(
-            { _id: storedUser._id },
+            { _id: authUser._id },
             {
               $set: {
                 status: 'confirmed'
@@ -152,8 +152,8 @@ export async function localUserPassController(app: FastifyInstance) {
       }
 
       if (
-        storedUser &&
-        storedUser.status === 'pending' &&
+        authUser &&
+        authUser.status === 'pending' &&
         on_user_creation_function_name &&
         functionsList[on_user_creation_function_name]
       ) {
@@ -183,7 +183,7 @@ export async function localUserPassController(app: FastifyInstance) {
         access_token: this.createAccessToken(userWithCustomData),
         refresh_token: this.createRefreshToken(userWithCustomData),
         device_id: '',
-        user_id: storedUser._id.toString()
+        user_id: authUser._id.toString()
       }
     }
   )
@@ -203,11 +203,11 @@ export async function localUserPassController(app: FastifyInstance) {
     async function (req) {
       const { resetPasswordCollection, resetPasswordConfig } = AUTH_CONFIG
       const email = req.body.email
-      const storedUser = await db.collection(authCollection!).findOne({
+      const authUser = await db.collection(authCollection!).findOne({
         email
       })
 
-      if (!storedUser) {
+      if (!authUser) {
         throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
       }
 
