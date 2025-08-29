@@ -167,8 +167,6 @@ export async function localUserPassController(app: FastifyInstance) {
         } catch (error) {
           console.log("🚀 ~ error:", error)
         }
-      } else {
-        console.error('Error function on_user_creation_function_name: ', on_user_creation_function_name)
       }
 
       return {

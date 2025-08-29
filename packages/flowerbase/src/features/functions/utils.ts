@@ -45,7 +45,8 @@ export const executeQuery = async ({
   query,
   update,
   document,
-  documents
+  documents,
+  pipeline
 }: ExecuteQueryParams) => {
   return {
     find: async () =>
@@ -67,7 +68,7 @@ export const executeQuery = async ({
     updateOne: () => currentMethod(EJSON.deserialize(query), EJSON.deserialize(update)),
     aggregate: async () =>
       (await (currentMethod as ReturnType<GetOperatorsFunction>['aggregate'])(
-        EJSON.deserialize(query)
+        EJSON.deserialize(pipeline) // TODO -> ADD OPTIONS
       )).toArray(),
     insertMany: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['insertMany'])(
@@ -84,3 +85,4 @@ export const executeQuery = async ({
       )
   }
 }
+

@@ -26,6 +26,7 @@ export type ExecuteQueryParams = {
   update: Document
   document: Document
   documents: Document[]
+  pipeline: Document[]
 }
 
 type FunctionsControllerOptions = {
