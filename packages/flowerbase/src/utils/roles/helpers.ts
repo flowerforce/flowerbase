@@ -44,7 +44,7 @@ const evaluateComplexExpression = async (
   const response = await GenerateContext({
     args: [params.cursor],
     app,
-    rules: {},
+    rules: StateManager.select("rules"),
     user,
     currentFunction,
     functionsList,
