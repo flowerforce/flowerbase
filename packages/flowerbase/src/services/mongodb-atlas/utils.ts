@@ -12,18 +12,25 @@ export const getValidRule = <T extends Role | Filter>({
   record = null
 }: GetValidRuleParams<T>) => {
   if (!filters.length) return []
+
   return filters.filter((f) => {
     if (Object.keys(f.apply_when).length === 0) return true
-    const conditions = expandQuery(f.apply_when, {
+
+    // expandQuery traduce i placeholder (%%user, %%true)
+    const conditions = expandQuery(f.apply_when, { 
       '%%user': user,
       '%%true': true
       /** values */
     })
-    const valid = rulesMatcherUtils.checkRule(
+
+    // checkRule valuta se i campi del record soddisfano quella condizione. 
+    // Quindi le regole vengono effettivamente rispettate.
+    const valid = rulesMatcherUtils.checkRule( 
       conditions,
       {
         ...(record ?? {}),
-        '%%user': user
+        '%%user': user,
+        '%%true': true
       },
       {}
     )
