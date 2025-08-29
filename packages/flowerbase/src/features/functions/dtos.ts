@@ -6,14 +6,14 @@ type MethodName = Exclude<keyof ReturnType<GetOperatorsFunction>, 'match'>
 
 export type FunctionCallDto =
   | {
-      name: MethodName
-      arguments: ArgumentsData
-    }
+    name: MethodName
+    arguments: ArgumentsData
+  }
   | {
-      arguments: ArgumentsData
-      name: MethodName
-      service: 'mongodb-atlas'
-    }
+    arguments: ArgumentsData
+    name: MethodName
+    service: 'mongodb-atlas'
+  }
 
 export type FunctionCallBase64Dto = {
   baas_request?: string
@@ -27,6 +27,7 @@ type ArgumentsData = Arguments<{
   update: Document
   document: Document
   documents: Document[]
+  pipeline?: Document[]
 }>
 
 export type Base64Function = {
