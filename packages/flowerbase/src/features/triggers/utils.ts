@@ -110,7 +110,8 @@ const handleAuthenticationTrigger = async ({
         user: {},
         currentFunction: triggerHandler,
         functionsList,
-        services
+        services,
+        runAsSystem: true
       })
     }
   })

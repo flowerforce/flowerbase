@@ -22,23 +22,26 @@ export async function GenerateContext({
   user,
   currentFunction,
   functionsList,
-  services
+  services,
+  runAsSystem
 }: GenerateContextParams) {
+  const contextFunction = { run_as_system: runAsSystem, ...currentFunction }
   const contextData = generateContextData({
     user,
     services,
     app,
     rules,
-    currentFunction,
+    currentFunction: contextFunction,
     functionsList,
-    GenerateContext
+    GenerateContext,
+    runAsSystem
   })
 
   try {
     const entryFile = require.main?.filename ?? process.cwd();
     const customRequire = createRequire(entryFile);
 
-    vm.runInContext(currentFunction.code, vm.createContext({
+    vm.runInContext(contextFunction.code, vm.createContext({
       ...contextData, require: customRequire,
       exports,
       module,
