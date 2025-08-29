@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'node:path'
 import cron from 'node-cron'
 import { AUTH_CONFIG, DB_NAME } from '../../constants'
+import { StateManager } from '../../state'
 import { readJsonContent } from '../../utils'
 import { GenerateContext } from '../../utils/context'
 import { HandlerParams, Trigger, Triggers } from './interface'
@@ -102,12 +103,16 @@ const handleAuthenticationTrigger = async ({
         args: [{
           user: {
             ...currentUser,
-            id: currentUser._id.toString()
+            id: currentUser._id.toString(),
+            data: {
+              _id: currentUser._id.toString(),
+              email: currentUser.email
+            }
           }
         }],
         app,
-        rules: {},
-        user: {},
+        rules: StateManager.select("rules"),
+        user: {},  // TODO from currentUser ??
         currentFunction: triggerHandler,
         functionsList,
         services
@@ -169,12 +174,13 @@ const handleDataBaseTrigger = async ({
       ? 'whenAvailable'
       : undefined
   })
-  changeStream.on('change', async function (change) {
+  // Omit<Record<string, unknown>, "clusterTime">
+  changeStream.on('change', async function ({ clusterTime, ...change }) {
     await GenerateContext({
       args: [change],
       app,
-      rules: {},
-      user: {},
+      rules: StateManager.select("rules"),
+      user: {}, // TODO add from? 
       currentFunction: triggerHandler,
       functionsList,
       services
