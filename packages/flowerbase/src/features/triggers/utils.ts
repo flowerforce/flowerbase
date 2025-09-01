@@ -174,7 +174,6 @@ const handleDataBaseTrigger = async ({
       ? 'whenAvailable'
       : undefined
   })
-  // Omit<Record<string, unknown>, "clusterTime">
   changeStream.on('change', async function ({ clusterTime, ...change }) {
     await GenerateContext({
       args: [change],
