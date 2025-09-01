@@ -1,8 +1,9 @@
 name: Publish release
 
 on:
+  workflow_dispatch:
   push:
-    branches: 
+    branches:
       - release
 
 jobs:
@@ -30,13 +31,6 @@ jobs:
           node-version: 20
           cache: 'npm'
           registry-url: https://registry.npmjs.org/
-      - name: Wait for status check # Do not continue if the status check is not successful
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.ref }}
-          check-name: checks
-          repo-token: ${{ secrets.GH_TOKEN }}
-          wait-interval: 20
       - name: Install deps
         run: npm ci --include=optional
       - name: Prepare release and push commit

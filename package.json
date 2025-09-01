@@ -1,12 +1,14 @@
 {
-  "name": "flower-server",
+  "name": "flowerbase",
   "version": "1.0.0",
-  "description": "flower-server-packages",
+  "description": "flowerbase-packages",
   "private": true,
   "scripts": {
     "test": "npx jest",
+    "tsc:noemit": "nx run-many -t tsc:noemit",
+    "lint:check": "nx run-many -t lint --fix --quiet --exclude=demo",
     "coverage": "npm run test -- --coverage",
-    "build:flowerbase": "cd packages/flowerbase && rm -rf dist/ && tsc",
+    "build": "cd packages/flowerbase && rm -rf dist/ && tsc",
     "dev": "nodemon index.ts",
     "lint:fds": "eslint packages/flowerbase",
     "format:fds": "prettier --write 'packages/flowerbase/**/*.ts'",
@@ -23,14 +25,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/flowerforce/flower-server.git"
+    "url": "git+https://github.com/flowerforce/flowerbase.git"
   },
   "author": "Stackhouse SRL",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/flowerforce/flower-server/issues"
+    "url": "https://github.com/flowerforce/flowerbase/issues"
   },
-  "homepage": "https://github.com/flowerforce/flower-server#readme",
+  "homepage": "https://github.com/flowerforce/flowerbase#readme",
   "dependencies": {},
   "devDependencies": {
     "@babel/core": "^7.24.5",
