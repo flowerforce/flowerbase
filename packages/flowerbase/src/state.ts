@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { Endpoints } from './features/endpoints/interface'
 import { Functions } from './features/functions/interface'
+import { FunctionsQueue } from './features/functions/queue'
 import { Rules } from './features/rules/interface'
 import { Triggers } from './features/triggers/interface'
 import { Services } from './services/interface'
@@ -12,6 +13,7 @@ type State = {
   endpoints: Endpoints
   rules: Rules
   app?: FastifyInstance
+  functionsQueue: FunctionsQueue
 }
 
 export class StateManager {
@@ -19,7 +21,8 @@ export class StateManager {
     functions: {},
     triggers: [],
     endpoints: [],
-    rules: {}
+    rules: {},
+    functionsQueue: new FunctionsQueue()
   }
   static select<K extends keyof typeof this._state>(
     key: K
