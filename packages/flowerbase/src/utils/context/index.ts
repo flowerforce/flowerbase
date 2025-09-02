@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import vm from 'vm'
 import { EJSON } from 'bson'
+import { StateManager } from '../../state'
 import { generateContextData } from './helpers'
 import { GenerateContextParams } from './interface'
 
@@ -23,35 +24,49 @@ export async function GenerateContext({
   currentFunction,
   functionsList,
   services,
-  runAsSystem
+  runAsSystem,
+  deserializeArgs = true,
+  enqueue
 }: GenerateContextParams) {
-  const contextFunction = { run_as_system: runAsSystem, ...currentFunction }
-  const contextData = generateContextData({
-    user,
-    services,
-    app,
-    rules,
-    currentFunction: contextFunction,
-    functionsList,
-    GenerateContext,
-    runAsSystem
-  })
 
-  try {
-    const entryFile = require.main?.filename ?? process.cwd();
-    const customRequire = createRequire(entryFile);
+  const functionsQueue = StateManager.select("functionsQueue")
 
-    vm.runInContext(contextFunction.code, vm.createContext({
-      ...contextData, require: customRequire,
-      exports,
-      module,
-      __filename: __filename,
-      __dirname: __dirname
-    }));
+  const functionToRun = { run_as_system: runAsSystem, ...currentFunction }
+
+  const run = async () => {
+
+    const contextData = generateContextData({
+      user,
+      services,
+      app,
+      rules,
+      currentFunction: functionToRun,
+      functionsList,
+      GenerateContext
+    })
+
+    try {
+      const entryFile = require.main?.filename ?? process.cwd();
+      const customRequire = createRequire(entryFile);
+
+      vm.runInContext(functionToRun.code, vm.createContext({
+        ...contextData, require: customRequire,
+        exports,
+        module,
+        __filename: __filename,
+        __dirname: __dirname
+      }));
+    }
+    catch (e) {
+      console.log(e)
+    }
+
+    if (deserializeArgs) {
+      return await module.exports(...EJSON.deserialize(args))
+    }
+
+    return await module.exports(...args)
   }
-  catch (e) {
-    console.log(e)
-  }
-
-  return await module.exports(...EJSON.deserialize(args))
+  const res = await functionsQueue.add(run, enqueue)
+  return res
 }

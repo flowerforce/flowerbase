@@ -66,22 +66,42 @@ export const generateHandler = ({
   rulesList
 }: GenerateHandlerParams) => {
   return async (req: FastifyRequest, res: FastifyReply) => {
-    try {
+    const { body: originalBody, headers, query } = req
 
-      // TODO gestire tramite http_method le args da passare
+    const customBody = {
+      text: () => JSON.stringify(originalBody)
+    }
+
+    const customResponseBody: {
+      data: unknown
+    } = {
+      data: null
+    }
+    try {
+      const customResponse = {
+        setStatusCode: (code: number) => {
+          res.status(code)
+        },
+        setBody: (body: unknown) => {
+          customResponseBody.data = body
+        }
+      }
 
       const response = await GenerateContext({
-        args: [], // TODO passare solo body e query ???
+        args: [
+          { body: customBody, headers, query: JSON.parse(JSON.stringify(query)) },
+          customResponse
+        ],
         app,
         rules: rulesList,
         user: req.user,
         currentFunction,
         functionsList,
-        services
+        services,
+        deserializeArgs: false
       })
 
-      return res.send(response)
-
+      return res.send(customResponseBody.data ?? response)
     } catch (e) {
       console.log(e)
     }

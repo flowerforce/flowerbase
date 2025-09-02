@@ -2,6 +2,7 @@ import sendGrid from '@sendgrid/mail'
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME } from '../../../constants'
 import { services } from '../../../services'
+import handleUserRegistration from '../../../shared/handleUserRegistration'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
 import { comparePassword, generateToken, hashPassword } from '../../../utils/crypto'
@@ -11,7 +12,6 @@ import {
   CONFIRM_RESET_SCHEMA,
   getMailConfig,
   LOGIN_SCHEMA,
-  PROVIDER_TYPE,
   REGISTRATION_SCHEMA,
   RESET_SCHEMA
 } from '../../utils'
@@ -28,10 +28,14 @@ import {
  * @param {FastifyInstance} app - The Fastify instance.
  */
 export async function localUserPassController(app: FastifyInstance) {
-
   const functionsList = StateManager.select('functions')
 
-  const { authCollection, userCollection, user_id_field, on_user_creation_function_name } = AUTH_CONFIG
+  const {
+    authCollection,
+    userCollection,
+    user_id_field,
+    on_user_creation_function_name
+  } = AUTH_CONFIG
   const db = app.mongo.client.db(DB_NAME)
 
   /**
@@ -47,53 +51,12 @@ export async function localUserPassController(app: FastifyInstance) {
     {
       schema: REGISTRATION_SCHEMA
     },
-    async function (req, res) {
-      const { email, password } = req.body
-      const hashedPassword = await hashPassword(password)
+    async (req, res) => {
 
-      const existingUser = await db.collection(authCollection!).findOne({
-        email
-      })
+      const result = await handleUserRegistration(app, { run_as_system: true })({ email: req.body.email.toLowerCase(), password: req.body.password })
 
-      if (existingUser) {
-        res.status(409)
-        return {
-          error: 'This email address is already used'
-        }
-      }
-
-      const result = await db.collection(authCollection!).insertOne({
-        email: email,
-        password: hashedPassword,
-        status: 'pending',
-        custom_data: {
-          // TODO da aggiungere in fase di registrazione utente, funzionalità utile che realm non permetteva
-        }
-      })
-
-      await db?.collection(authCollection!).updateOne(
-        {
-          email: email
-        },
-        {
-          $set: {
-            identities: [
-              {
-                id: result?.insertedId.toString(),
-                provider_id: result?.insertedId.toString(),
-                provider_type: PROVIDER_TYPE,
-                provider_data: { email }
-              }
-            ]
-          }
-        }
-      )
-
-      res.status(201)
-
-      return {
-        userId: result?.insertedId
-      }
+      res?.status(201)
+      return { userId: result?.insertedId.toString() }
     }
   )
 
@@ -110,32 +73,37 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: LOGIN_SCHEMA
     },
     async function (req) {
-      const storedUser = await db.collection(authCollection!).findOne({
+      const authUser = await db.collection(authCollection!).findOne({
         email: req.body.username
       })
 
-      if (!storedUser) {
+      if (!authUser) {
         throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
       }
 
       const passwordMatches = await comparePassword(
         req.body.password,
-        storedUser.password
+        authUser.password
       )
 
       if (!passwordMatches) {
         throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
       }
 
-      const user = user_id_field && userCollection
-        ? (await db!.collection(userCollection).findOne({ [user_id_field]: storedUser._id.toString() }))
-        : {}
+      const user =
+        user_id_field && userCollection
+          ? await db!
+            .collection(userCollection)
+            .findOne({ [user_id_field]: authUser._id.toString() })
+          : {}
+      delete authUser?.password
 
-      const userWithCustomData = { ...storedUser, user_data: user }
+      const userWithCustomData = { ...authUser, user_data: user, id: authUser._id.toString() }
 
-      if (storedUser && storedUser.status === 'pending') {
+      if (authUser && authUser.status === 'pending') {
         try {
-          await db?.collection(authCollection!).updateOne({ _id: storedUser._id },
+          await db?.collection(authCollection!).updateOne(
+            { _id: authUser._id },
             {
               $set: {
                 status: 'confirmed'
@@ -143,29 +111,35 @@ export async function localUserPassController(app: FastifyInstance) {
             }
           )
         } catch (error) {
-          console.log(">>> 🚀 ~ localUserPassController ~ error:", error)
+          console.log('>>> 🚀 ~ localUserPassController ~ error:', error)
         }
       }
 
-      if (storedUser && storedUser.status === 'pending' && on_user_creation_function_name && functionsList[on_user_creation_function_name]) {
-        delete storedUser?.password
+      if (
+        authUser &&
+        authUser.status === 'pending' &&
+        on_user_creation_function_name &&
+        functionsList[on_user_creation_function_name]
+      ) {
         try {
           await GenerateContext({
-            args: [{
-              operationType: 'CREATE',
-              providers: 'local-userpass',
-              user,
-              time: new Date().getTime()
-            }],
+            args: [
+              {
+                operationType: 'CREATE',
+                providers: 'local-userpass',
+                user: userWithCustomData,
+                time: new Date().getTime()
+              }
+            ],
             app,
             rules: {},
-            user: undefined,
+            user: userWithCustomData,
             currentFunction: functionsList[on_user_creation_function_name],
             functionsList,
             services
           })
         } catch (error) {
-          console.log("🚀 ~ error:", error)
+          console.log('localUserPassController - /login - GenerateContext - CATCH:', error)
         }
       }
 
@@ -173,7 +147,7 @@ export async function localUserPassController(app: FastifyInstance) {
         access_token: this.createAccessToken(userWithCustomData),
         refresh_token: this.createRefreshToken(userWithCustomData),
         device_id: '',
-        user_id: storedUser._id.toString()
+        user_id: authUser._id.toString()
       }
     }
   )
@@ -193,11 +167,11 @@ export async function localUserPassController(app: FastifyInstance) {
     async function (req) {
       const { resetPasswordCollection, resetPasswordConfig } = AUTH_CONFIG
       const email = req.body.email
-      const storedUser = await db.collection(authCollection!).findOne({
+      const authUser = await db.collection(authCollection!).findOne({
         email
       })
 
-      if (!storedUser) {
+      if (!authUser) {
         throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
       }
 

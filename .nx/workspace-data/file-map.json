@@ -90,12 +90,48 @@
   "fileMap": {
     "nonProjectFiles": [
       {
-        "file": "jest.config.ts",
-        "hash": "3494843969422251966"
+        "file": "package-lock.json",
+        "hash": "6247264392227273707"
+      },
+      {
+        "file": "package.json",
+        "hash": "9247982261855955756"
       },
       {
         "file": ".eslintrc",
         "hash": "4890099772766365500"
+      },
+      {
+        "file": ".prettierrc",
+        "hash": "7656430364163193455"
+      },
+      {
+        "file": ".github/workflows/release.yaml",
+        "hash": "2304665246591611055"
+      },
+      {
+        "file": "jest.preset.js",
+        "hash": "9430166341120122740"
+      },
+      {
+        "file": ".github/PULL_REQUEST_TEMPLATE.md",
+        "hash": "777829933608130992"
+      },
+      {
+        "file": "LICENSE",
+        "hash": "12182717254072030367"
+      },
+      {
+        "file": ".vscode/settings.json",
+        "hash": "17816762371917633494"
+      },
+      {
+        "file": ".npmignore",
+        "hash": "9882982332580877298"
+      },
+      {
+        "file": "nx.json",
+        "hash": "9418980942870310400"
       },
       {
         "file": "DOCS.md",
@@ -106,200 +142,35 @@
         "hash": "1579121106462692968"
       },
       {
-        "file": ".npmignore",
-        "hash": "9882982332580877298"
-      },
-      {
-        "file": "package-lock.json",
-        "hash": "3676292613274544332"
-      },
-      {
-        "file": ".gitignore",
-        "hash": "12510454605679904704"
-      },
-      {
-        "file": "nx.json",
-        "hash": "9418980942870310400"
-      },
-      {
-        "file": ".github/workflows/release.yaml",
-        "hash": "5668715174629061208"
-      },
-      {
-        "file": "package.json",
-        "hash": "9247982261855955756"
-      },
-      {
-        "file": ".vscode/settings.json",
-        "hash": "17816762371917633494"
-      },
-      {
         "file": "tsconfig.base.json",
         "hash": "11549800608902314440"
+      },
+      {
+        "file": "jest.config.ts",
+        "hash": "3494843969422251966"
       },
       {
         "file": "scripts/prerelease.ts",
         "hash": "14144003354920194568"
       },
       {
-        "file": ".prettierrc",
-        "hash": "7656430364163193455"
-      },
-      {
-        "file": "jest.preset.js",
-        "hash": "9430166341120122740"
-      },
-      {
         "file": "eslint.config.mjs",
         "hash": "15816864606171050325"
       },
       {
-        "file": "LICENSE",
-        "hash": "12182717254072030367"
+        "file": ".gitignore",
+        "hash": "3556843805136296686"
       },
       {
         "file": ".github/workflows/checks.yaml",
-        "hash": "15811896887820413211"
+        "hash": "16547202209486812471"
       }
     ],
     "projectFileMap": {
-      "frontend": [
-        {
-          "file": "packages/demo/packages/frontend/.gitignore",
-          "hash": "13046175384202504187"
-        },
-        {
-          "file": "packages/demo/packages/frontend/README.md",
-          "hash": "13160460843517416105"
-        },
-        {
-          "file": "packages/demo/packages/frontend/eslint.config.js",
-          "hash": "16145672096969245511"
-        },
-        {
-          "file": "packages/demo/packages/frontend/index.html",
-          "hash": "4025202329384162906"
-        },
-        {
-          "file": "packages/demo/packages/frontend/package-lock.json",
-          "hash": "4932292718093455468"
-        },
-        {
-          "file": "packages/demo/packages/frontend/package.json",
-          "hash": "2630108362905442116",
-          "deps": [
-            "npm:typescript@5.8.3"
-          ]
-        },
-        {
-          "file": "packages/demo/packages/frontend/public/vite.svg",
-          "hash": "16046085400642193116"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/App.css",
-          "hash": "3739391659270974612"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/App.tsx",
-          "hash": "1989732526986445183"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/api/client.ts",
-          "hash": "11827492391897522812"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/appRoutes.ts",
-          "hash": "6744697892634064487"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/assets/react.svg",
-          "hash": "16069471864800376455"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/components/EmptyState/index.tsx",
-          "hash": "13818087902908550141"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/components/Layout/index.tsx",
-          "hash": "9208038598266246320"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/components/Loader/index.tsx",
-          "hash": "5439699450597759093"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/components/NewTask/index.tsx",
-          "hash": "16179991392904483125"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/components/Pagination/index.tsx",
-          "hash": "15784848270396726706"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/components/TaskBoard/index.tsx",
-          "hash": "7496398157237751950"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/components/TaskTable/index.tsx",
-          "hash": "15200496161907260446"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/context/Authentication.tsx",
-          "hash": "6615975624568309645"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/hooks/useAuthentication.ts",
-          "hash": "6290839895112002736"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/index.css",
-          "hash": "8688147797407610842"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/main.tsx",
-          "hash": "15503771049540406531"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/pages/Home/index.tsx",
-          "hash": "12195795209109929614"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/pages/Login/index.tsx",
-          "hash": "16267190739117165768"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/pages/Registration/index.tsx",
-          "hash": "12840201238792842803"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/pages/Welcome/index.tsx",
-          "hash": "4928837705085028779"
-        },
-        {
-          "file": "packages/demo/packages/frontend/src/vite-env.d.ts",
-          "hash": "12946363841406869089"
-        },
-        {
-          "file": "packages/demo/packages/frontend/tsconfig.app.json",
-          "hash": "709621094284831163"
-        },
-        {
-          "file": "packages/demo/packages/frontend/tsconfig.json",
-          "hash": "2365188958523842680"
-        },
-        {
-          "file": "packages/demo/packages/frontend/tsconfig.node.json",
-          "hash": "2201964403257550573"
-        },
-        {
-          "file": "packages/demo/packages/frontend/vite.config.ts",
-          "hash": "16225914092815047172"
-        }
-      ],
       "backend": [
         {
           "file": "packages/demo/packages/backend/auth/custom_user_data.json",
-          "hash": "3927028957925870881"
+          "hash": "10404628569435651218"
         },
         {
           "file": "packages/demo/packages/backend/auth/providers.json",
@@ -334,7 +205,11 @@
         },
         {
           "file": "packages/demo/packages/backend/http_endpoints/config.json",
-          "hash": "5079120912223948982"
+          "hash": "13358479922256070029"
+        },
+        {
+          "file": "packages/demo/packages/backend/https_endpoints/config.json",
+          "hash": "3210482238461104306"
         },
         {
           "file": "packages/demo/packages/backend/index.ts",
@@ -363,35 +238,18 @@
           "hash": "13542890855063395180"
         }
       ],
-      "flowerbase-demo": [
-        {
-          "file": "packages/demo/README.md",
-          "hash": "10793297036395519946"
-        },
-        {
-          "file": "packages/demo/package-lock.json",
-          "hash": "2096834049677913296"
-        },
-        {
-          "file": "packages/demo/package.json",
-          "hash": "7323055674015837798",
-          "deps": [
-            "npm:concurrently"
-          ]
-        }
-      ],
       "flowerbase": [
         {
           "file": "packages/flowerbase/CHANGELOG.md",
-          "hash": "3244421341483603138"
+          "hash": "127082807175306356"
         },
         {
           "file": "packages/flowerbase/LICENSE",
-          "hash": "18051186965849752752"
+          "hash": "17330665133841632028"
         },
         {
           "file": "packages/flowerbase/README.md",
-          "hash": "15950364827485381646"
+          "hash": "1134395253210228373"
         },
         {
           "file": "packages/flowerbase/jest.config.ts",
@@ -399,7 +257,7 @@
         },
         {
           "file": "packages/flowerbase/package.json",
-          "hash": "3968302081809293340",
+          "hash": "13329414870720393396",
           "deps": [
             "npm:@babel/cli",
             "npm:@babel/core",
@@ -430,6 +288,8 @@
             "npm:@fastify/cors",
             "npm:@fastify/jwt",
             "npm:@fastify/mongodb",
+            "npm:@fastify/swagger",
+            "npm:@fastify/swagger-ui",
             "npm:@sendgrid/mail",
             "npm:aws-sdk",
             "npm:bson",
@@ -456,7 +316,7 @@
         },
         {
           "file": "packages/flowerbase/src/auth/controller.ts",
-          "hash": "9502512979046153021",
+          "hash": "8920025419019649307",
           "deps": [
             "npm:bson",
             "npm:fastify"
@@ -477,7 +337,7 @@
         },
         {
           "file": "packages/flowerbase/src/auth/providers/local-userpass/controller.ts",
-          "hash": "14257683980239091573",
+          "hash": "4579298034115210652",
           "deps": [
             "npm:@sendgrid/mail",
             "npm:fastify"
@@ -489,7 +349,7 @@
         },
         {
           "file": "packages/flowerbase/src/auth/utils.ts",
-          "hash": "16532693549601921769"
+          "hash": "2617179695288496778"
         },
         {
           "file": "packages/flowerbase/src/babel.config.json",
@@ -497,7 +357,7 @@
         },
         {
           "file": "packages/flowerbase/src/constants.ts",
-          "hash": "15332673479788837016"
+          "hash": "18362866349821028139"
         },
         {
           "file": "packages/flowerbase/src/fastify.d.ts",
@@ -508,32 +368,32 @@
         },
         {
           "file": "packages/flowerbase/src/features/endpoints/index.ts",
-          "hash": "9065001234513442813"
+          "hash": "10322214324742830283"
         },
         {
           "file": "packages/flowerbase/src/features/endpoints/interface.ts",
-          "hash": "16273799723638004833",
+          "hash": "785632599852090663",
           "deps": [
             "npm:fastify"
           ]
         },
         {
           "file": "packages/flowerbase/src/features/endpoints/utils.ts",
-          "hash": "11472936155210349180",
+          "hash": "7233423249475751733",
           "deps": [
             "npm:fastify"
           ]
         },
         {
           "file": "packages/flowerbase/src/features/functions/controller.ts",
-          "hash": "6386459322280123765",
+          "hash": "10317662607881668023",
           "deps": [
             "npm:bson"
           ]
         },
         {
           "file": "packages/flowerbase/src/features/functions/dtos.ts",
-          "hash": "6057490863033497507",
+          "hash": "15742582065315377219",
           "deps": [
             "npm:mongodb"
           ]
@@ -544,7 +404,7 @@
         },
         {
           "file": "packages/flowerbase/src/features/functions/interface.ts",
-          "hash": "10523203435227851676",
+          "hash": "912071536843058793",
           "deps": [
             "npm:fastify",
             "npm:mongodb"
@@ -552,7 +412,7 @@
         },
         {
           "file": "packages/flowerbase/src/features/functions/utils.ts",
-          "hash": "12819340312788544475",
+          "hash": "14048521564942895702",
           "deps": [
             "npm:bson"
           ]
@@ -563,11 +423,14 @@
         },
         {
           "file": "packages/flowerbase/src/features/rules/interface.ts",
-          "hash": "421917872219258968"
+          "hash": "2676357654844338889",
+          "deps": [
+            "npm:mongodb"
+          ]
         },
         {
           "file": "packages/flowerbase/src/features/rules/utils.ts",
-          "hash": "15397549863305988300"
+          "hash": "14508962079404020007"
         },
         {
           "file": "packages/flowerbase/src/features/triggers/dtos.ts",
@@ -589,7 +452,7 @@
         },
         {
           "file": "packages/flowerbase/src/features/triggers/utils.ts",
-          "hash": "12897967977649159525",
+          "hash": "15383177248991603914",
           "deps": [
             "npm:node-cron"
           ]
@@ -600,10 +463,18 @@
         },
         {
           "file": "packages/flowerbase/src/index.ts",
-          "hash": "15849391788067266141",
+          "hash": "12298194705739830846",
           "deps": [
             "npm:dotenv",
-            "npm:fastify"
+            "npm:fastify",
+            [
+              "npm:@fastify/swagger",
+              "dynamic"
+            ],
+            [
+              "npm:@fastify/swagger-ui",
+              "dynamic"
+            ]
           ]
         },
         {
@@ -648,7 +519,7 @@
         },
         {
           "file": "packages/flowerbase/src/services/mongodb-atlas/index.ts",
-          "hash": "5946749177094543419",
+          "hash": "3539048172604260214",
           "deps": [
             "npm:lodash",
             "npm:mongodb"
@@ -656,7 +527,7 @@
         },
         {
           "file": "packages/flowerbase/src/services/mongodb-atlas/model.ts",
-          "hash": "5394900792655197847",
+          "hash": "15471339076050936384",
           "deps": [
             "npm:fastify",
             "npm:mongodb"
@@ -664,7 +535,7 @@
         },
         {
           "file": "packages/flowerbase/src/services/mongodb-atlas/utils.ts",
-          "hash": "8636379604639619643",
+          "hash": "18021074533375938270",
           "deps": [
             "npm:mongodb"
           ]
@@ -820,14 +691,14 @@
         },
         {
           "file": "packages/flowerbase/src/utils/context/index.ts",
-          "hash": "18272130124239141105",
+          "hash": "12563703786046313820",
           "deps": [
             "npm:bson"
           ]
         },
         {
           "file": "packages/flowerbase/src/utils/context/interface.ts",
-          "hash": "3820796287391483907",
+          "hash": "14920036670505654100",
           "deps": [
             "npm:fastify"
           ]
@@ -954,7 +825,7 @@
         },
         {
           "file": "packages/flowerbase/src/utils/rules.ts",
-          "hash": "3369226066370644364",
+          "hash": "1338918994477437079",
           "deps": [
             "npm:lodash"
           ]
@@ -962,6 +833,162 @@
         {
           "file": "packages/flowerbase/tsconfig.json",
           "hash": "7518117920492327411"
+        }
+      ],
+      "flowerbase-demo": [
+        {
+          "file": "packages/demo/README.md",
+          "hash": "10793297036395519946"
+        },
+        {
+          "file": "packages/demo/package-lock.json",
+          "hash": "2096834049677913296"
+        },
+        {
+          "file": "packages/demo/package.json",
+          "hash": "7323055674015837798",
+          "deps": [
+            "npm:concurrently"
+          ]
+        }
+      ],
+      "frontend": [
+        {
+          "file": "packages/demo/packages/frontend/.gitignore",
+          "hash": "13046175384202504187"
+        },
+        {
+          "file": "packages/demo/packages/frontend/README.md",
+          "hash": "13160460843517416105"
+        },
+        {
+          "file": "packages/demo/packages/frontend/eslint.config.js",
+          "hash": "16145672096969245511",
+          "deps": [
+            "npm:@eslint/js",
+            "npm:globals",
+            "npm:eslint-plugin-react-hooks",
+            "npm:typescript-eslint"
+          ]
+        },
+        {
+          "file": "packages/demo/packages/frontend/index.html",
+          "hash": "4025202329384162906"
+        },
+        {
+          "file": "packages/demo/packages/frontend/package-lock.json",
+          "hash": "4932292718093455468"
+        },
+        {
+          "file": "packages/demo/packages/frontend/package.json",
+          "hash": "2630108362905442116",
+          "deps": [
+            "npm:typescript@5.8.3"
+          ]
+        },
+        {
+          "file": "packages/demo/packages/frontend/public/vite.svg",
+          "hash": "16046085400642193116"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/App.css",
+          "hash": "3739391659270974612"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/App.tsx",
+          "hash": "1989732526986445183"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/api/client.ts",
+          "hash": "11827492391897522812"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/appRoutes.ts",
+          "hash": "6744697892634064487"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/assets/react.svg",
+          "hash": "16069471864800376455"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/EmptyState/index.tsx",
+          "hash": "13818087902908550141"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/Layout/index.tsx",
+          "hash": "9208038598266246320"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/Loader/index.tsx",
+          "hash": "5439699450597759093"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/NewTask/index.tsx",
+          "hash": "16179991392904483125"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/Pagination/index.tsx",
+          "hash": "15784848270396726706"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/TaskBoard/index.tsx",
+          "hash": "7496398157237751950"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/components/TaskTable/index.tsx",
+          "hash": "15200496161907260446"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/context/Authentication.tsx",
+          "hash": "6615975624568309645"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/hooks/useAuthentication.ts",
+          "hash": "6290839895112002736"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/index.css",
+          "hash": "8688147797407610842"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/main.tsx",
+          "hash": "15503771049540406531"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/pages/Home/index.tsx",
+          "hash": "12195795209109929614"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/pages/Login/index.tsx",
+          "hash": "16267190739117165768"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/pages/Registration/index.tsx",
+          "hash": "12840201238792842803"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/pages/Welcome/index.tsx",
+          "hash": "4928837705085028779"
+        },
+        {
+          "file": "packages/demo/packages/frontend/src/vite-env.d.ts",
+          "hash": "12946363841406869089"
+        },
+        {
+          "file": "packages/demo/packages/frontend/tsconfig.app.json",
+          "hash": "709621094284831163"
+        },
+        {
+          "file": "packages/demo/packages/frontend/tsconfig.json",
+          "hash": "2365188958523842680"
+        },
+        {
+          "file": "packages/demo/packages/frontend/tsconfig.node.json",
+          "hash": "2201964403257550573"
+        },
+        {
+          "file": "packages/demo/packages/frontend/vite.config.ts",
+          "hash": "16225914092815047172"
         }
       ]
     }

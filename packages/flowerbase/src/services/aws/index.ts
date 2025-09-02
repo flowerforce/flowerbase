@@ -1,20 +1,22 @@
-import { AWSError } from 'aws-sdk'
+import { AWSError, Credentials } from 'aws-sdk'
 import Lambda from 'aws-sdk/clients/lambda'
 import S3 from 'aws-sdk/clients/s3'
 import { PromiseResult } from 'aws-sdk/lib/request'
+import { S3_CONFIG } from '../../constants'
 
-const accessKeyId = 'GET_THIS_FROM_CONFIG'
-const secretAccessKey = 'GET_THIS_FROM_CONFIG'
 
 const Aws = () => {
+
+  const credentials = {
+    accessKeyId: S3_CONFIG.ACCESS_KEY_ID,
+    secretAccessKey: S3_CONFIG.SECRET_ACCESS_KEY,
+  } as Credentials
+
   return {
     lambda: (region: string) => {
       const lambda = new Lambda({
         region: region,
-        credentials: {
-          accessKeyId,
-          secretAccessKey
-        }
+        credentials
       }) as Lambda & {
         Invoke: (
           ...args: Parameters<Lambda['invoke']>
@@ -37,10 +39,7 @@ const Aws = () => {
       new S3({
         region,
         apiVersion: '2006-03-01',
-        credentials: {
-          accessKeyId,
-          secretAccessKey
-        },
+        credentials,
         s3ForcePathStyle: true,
         signatureVersion: 'v4'
       })
