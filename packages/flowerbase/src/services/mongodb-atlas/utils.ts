@@ -1,6 +1,17 @@
-import { Collection, Document } from 'mongodb'
+import { ObjectId } from 'mongodb'
+
+import { Collection, Document, Filter as FilterMongoDB } from 'mongodb'
 import { User } from '../../auth/dtos'
-import { AggregationPipeline, AggregationPipelineStage, Filter, LookupStage, Projection, Rules, STAGES_TO_SEARCH, UnionWithStage } from '../../features/rules/interface'
+import {
+  AggregationPipeline,
+  AggregationPipelineStage,
+  Filter,
+  LookupStage,
+  Projection,
+  Rules,
+  STAGES_TO_SEARCH,
+  UnionWithStage
+} from '../../features/rules/interface'
 import { Role } from '../../utils/roles/interface'
 import { expandQuery } from '../../utils/rules'
 import rulesMatcherUtils from '../../utils/rules-matcher/utils'
@@ -42,42 +53,49 @@ export const getFormattedQuery = (
   return [
     isValidPreFilter && expandQuery(preFilter[0].query, { '%%user': user }),
     query
-  ].filter(Boolean)
+  ].filter(Boolean) as FilterMongoDB<Document>[]
 }
 
-export const getFormattedProjection = (filters: Filter[] = [], user?: User): Projection | null => {
-  const projections = filters.filter((filter) => {
-    if (filter.projection) {
-      const preFilter = getValidRule({ filters, user })
-      const isValidPreFilter = !!preFilter?.length
-      return isValidPreFilter
-    }
-    return false
-  }).map(f => f.projection)
-  if (!projections.length) return null;
-  return Object.assign({}, ...projections);
+export const getFormattedProjection = (
+  filters: Filter[] = [],
+  user?: User
+): Projection | null => {
+  const projections = filters
+    .filter((filter) => {
+      if (filter.projection) {
+        const preFilter = getValidRule({ filters, user })
+        const isValidPreFilter = !!preFilter?.length
+        return isValidPreFilter
+      }
+      return false
+    })
+    .map((f) => f.projection)
+  if (!projections.length) return null
+  return Object.assign({}, ...projections)
 }
-
 
 export const applyAccessControlToPipeline = (
   pipeline: AggregationPipeline,
-  rules: Record<string, {
-    filters?: Filter[];
-    roles?: Role[];
-  }>,
+  rules: Record<
+    string,
+    {
+      filters?: Filter[]
+      roles?: Role[]
+    }
+  >,
   user: User
 ): AggregationPipeline => {
   return pipeline.map((stage) => {
-    const [stageName] = Object.keys(stage);
-    const value = stage[stageName as keyof typeof stage];
+    const [stageName] = Object.keys(stage)
+    const value = stage[stageName as keyof typeof stage]
 
     // CASE LOOKUP
     if (stageName === STAGES_TO_SEARCH.LOOKUP) {
       const lookUpStage = value as LookupStage
       const currentCollection = lookUpStage.from
-      const lookupRules = rules[currentCollection] || {};
-      const formattedQuery = getFormattedQuery(lookupRules.filters, {}, user);
-      const projection = getFormattedProjection(lookupRules.filters);
+      const lookupRules = rules[currentCollection] || {}
+      const formattedQuery = getFormattedQuery(lookupRules.filters, {}, user)
+      const projection = getFormattedProjection(lookupRules.filters)
 
       return {
         $lookup: {
@@ -88,19 +106,19 @@ export const applyAccessControlToPipeline = (
             ...applyAccessControlToPipeline(lookUpStage.pipeline || [], rules, user)
           ]
         }
-      };
+      }
     }
 
     // CASE LOOKUP
     if (stageName === STAGES_TO_SEARCH.UNION_WITH) {
       const unionWithStage = value as UnionWithStage
-      const isSimpleStage = typeof unionWithStage === "string"
-      const currentCollection = isSimpleStage ? unionWithStage : unionWithStage.coll;
-      const unionRules = rules[currentCollection] || {};
-      const formattedQuery = getFormattedQuery(unionRules.filters, {}, user);
-      const projection = getFormattedProjection(unionRules.filters);
+      const isSimpleStage = typeof unionWithStage === 'string'
+      const currentCollection = isSimpleStage ? unionWithStage : unionWithStage.coll
+      const unionRules = rules[currentCollection] || {}
+      const formattedQuery = getFormattedQuery(unionRules.filters, {}, user)
+      const projection = getFormattedProjection(unionRules.filters)
 
-      const nestedPipeline = isSimpleStage ? [] : (unionWithStage.pipeline || [])
+      const nestedPipeline = isSimpleStage ? [] : unionWithStage.pipeline || []
 
       return {
         $unionWith: {
@@ -108,54 +126,68 @@ export const applyAccessControlToPipeline = (
           pipeline: [
             ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
             ...(projection ? [{ $project: projection }] : []),
-            ...applyAccessControlToPipeline((nestedPipeline), rules, user)
+            ...applyAccessControlToPipeline(nestedPipeline, rules, user)
           ]
         }
-      };
+      }
     }
 
     // CASE FACET
     if (stageName === STAGES_TO_SEARCH.FACET) {
       const modifiedFacets = Object.fromEntries(
-        (Object.entries(value) as [string, AggregationPipelineStage[]][]).map(([facetKey, facetPipeline]) => {
-          return [
-            facetKey,
-            applyAccessControlToPipeline(facetPipeline, rules, user)
-          ];
-        })
-      );
+        (Object.entries(value) as [string, AggregationPipelineStage[]][]).map(
+          ([facetKey, facetPipeline]) => {
+            return [facetKey, applyAccessControlToPipeline(facetPipeline, rules, user)]
+          }
+        )
+      )
 
-      return { $facet: modifiedFacets };
+      return { $facet: modifiedFacets }
     }
 
-    return stage;
-  });
+    return stage
+  })
 }
 
-export const checkDenyOperation = (rules: Rules, collectionName: string, operation: CRUD_OPERATIONS) => {
+export const checkDenyOperation = (
+  rules: Rules,
+  collectionName: string,
+  operation: CRUD_OPERATIONS
+) => {
   const collectionRules = rules[collectionName]
   if (!collectionRules) {
     throw new Error(`${operation} FORBIDDEN!`)
   }
 }
+
+export function normalizeQuery(query: FilterMongoDB<Document>[]) {
+  return query.map((cond) => {
+    const newCond = { ...cond }
+    if (newCond._id && typeof newCond._id === 'string' && ObjectId.isValid(newCond._id)) {
+      newCond._id = new ObjectId(newCond._id)
+    }
+    return newCond
+  })
+}
+
 export const getCollectionsFromPipeline = (pipeline: Document[]) => {
   return pipeline.reduce<string[]>((acc, stage) => {
-    const [stageKey] = Object.keys(stage);
-    const stageValue = stage[stageKey];
-    const subPipeline = stageValue?.pipeline;
+    const [stageKey] = Object.keys(stage)
+    const stageValue = stage[stageKey]
+    const subPipeline = stageValue?.pipeline
 
     if (stageKey === STAGES_TO_SEARCH.LOOKUP) {
-      acc.push(...[stageValue.from, ...acc]);
+      acc.push(...[stageValue.from, ...acc])
       if (subPipeline) {
-        const collections = getCollectionsFromPipeline(subPipeline);
-        acc.push(...[stageValue.from, ...collections]);
+        const collections = getCollectionsFromPipeline(subPipeline)
+        acc.push(...[stageValue.from, ...collections])
       }
     }
 
     if (stageKey === STAGES_TO_SEARCH.FACET) {
       for (const sub of Object.values(stageValue) as Document[][]) {
-        const collections = getCollectionsFromPipeline(sub);
-        acc.push(...collections);
+        const collections = getCollectionsFromPipeline(sub)
+        acc.push(...collections)
       }
     }
 
@@ -164,10 +196,10 @@ export const getCollectionsFromPipeline = (pipeline: Document[]) => {
       typeof stageValue === 'object' &&
       subPipeline
     ) {
-      const collections = getCollectionsFromPipeline(subPipeline);
-      acc.push(...[stageValue.coll, ...collections]);
+      const collections = getCollectionsFromPipeline(subPipeline)
+      acc.push(...[stageValue.coll, ...collections])
     }
 
-    return acc;
-  }, []);
-};
+    return acc
+  }, [])
+}

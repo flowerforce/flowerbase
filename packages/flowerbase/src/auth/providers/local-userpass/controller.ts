@@ -28,10 +28,14 @@ import {
  * @param {FastifyInstance} app - The Fastify instance.
  */
 export async function localUserPassController(app: FastifyInstance) {
-
   const functionsList = StateManager.select('functions')
 
-  const { authCollection, userCollection, user_id_field, on_user_creation_function_name } = AUTH_CONFIG
+  const {
+    authCollection,
+    userCollection,
+    user_id_field,
+    on_user_creation_function_name
+  } = AUTH_CONFIG
   const db = app.mongo.client.db(DB_NAME)
 
   /**
@@ -127,15 +131,20 @@ export async function localUserPassController(app: FastifyInstance) {
         throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
       }
 
-      const user = user_id_field && userCollection
-        ? (await db!.collection(userCollection).findOne({ [user_id_field]: storedUser._id.toString() }))
-        : {}
+      const user =
+        user_id_field && userCollection
+          ? await db!
+              .collection(userCollection)
+              .findOne({ [user_id_field]: storedUser._id.toString() })
+          : {}
+      delete storedUser?.password
 
       const userWithCustomData = { ...storedUser, user_data: user }
 
       if (storedUser && storedUser.status === 'pending') {
         try {
-          await db?.collection(authCollection!).updateOne({ _id: storedUser._id },
+          await db?.collection(authCollection!).updateOne(
+            { _id: storedUser._id },
             {
               $set: {
                 status: 'confirmed'
@@ -143,29 +152,36 @@ export async function localUserPassController(app: FastifyInstance) {
             }
           )
         } catch (error) {
-          console.log(">>> 🚀 ~ localUserPassController ~ error:", error)
+          console.log('>>> 🚀 ~ localUserPassController ~ error:', error)
         }
       }
-
-      if (storedUser && storedUser.status === 'pending' && on_user_creation_function_name && functionsList[on_user_creation_function_name]) {
-        delete storedUser?.password
+      const confirmedUser = await db
+        .collection(authCollection!)
+        .findOne({ _id: storedUser._id })
+      if (
+        confirmedUser &&
+        on_user_creation_function_name &&
+        functionsList[on_user_creation_function_name]
+      ) {
         try {
           await GenerateContext({
-            args: [{
-              operationType: 'CREATE',
-              providers: 'local-userpass',
-              user,
-              time: new Date().getTime()
-            }],
+            args: [
+              {
+                operationType: 'CREATE',
+                providers: 'local-userpass',
+                user: confirmedUser,
+                time: new Date().getTime()
+              }
+            ],
             app,
             rules: {},
-            user: undefined,
+            user: confirmedUser,
             currentFunction: functionsList[on_user_creation_function_name],
             functionsList,
             services
           })
         } catch (error) {
-          console.log("🚀 ~ error:", error)
+          console.log('🚀 ~ error in GenerateContext:', error)
         }
       }
 

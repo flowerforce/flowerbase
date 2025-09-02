@@ -23,7 +23,8 @@ export async function GenerateContext({
   currentFunction,
   functionsList,
   services,
-  runAsSystem
+  runAsSystem,
+  deserializeArgs = true
 }: GenerateContextParams) {
   const contextFunction = { run_as_system: runAsSystem, ...currentFunction }
   const contextData = generateContextData({
@@ -38,20 +39,27 @@ export async function GenerateContext({
   })
 
   try {
-    const entryFile = require.main?.filename ?? process.cwd();
-    const customRequire = createRequire(entryFile);
+    const entryFile = require.main?.filename ?? process.cwd()
+    const customRequire = createRequire(entryFile)
 
-    vm.runInContext(contextFunction.code, vm.createContext({
-      ...contextData, require: customRequire,
-      exports,
-      module,
-      __filename: __filename,
-      __dirname: __dirname
-    }));
-  }
-  catch (e) {
+    vm.runInContext(
+      contextFunction.code,
+      vm.createContext({
+        ...contextData,
+        require: customRequire,
+        exports,
+        module,
+        __filename: __filename,
+        __dirname: __dirname
+      })
+    )
+  } catch (e) {
     console.log(e)
   }
 
-  return await module.exports(...EJSON.deserialize(args))
+  if (deserializeArgs) {
+    return await module.exports(...EJSON.deserialize(args))
+  }
+
+  return await module.exports(...args)
 }

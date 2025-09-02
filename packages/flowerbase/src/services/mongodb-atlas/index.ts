@@ -4,7 +4,13 @@ import { Collection, Document, EventsDescription, FindCursor, WithId } from 'mon
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
 import { CRUD_OPERATIONS, GetOperatorsFunction, MongodbAtlasFunction } from './model'
-import { applyAccessControlToPipeline, checkDenyOperation, getFormattedProjection, getFormattedQuery } from './utils'
+import {
+  applyAccessControlToPipeline,
+  checkDenyOperation,
+  getFormattedProjection,
+  getFormattedQuery,
+  normalizeQuery
+} from './utils'
 
 //TODO aggiungere no-sql inject security
 const getOperators: GetOperatorsFunction = (
@@ -40,15 +46,15 @@ const getOperators: GetOperatorsFunction = (
 
       const { status, document } = winningRole
         ? await checkValidation(
-          winningRole,
-          {
-            type: 'read',
-            roles,
-            cursor: result,
-            expansions: {}
-          },
-          user
-        )
+            winningRole,
+            {
+              type: 'read',
+              roles,
+              cursor: result,
+              expansions: {}
+            },
+            user
+          )
         : { status: true, document: result }
 
       // Return validated document or empty object if not permitted
@@ -88,15 +94,15 @@ const getOperators: GetOperatorsFunction = (
 
       const { status } = winningRole
         ? await checkValidation(
-          winningRole,
-          {
-            type: 'delete',
-            roles,
-            cursor: result,
-            expansions: {}
-          },
-          user
-        )
+            winningRole,
+            {
+              type: 'delete',
+              roles,
+              cursor: result,
+              expansions: {}
+            },
+            user
+          )
         : { status: true }
 
       if (!status) {
@@ -136,15 +142,15 @@ const getOperators: GetOperatorsFunction = (
 
       const { status, document } = winningRole
         ? await checkValidation(
-          winningRole,
-          {
-            type: 'insert',
-            roles,
-            cursor: data,
-            expansions: {}
-          },
-          user
-        )
+            winningRole,
+            {
+              type: 'insert',
+              roles,
+              cursor: data,
+              expansions: {}
+            },
+            user
+          )
         : { status: true, document: data }
 
       if (!status || !isEqual(data, document)) {
@@ -177,20 +183,40 @@ const getOperators: GetOperatorsFunction = (
    *  - If validation fails, throws an error; otherwise, updates the document.
    */
   updateOne: async (query, data, options) => {
+    console.log('Step1 - query', query)
+    console.log('Step1 - data', data)
+    console.log('Step1 - options', options)
     if (!run_as_system) {
+      console.log('Step1 - runs_as_system')
+
       checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
       const { filters, roles } = rules[collName] || {}
       // Apply access control filters
+
+      // Normalize _id
       const formattedQuery = getFormattedQuery(filters, query, user)
+      const safeQuery = Array.isArray(formattedQuery)
+        ? normalizeQuery(formattedQuery)
+        : formattedQuery
+
+      const result = await collection.findOne({ $and: safeQuery })
+
+      /*  const formattedQuery = getFormattedQuery(filters, query, user) */
+      console.log('Step2 - formattedQuery', formattedQuery)
 
       // Retrieve the document to check permissions before updating
-      const result = await collection.findOne({ $and: formattedQuery })
+      console.log('Step2 after fq  - collection ', collection)
+      /*   const result = await collection.findOne({ $and: formattedQuery }) */
+      console.log('result ', result)
 
       if (!result) {
+        console.log('check step error in !result')
+
         throw new Error('Update not permitted')
       }
 
       const winningRole = getWinningRole(result, user, roles)
+      console.log('Step3 - winningRole', winningRole)
 
       // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
       const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
@@ -199,7 +225,10 @@ const getOperators: GetOperatorsFunction = (
       // const docToCheck = hasOperators
       //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
       //   : data
-      const [matchQuery] = formattedQuery;
+
+      const [matchQuery] = formattedQuery
+      console.log('Step4 - matchQuery', matchQuery)
+
       const pipeline = [
         {
           $match: matchQuery
@@ -209,28 +238,29 @@ const getOperators: GetOperatorsFunction = (
         },
         ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
       ]
-
+      console.log('Step5 - pipeline', pipeline)
       const [docToCheck] = hasOperators
         ? await collection.aggregate(pipeline).toArray()
         : ([data] as [Document])
       // Validate update permissions
       const { status, document } = winningRole
         ? await checkValidation(
-          winningRole,
-          {
-            type: 'write',
-            roles,
-            cursor: docToCheck,
-            expansions: {}
-          },
-          user
-        )
+            winningRole,
+            {
+              type: 'write',
+              roles,
+              cursor: docToCheck,
+              expansions: {}
+            },
+            user
+          )
         : { status: true, document: docToCheck }
-
+      console.log('Step6 - status', status)
       // Ensure no unauthorized changes are made
       const areDocumentsEqual = isEqual(document, docToCheck)
 
       if (!status || !areDocumentsEqual) {
+        console.log('check step error in status or documentsEqual')
         throw new Error('Update not permitted')
       }
       return collection.updateOne({ $and: formattedQuery }, data, options)
@@ -283,15 +313,15 @@ const getOperators: GetOperatorsFunction = (
 
             const { status, document } = winningRole
               ? await checkValidation(
-                winningRole,
-                {
-                  type: 'read',
-                  roles,
-                  cursor: currentDoc,
-                  expansions: {}
-                },
-                user
-              )
+                  winningRole,
+                  {
+                    type: 'read',
+                    roles,
+                    cursor: currentDoc,
+                    expansions: {}
+                  },
+                  user
+                )
               : { status: !roles.length, document: currentDoc }
 
             return status ? document : undefined
@@ -355,28 +385,28 @@ const getOperators: GetOperatorsFunction = (
 
         const { status, document } = winningRole
           ? await checkValidation(
-            winningRole,
-            {
-              type: 'read',
-              roles,
-              cursor: fullDocument,
-              expansions: {}
-            },
-            user
-          )
+              winningRole,
+              {
+                type: 'read',
+                roles,
+                cursor: fullDocument,
+                expansions: {}
+              },
+              user
+            )
           : { status: true, document: fullDocument }
 
         const { status: updatedFieldsStatus, document: updatedFields } = winningRole
           ? await checkValidation(
-            winningRole,
-            {
-              type: 'read',
-              roles,
-              cursor: updateDescription?.updatedFields,
-              expansions: {}
-            },
-            user
-          )
+              winningRole,
+              {
+                type: 'read',
+                roles,
+                cursor: updateDescription?.updatedFields,
+                expansions: {}
+              },
+              user
+            )
           : { status: true, document: updateDescription?.updatedFields }
 
         return { status, document, updatedFieldsStatus, updatedFields }
@@ -413,22 +443,20 @@ const getOperators: GetOperatorsFunction = (
   },
   //TODO -> add filter & rules in aggregate
   aggregate: async (pipeline = [], options) => {
-
     if (run_as_system) {
-      return collection.aggregate(pipeline, options);
+      return collection.aggregate(pipeline, options)
     }
     checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.READ)
 
-    const { filters = [], roles = [] } = rules[collection.collectionName] || {};
-    const formattedQuery = getFormattedQuery(filters, {}, user);
-    const projection = getFormattedProjection(filters);
-
+    const { filters = [], roles = [] } = rules[collection.collectionName] || {}
+    const formattedQuery = getFormattedQuery(filters, {}, user)
+    const projection = getFormattedProjection(filters)
 
     const guardedPipeline = [
       ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
       ...(projection ? [{ $project: projection }] : []),
       ...applyAccessControlToPipeline(pipeline, rules, user)
-    ];
+    ]
 
     // const pipelineCollections = getCollectionsFromPipeline(pipeline)
 
@@ -436,26 +464,30 @@ const getOperators: GetOperatorsFunction = (
 
     // pipelineCollections.every((collection) => checkDenyOperation(rules, collection, CRUD_OPERATIONS.READ))
 
-    const originalCursor = collection.aggregate(guardedPipeline, options);
-    const newCursor = Object.create(originalCursor);
+    const originalCursor = collection.aggregate(guardedPipeline, options)
+    const newCursor = Object.create(originalCursor)
 
     newCursor.toArray = async () => {
-      const results = await originalCursor.toArray();
+      const results = await originalCursor.toArray()
 
       const filtered = await Promise.all(
         results.map(async (doc) => {
-          const role = getWinningRole(doc, user, roles);
+          const role = getWinningRole(doc, user, roles)
           const { status, document } = role
-            ? await checkValidation(role, { type: 'read', roles, cursor: doc, expansions: {} }, user)
-            : { status: !roles?.length, document: doc };
-          return status ? document : undefined;
+            ? await checkValidation(
+                role,
+                { type: 'read', roles, cursor: doc, expansions: {} },
+                user
+              )
+            : { status: !roles?.length, document: doc }
+          return status ? document : undefined
         })
-      );
+      )
 
-      return filtered.filter(Boolean);
-    };
+      return filtered.filter(Boolean)
+    }
 
-    return newCursor;
+    return newCursor
   },
   /**
    * Inserts multiple documents into a MongoDB collection with optional role-based access control and validation.
@@ -485,15 +517,15 @@ const getOperators: GetOperatorsFunction = (
 
           const { status, document } = winningRole
             ? await checkValidation(
-              winningRole,
-              {
-                type: 'insert',
-                roles,
-                cursor: currentDoc,
-                expansions: {}
-              },
-              user
-            )
+                winningRole,
+                {
+                  type: 'insert',
+                  roles,
+                  cursor: currentDoc,
+                  expansions: {}
+                },
+                user
+              )
             : { status: !roles.length, document: currentDoc }
 
           return status ? document : undefined
@@ -521,6 +553,7 @@ const getOperators: GetOperatorsFunction = (
       // Retrieve the document to check permissions before updating
       const result = await collection.find({ $and: formattedQuery }).toArray()
       if (!result) {
+        console.log('check1 In updateMany --> (!result)')
         throw new Error('Update not permitted')
       }
 
@@ -549,15 +582,15 @@ const getOperators: GetOperatorsFunction = (
 
           const { status, document } = winningRole
             ? await checkValidation(
-              winningRole,
-              {
-                type: 'write',
-                roles,
-                cursor: currentDoc,
-                expansions: {}
-              },
-              user
-            )
+                winningRole,
+                {
+                  type: 'write',
+                  roles,
+                  cursor: currentDoc,
+                  expansions: {}
+                },
+                user
+              )
             : { status: !roles.length, document: currentDoc }
 
           return status ? document : undefined
@@ -568,6 +601,8 @@ const getOperators: GetOperatorsFunction = (
       const areDocumentsEqual = isEqual(docsToCheck, filteredItems)
 
       if (!areDocumentsEqual) {
+        console.log('check1 In updateMany --> (!areDocumentsEqual)')
+
         throw new Error('Update not permitted')
       }
 
@@ -607,15 +642,15 @@ const getOperators: GetOperatorsFunction = (
 
           const { status, document } = winningRole
             ? await checkValidation(
-              winningRole,
-              {
-                type: 'delete',
-                roles,
-                cursor: currentDoc,
-                expansions: {}
-              },
-              user
-            )
+                winningRole,
+                {
+                  type: 'delete',
+                  roles,
+                  cursor: currentDoc,
+                  expansions: {}
+                },
+                user
+              )
             : { status: !roles.length, document: currentDoc }
 
           return status ? document : undefined
@@ -655,7 +690,10 @@ const MongodbAtlas: MongodbAtlasFunction = (
           .db(dbName)
           .collection(collName)
         return getOperators(collection, {
-          rules, collName, user, run_as_system
+          rules,
+          collName,
+          user,
+          run_as_system
         })
       }
     }
