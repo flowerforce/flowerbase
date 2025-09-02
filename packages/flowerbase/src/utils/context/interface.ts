@@ -14,6 +14,7 @@ export interface GenerateContextParams {
   args: Arguments
   runAsSystem?: boolean
   deserializeArgs?: boolean
+  enqueue?: boolean
 }
 
 export interface GenerateContextDataParams extends Omit<GenerateContextParams, 'args'> {

@@ -32,9 +32,11 @@ export default fp(async function (fastify, opts: Options) {
 
   fastify.decorate('createAccessToken', function (user: WithId<Document>) {
     const id = user._id.toString()
+    const userDataId = user.user_data._id.toString()
+
     const user_data = {
-      _id: id,
-      id,
+      _id: userDataId,
+      id: userDataId,
       ...user.user_data
     }
     return this.jwt.sign(

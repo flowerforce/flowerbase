@@ -28,3 +28,10 @@ export const AUTH_CONFIG = {
   user_id_field,
   on_user_creation_function_name
 }
+
+
+
+export const S3_CONFIG = {
+  ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
+  SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY
+}
