@@ -3,6 +3,7 @@ import fastifyMongodb from '@fastify/mongodb'
 import { FastifyInstance } from 'fastify'
 import { authController } from '../../auth/controller'
 import jwtAuthPlugin from '../../auth/plugins/jwt'
+import { customFunctionController } from '../../auth/providers/custom-function/controller'
 import { localUserPassController } from '../../auth/providers/local-userpass/controller'
 import { API_VERSION } from '../../constants'
 import { Functions } from '../../features/functions/interface'
@@ -58,7 +59,7 @@ export const registerPlugins = async ({
 }
 
 /**
- * > Used to generate the register congig
+ * > Used to generate the register config
  * @param mongodbUrl -> the database connection string
  * @param jwtSecret -> connection jwt
  * @testable
@@ -103,6 +104,13 @@ const getRegisterConfig = async ({
       plugin: localUserPassController,
       options: {
         prefix: `${API_VERSION}/app/:appId/auth/providers/local-userpass`
+      }
+    },
+    {
+      pluginName: 'customFunctionController',
+      plugin: customFunctionController,
+      options: {
+        prefix: `${API_VERSION}/app/:appId/auth/providers/custom-function`
       }
     }
   ] as RegisterConfig[]

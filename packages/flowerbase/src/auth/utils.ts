@@ -66,6 +66,7 @@ export interface AuthConfig {
   auth_collection?: string
   'api-key': ApiKey
   'local-userpass': LocalUserpass
+  'custom-function': CustomFunction
 }
 
 interface ApiKey {
@@ -78,6 +79,15 @@ interface LocalUserpass {
   type: string
   disabled: boolean
   config: Config
+}
+
+interface CustomFunction {
+  name: "custom-function",
+  type: "custom-function",
+  disabled: boolean,
+  config: {
+    "authFunctionName": string
+  }
 }
 
 export interface Config {
