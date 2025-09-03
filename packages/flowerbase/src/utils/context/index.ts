@@ -26,7 +26,8 @@ export async function GenerateContext({
   services,
   runAsSystem,
   deserializeArgs = true,
-  enqueue
+  enqueue,
+  request
 }: GenerateContextParams) {
 
   const functionsQueue = StateManager.select("functionsQueue")
@@ -42,7 +43,8 @@ export async function GenerateContext({
       rules,
       currentFunction: functionToRun,
       functionsList,
-      GenerateContext
+      GenerateContext,
+      request
     })
 
     try {

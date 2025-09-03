@@ -20,13 +20,18 @@ export const DEFAULT_CONFIG = {
 export const API_VERSION = `/api/client/${DEFAULT_CONFIG.API_VERSION}`
 export const HTTPS_SCHEMA = DEFAULT_CONFIG.HTTPS_SCHEMA
 export const DB_NAME = database_name
+
+// TODO spostare nell'oggetto providers anche le altre configurazioni
 export const AUTH_CONFIG = {
   authCollection: auth_collection,
   userCollection: collection_name,
   resetPasswordCollection: 'reset-password-requests',
-  resetPasswordConfig: configuration['local-userpass'].config,
+  resetPasswordConfig: configuration['local-userpass']?.config,
   user_id_field,
-  on_user_creation_function_name
+  on_user_creation_function_name,
+  providers: {
+    "custom-function": configuration['custom-function']?.config
+  }
 }
 
 
