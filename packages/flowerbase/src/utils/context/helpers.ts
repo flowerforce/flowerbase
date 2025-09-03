@@ -20,7 +20,8 @@ export const generateContextData = ({
   rules,
   currentFunction,
   functionsList,
-  GenerateContext
+  GenerateContext,
+  request
 }: GenerateContextDataParams) => ({
   BSON: mongodb.BSON,
   console: {
@@ -29,6 +30,10 @@ export const generateContextData = ({
     }
   },
   context: {
+    request: {
+      ...request,
+      remoteIPAddress: request?.ip
+    },
     user,
     environment: {
       tag: process.env.NODE_ENV

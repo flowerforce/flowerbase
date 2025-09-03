@@ -24,7 +24,8 @@ export async function GenerateContext({
   currentFunction,
   functionsList,
   services,
-  enqueue
+  enqueue,
+  request
 }: GenerateContextParams) {
 
 
@@ -39,7 +40,8 @@ export async function GenerateContext({
       rules,
       currentFunction,
       functionsList,
-      GenerateContext
+      GenerateContext,
+      request
     })
 
     try {
