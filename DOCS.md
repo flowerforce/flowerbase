@@ -19,6 +19,7 @@ This package aims to reproduce the core server-side functionalities available in
 
 Rules are defined via JSON files and are used to enforce fine-grained access control over your database operations. These rules determine what CRUD (Create, Read, Update, Delete) operations can be performed on specific documents—or even parts of documents—based on various conditions.
 
+
 This allows you to:
 
 * Restrict or allow actions based on user roles or attributes
