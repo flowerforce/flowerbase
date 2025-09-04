@@ -37,12 +37,15 @@ export default fp(async function (fastify, opts: Options) {
     const user_data = {
       _id: userDataId,
       id: userDataId,
+      email: user.email,
       ...user.user_data
     }
+
     return this.jwt.sign(
       {
         typ: 'access',
         id,
+        data: user_data,
         user_data: user_data,
         custom_data: user_data
       },
