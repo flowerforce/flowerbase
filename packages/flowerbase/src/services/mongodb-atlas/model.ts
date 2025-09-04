@@ -53,6 +53,7 @@ export type GetOperatorsFunction = (
   find: (...params: Parameters<Method<'find'>>) => FindCursor
   watch: (...params: Parameters<Method<'watch'>>) => ReturnType<Method<'watch'>>
   aggregate: (
+    isClient: boolean,
     ...params: Parameters<Method<'aggregate'>>
   ) => Promise<ReturnType<Method<'aggregate'>>>
   insertMany: (

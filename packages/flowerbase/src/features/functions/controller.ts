@@ -25,9 +25,10 @@ export const functionsController: FunctionController = async (
 
     if ('service' in req.body) {
       const serviceFn = services[req.body.service]
-      if (!serviceFn) {
-        throw new Error(`Service "${req.body.service}" does not exist`)
-      }
+      if (req.body.service)
+        if (!serviceFn) {
+          throw new Error(`Service "${req.body.service}" does not exist`)
+        }
       const [{ database, collection, query, update, document, documents, pipeline = [] }] = args
 
       const currentMethod = serviceFn(app, { rules, user })
@@ -40,7 +41,8 @@ export const functionsController: FunctionController = async (
         update,
         document,
         documents,
-        pipeline
+        pipeline,
+        isClient: true
       })
       return operatorsByType[method as keyof typeof operatorsByType]()
     }

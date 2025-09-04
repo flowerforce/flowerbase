@@ -27,6 +27,7 @@ export type ExecuteQueryParams = {
   document: Document
   documents: Document[]
   pipeline: Document[]
+  isClient?: boolean
 }
 
 type FunctionsControllerOptions = {
