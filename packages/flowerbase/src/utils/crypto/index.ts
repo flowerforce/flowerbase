@@ -22,6 +22,11 @@ export const hashPassword = async (plaintext: string) => {
  */
 export const comparePassword = async (plaintext: string, storedPassword: string) => {
   const [storedHash, storedSalt] = storedPassword.split('.')
+
+  if (!storedHash || !storedSalt) {
+    throw new Error(`Invalid stored password: ${storedPassword}`);
+  }
+
   const storedBuffer = Buffer.from(storedHash, 'hex')
   const buffer = (await scrypt(plaintext, storedSalt, 64)) as Buffer
   return crypto.timingSafeEqual(buffer, storedBuffer)
