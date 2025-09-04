@@ -142,11 +142,26 @@ export const getMailConfig = (
   const { from, subject, mailToken } = mailConfig
 
   const [fromPrefix, fromPath] = from.split('.')
+
+  if (!fromPath) {
+    throw new Error(`Invalid fromPath: ${fromPath}`)
+  }
+
   const currentSender = (fromPrefix === ENV_PREFIX ? process.env[fromPath] : from) ?? ''
   const [subjectPrefix, subjectPath] = subject.split('.')
+
+  if (!subjectPath) {
+    throw new Error(`Invalid subjectPath: ${subjectPath}`)
+  } 
+
   const currentSubject =
     (subjectPrefix === ENV_PREFIX ? process.env[subjectPath] : subject) ?? ''
   const [mailTokenPrefix, mailTokenPath] = mailToken.split('.')
+
+  if (!mailTokenPath) {
+    throw new Error(`Invalid mailTokenPath: ${mailTokenPath}`)
+  } 
+
   const currentMailToken =
     (mailTokenPrefix === 'ENV' ? process.env[mailTokenPath] : mailToken) ?? ''
 

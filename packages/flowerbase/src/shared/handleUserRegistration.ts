@@ -1,3 +1,4 @@
+import { FastifyMongoObject } from "@fastify/mongodb/types"
 import { PROVIDER_TYPE } from "../auth/utils"
 import { AUTH_CONFIG, DB_NAME } from "../constants"
 import { hashPassword } from "../utils/crypto"
@@ -18,7 +19,8 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
     }
 
     const { authCollection } = AUTH_CONFIG
-    const db = app?.mongo.client.db(DB_NAME)
+    const mongo: FastifyMongoObject = app?.mongo
+    const db = mongo.client.db(DB_NAME)
     const hashedPassword = await hashPassword(password)
 
     const existingUser = await db?.collection(authCollection!).findOne({ email })
