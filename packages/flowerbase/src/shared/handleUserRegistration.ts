@@ -1,5 +1,4 @@
 import { FastifyMongoObject } from "@fastify/mongodb/types"
-import { PROVIDER_TYPE } from "../auth/utils"
 import { AUTH_CONFIG, DB_NAME } from "../constants"
 import { hashPassword } from "../utils/crypto"
 import { HandleUserRegistration } from "./models/handleUserRegistration.model"
@@ -12,8 +11,8 @@ import { HandleUserRegistration } from "./models/handleUserRegistration.model"
  * @returns {Promise<InsertOneResult<Document>>} A promise resolving to the result of the insert operation.
  */
 const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ email, password }) => {
-    const { run_as_system } = opt ?? {}
-    
+    const { run_as_system, skipUserCheck, provider } = opt ?? {}
+
     if (!run_as_system) {
         throw new Error('only run_as_system')
     }
@@ -24,20 +23,20 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
     const hashedPassword = await hashPassword(password)
 
     const existingUser = await db?.collection(authCollection!).findOne({ email })
-    if (existingUser) {
+    if (existingUser && !skipUserCheck) {
         throw new Error('This email address is already used')
     }
 
     const result = await db?.collection(authCollection!).insertOne({
         email,
         password: hashedPassword,
-        status: 'pending', // confirmed
+        status: skipUserCheck ? 'confirmed' : 'pending',
         custom_data: {
             // TODO: aggiungere dati personalizzati alla registrazione
         },
         identities: [
             {
-                provider_type: PROVIDER_TYPE,
+                provider_type: provider,
                 provider_data: { email }
             }
         ]
@@ -51,7 +50,7 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
                     {
                         id: result?.insertedId.toString(),
                         provider_id: result?.insertedId.toString(),
-                        provider_type: PROVIDER_TYPE,
+                        provider_type: provider,
                         provider_data: { email }
                     }
                 ]

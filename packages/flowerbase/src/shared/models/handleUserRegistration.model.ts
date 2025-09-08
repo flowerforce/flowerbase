@@ -11,6 +11,8 @@ type RegistrationParams = {
 export type Options = {
   user?: User
   rules?: Rules
+  skipUserCheck?: boolean
+  provider?: PROVIDER
   run_as_system?: boolean
 }
 
@@ -18,3 +20,8 @@ export type HandleUserRegistration = (
   app: FastifyInstance,
   opt: Options
 ) => (params: RegistrationParams) => Promise<InsertOneResult<Document>>
+
+export enum PROVIDER {
+  LOCAL_USERPASS = "local-userpass",
+  CUSTOM_FUNCTION = "custom-function"
+}

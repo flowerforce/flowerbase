@@ -3,6 +3,7 @@ import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME } from '../../../constants'
 import { services } from '../../../services'
 import handleUserRegistration from '../../../shared/handleUserRegistration'
+import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
 import { comparePassword, generateToken, hashPassword } from '../../../utils/crypto'
@@ -21,7 +22,6 @@ import {
   RegistrationDto,
   ResetPasswordDto
 } from './dtos'
-
 /**
  * Controller for handling local user registration and login.
  * @testable
@@ -53,7 +53,7 @@ export async function localUserPassController(app: FastifyInstance) {
     },
     async (req, res) => {
 
-      const result = await handleUserRegistration(app, { run_as_system: true })({ email: req.body.email.toLowerCase(), password: req.body.password })
+      const result = await handleUserRegistration(app, { run_as_system: true, provider: PROVIDER.LOCAL_USERPASS })({ email: req.body.email.toLowerCase(), password: req.body.password })
 
       res?.status(201)
       return { userId: result?.insertedId.toString() }

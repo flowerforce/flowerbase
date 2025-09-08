@@ -1,10 +1,12 @@
-import { ObjectId } from 'bson'
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG } from '../../../constants'
+import handleUserRegistration from '../../../shared/handleUserRegistration'
+import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
 import {
   AUTH_ENDPOINTS,
+  generatePassword,
 } from '../../utils'
 import {
   LoginDto
@@ -72,18 +74,21 @@ export async function customFunctionController(app: FastifyInstance) {
         }
       })
 
-      const currentUserData = {
-        _id: new ObjectId(res.id),
-        user_data: {
-          _id: new ObjectId(res.id),
-        }
-      }
+
       if (res.id) {
+        const user = await handleUserRegistration(app, { run_as_system: true, skipUserCheck: true, provider: PROVIDER.CUSTOM_FUNCTION })({ email: res.id, password: generatePassword() })
+
+        const currentUserData = {
+          _id: user.insertedId,
+          user_data: {
+            _id: user.insertedId,
+          }
+        }
         return {
           access_token: this.createAccessToken(currentUserData),
           refresh_token: this.createRefreshToken(currentUserData),
           device_id: '',
-          user_id: res.id
+          user_id: user.insertedId.toString(),
         }
       }
 

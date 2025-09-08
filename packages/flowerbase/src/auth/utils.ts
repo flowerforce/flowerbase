@@ -1,6 +1,9 @@
+import crypto from "crypto";
 import fs from 'fs'
 import path from 'path'
 
+const CHARSET =
+  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{};:,.<>?";
 export const LOGIN_SCHEMA = {
   body: {
     type: 'object',
@@ -112,7 +115,6 @@ export interface CustomUserDataConfig {
   on_user_creation_function_name: string
 }
 
-export const PROVIDER_TYPE = 'local-userpass'
 
 /**
  * > Loads the auth config json file
@@ -152,7 +154,7 @@ export const getMailConfig = (
 
   if (!subjectPath) {
     throw new Error(`Invalid subjectPath: ${subjectPath}`)
-  } 
+  }
 
   const currentSubject =
     (subjectPrefix === ENV_PREFIX ? process.env[subjectPath] : subject) ?? ''
@@ -160,7 +162,7 @@ export const getMailConfig = (
 
   if (!mailTokenPath) {
     throw new Error(`Invalid mailTokenPath: ${mailTokenPath}`)
-  } 
+  }
 
   const currentMailToken =
     (mailTokenPrefix === 'ENV' ? process.env[mailTokenPath] : mailToken) ?? ''
@@ -194,4 +196,13 @@ export const getMailConfig = (
     mailToken: currentMailToken,
     body
   }
+}
+
+
+
+
+
+export const generatePassword = (length = 20) => {
+  const bytes = crypto.randomBytes(length);
+  return Array.from(bytes, (b) => CHARSET[b % CHARSET.length]).join("");
 }
