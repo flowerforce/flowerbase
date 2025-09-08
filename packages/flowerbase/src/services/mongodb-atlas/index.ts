@@ -183,11 +183,7 @@ const getOperators: GetOperatorsFunction = (
    *  - If validation fails, throws an error; otherwise, updates the document.
    */
   updateOne: async (query, data, options) => {
-    console.log('Step1 - query', query)
-    console.log('Step1 - data', data)
-    console.log('Step1 - options', options)
     if (!run_as_system) {
-      console.log('Step1 - runs_as_system')
 
       checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
       const { filters, roles } = rules[collName] || {}
@@ -201,22 +197,11 @@ const getOperators: GetOperatorsFunction = (
 
       const result = await collection.findOne({ $and: safeQuery })
 
-      /*  const formattedQuery = getFormattedQuery(filters, query, user) */
-      console.log('Step2 - formattedQuery', formattedQuery)
-
-      // Retrieve the document to check permissions before updating
-      console.log('Step2 after fq  - collection ', collection)
-      /*   const result = await collection.findOne({ $and: formattedQuery }) */
-      console.log('result ', result)
-
       if (!result) {
-        console.log('check step error in !result')
-
         throw new Error('Update not permitted')
       }
 
       const winningRole = getWinningRole(result, user, roles)
-      console.log('Step3 - winningRole', winningRole)
 
       // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
       const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
@@ -235,7 +220,6 @@ const getOperators: GetOperatorsFunction = (
         },
         ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
       ]
-      console.log('Step5 - pipeline', pipeline)
       const [docToCheck] = hasOperators
         ? await collection.aggregate(pipeline).toArray()
         : ([data] as [Document])
@@ -252,12 +236,10 @@ const getOperators: GetOperatorsFunction = (
           user
         )
         : { status: true, document: docToCheck }
-      console.log('Step6 - status', status)
       // Ensure no unauthorized changes are made
       const areDocumentsEqual = isEqual(document, docToCheck)
 
       if (!status || !areDocumentsEqual) {
-        console.log('check step error in status or documentsEqual')
         throw new Error('Update not permitted')
       }
       return collection.updateOne({ $and: formattedQuery }, data, options)

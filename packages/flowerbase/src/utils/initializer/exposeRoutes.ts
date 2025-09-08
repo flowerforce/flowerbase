@@ -1,8 +1,9 @@
 import { uptime } from 'node:process'
 import { FastifyInstance } from 'fastify'
 import { RegistrationDto } from '../../auth/providers/local-userpass/dtos'
-import { AUTH_ENDPOINTS, PROVIDER_TYPE, REGISTRATION_SCHEMA } from '../../auth/utils'
+import { AUTH_ENDPOINTS, REGISTRATION_SCHEMA } from '../../auth/utils'
 import { API_VERSION, AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../constants'
+import { PROVIDER } from '../../shared/models/handleUserRegistration.model'
 import { hashPassword } from '../crypto'
 
 /**
@@ -59,7 +60,7 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
               {
                 id: result?.insertedId.toString(),
                 provider_id: result?.insertedId.toString(),
-                provider_type: PROVIDER_TYPE,
+                provider_type: PROVIDER.LOCAL_USERPASS,
                 provider_data: { email }
               }
             ]
