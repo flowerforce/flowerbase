@@ -1,6 +1,7 @@
 import cors from '@fastify/cors'
 import fastifyMongodb from '@fastify/mongodb'
 import { FastifyInstance } from 'fastify'
+import fastifyRawBody from 'fastify-raw-body'
 import { authController } from '../../auth/controller'
 import jwtAuthPlugin from '../../auth/plugins/jwt'
 import { customFunctionController } from '../../auth/providers/custom-function/controller'
@@ -92,6 +93,18 @@ const getRegisterConfig = async ({
       plugin: jwtAuthPlugin,
       options: {
         secret: jwtSecret
+      }
+    },
+    {
+      pluginName: 'fastifyRawBody',
+      plugin: fastifyRawBody,
+      options: {
+        field: 'rawBody',
+        global: false,
+        encoding: 'utf8',
+        runFirst: true,
+        routes: [],
+        jsonContentTypes: [],
       }
     },
     {

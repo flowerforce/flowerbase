@@ -44,12 +44,36 @@ export const getMethodsConfig = (
   handler: ReturnType<typeof generateHandler>,
   endpoint: string
 ) => ({
-  ALL: () => app.all(endpoint, handler),
-  GET: () => app.get(endpoint, handler),
-  POST: () => app.post(endpoint, handler),
-  PUT: () => app.put(endpoint, handler),
-  PATCH: () => app.patch(endpoint, handler),
-  DELETE: () => app.delete(endpoint, handler)
+  ALL: () => app.all(endpoint, {
+    config: {
+      rawBody: true
+    },
+  }, handler),
+  GET: () => app.get(endpoint, {
+    config: {
+      rawBody: true
+    },
+  }, handler),
+  POST: () => app.post(endpoint, {
+    config: {
+      rawBody: true
+    },
+  }, handler),
+  PUT: () => app.put(endpoint, {
+    config: {
+      rawBody: true
+    },
+  }, handler),
+  PATCH: () => app.patch(endpoint, {
+    config: {
+      rawBody: true
+    },
+  }, handler),
+  DELETE: () => app.delete(endpoint, {
+    config: {
+      rawBody: true
+    },
+  }, handler)
 })
 
 /**
@@ -66,10 +90,11 @@ export const generateHandler = ({
   rulesList
 }: GenerateHandlerParams) => {
   return async (req: FastifyRequest, res: FastifyReply) => {
-    const { body: originalBody, headers, query } = req
+    const { body: originalBody, headers, query, rawBody } = req
 
     const customBody = {
-      text: () => JSON.stringify(originalBody)
+      text: () => JSON.stringify(originalBody),
+      rawBody
     }
 
     const customResponseBody: {
