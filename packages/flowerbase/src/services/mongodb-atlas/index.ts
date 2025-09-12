@@ -270,8 +270,9 @@ const getOperators: GetOperatorsFunction = (
 
       // Pre-query filtering based on access control rules
       const formattedQuery = getFormattedQuery(filters, query, user)
+      const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
       // aggiunto filter per evitare questo errore: $and argument's entries must be objects
-      const originalCursor = collection.find({ $and: formattedQuery })
+      const originalCursor = collection.find(currentQuery)
       // Clone the cursor to override `toArray` with post-query validation
       const client = originalCursor[
         'client' as keyof typeof originalCursor
