@@ -1,3 +1,10 @@
+## 1.1.1 (2025-09-12)
+
+
+### 🩹 Fixes
+
+- **getOperators:** Handle the formattedQuery when it is empty ([e340be2](https://github.com/flowerforce/flowerbase/commit/e340be2))
+
 ## 1.1.0 (2025-09-12)
 
 
