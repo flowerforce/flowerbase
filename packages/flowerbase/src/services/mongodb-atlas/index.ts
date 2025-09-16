@@ -422,7 +422,7 @@ const getOperators: GetOperatorsFunction = (
     return collection.watch(pipeline, options)
   },
   //TODO -> add filter & rules in aggregate
-  aggregate: async (isClient, pipeline = [], options) => {
+  aggregate: async (pipeline = [], options, isClient) => {
     if (isClient) {
       throw new Error("Aggregate operator from cliente is not implemented! Move it to a function")
     }
