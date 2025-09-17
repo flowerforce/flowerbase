@@ -426,7 +426,7 @@ const getOperators: GetOperatorsFunction = (
     if (isClient) {
       throw new Error("Aggregate operator from cliente is not implemented! Move it to a function")
     }
-    if (run_as_system) {
+    if (run_as_system || !isClient) {
       return collection.aggregate(pipeline, options)
     }
     checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.READ)
