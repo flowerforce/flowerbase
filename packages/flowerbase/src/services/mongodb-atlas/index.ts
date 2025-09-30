@@ -342,14 +342,17 @@ const getOperators: GetOperatorsFunction = (
 
       // Apply access filters to initial change stream pipeline
       const formattedQuery = getFormattedQuery(filters, {}, user)
+
+      const firstStep = formattedQuery.length ? {
+        $match: {
+          $and: formattedQuery
+        }
+      } : undefined
+
       const formattedPipeline = [
-        {
-          $match: {
-            $and: formattedQuery
-          }
-        },
+        firstStep,
         ...pipeline
-      ]
+      ].filter(Boolean) as Document[]
 
       const result = collection.watch(formattedPipeline, options)
       const originalOn = result.on.bind(result)
