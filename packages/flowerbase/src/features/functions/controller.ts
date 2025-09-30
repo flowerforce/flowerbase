@@ -78,6 +78,14 @@ export const functionsController: FunctionController = async (
     const config: Base64Function = JSON.parse(
       Buffer.from(baas_request || stitch_request || '', 'base64').toString('utf8')
     )
+
+    console.log("🚀 ~ functionsController ~ baas_request:",
+      baas_request,
+      query,
+      Buffer.from(baas_request || stitch_request || '', 'base64'),
+      Buffer.from(baas_request || stitch_request || '', 'base64').toString('utf8'),
+      config
+    )
     const [{ database, collection }] = config.arguments
     const app = StateManager.select('app')
     const services = StateManager.select('services')
