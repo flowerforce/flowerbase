@@ -32,7 +32,7 @@ export type InitializeConfig = {
  */
 export async function initialize({
   projectId,
-  host,
+  host = DEFAULT_CONFIG.HOST,
   jwtSecret = DEFAULT_CONFIG.JWT_SECRET,
   port = DEFAULT_CONFIG.PORT,
   mongodbUrl = DEFAULT_CONFIG.MONGODB_URL
