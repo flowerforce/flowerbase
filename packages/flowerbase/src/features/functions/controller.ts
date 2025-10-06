@@ -19,9 +19,54 @@ export const functionsController: FunctionController = async (
 ) => {
   app.addHook('preHandler', app.jwtAuthentication)
 
-  app.post<{ Body: FunctionCallDto }>('/call', async (req, res) => {
-    const { user } = req
+  app.post<{ Body: FunctionCallDto, Querystring?: FunctionCallBase64Dto }>('/call', async (req, res) => {
+    const { user, query } = req
     const { name: method, arguments: args } = req.body
+    if (query) {
+      const { baas_request, stitch_request } = query
+
+      const config: Base64Function = JSON.parse(
+        Buffer.from(baas_request || stitch_request || '', 'base64').toString('utf8')
+      )
+
+      console.log("🚀 ~ functionsController ~ baas_request:",
+        baas_request,
+        query,
+        Buffer.from(baas_request || stitch_request || '', 'base64'),
+        Buffer.from(baas_request || stitch_request || '', 'base64').toString('utf8'),
+        config
+      )
+      const [{ database, collection }] = config.arguments
+      const app = StateManager.select('app')
+      const services = StateManager.select('services')
+
+      const changeStream = await services['mongodb-atlas'](app, {
+        user,
+        rules
+      })
+        .db(database)
+        .collection(collection)
+        .watch([], { fullDocument: 'whenAvailable' })
+      console.log("🚀 ~ functionsController ~ changeStream:", changeStream)
+
+      res.header('Content-Type', 'text/event-stream')
+      res.header('Cache-Control', 'no-cache')
+      res.header("content-encoding", "gzip")
+      res.header('Connection', 'keep-alive')
+      res.header("access-control-allow-credentials", true)
+      res.header("access-control-allow-origin", "*")
+      res.header("access-control-allow-headers", "X-Stitch-Location, X-Baas-Location, Location")
+      res.raw.flushHeaders()
+
+      changeStream.on('change', (change) => {
+        res.raw.write(`data: ${JSON.stringify(change)}\n\n`)
+      })
+
+      req.raw.on('close', () => {
+        changeStream.close()
+      })
+    }
+
 
     if ('service' in req.body) {
       const serviceFn = services[req.body.service]
@@ -97,6 +142,7 @@ export const functionsController: FunctionController = async (
       .db(database)
       .collection(collection)
       .watch([], { fullDocument: 'whenAvailable' })
+    console.log("🚀 ~ functionsController ~ changeStream:", changeStream)
 
     res.header('Content-Type', 'text/event-stream')
     res.header('Cache-Control', 'no-cache')
