@@ -342,7 +342,6 @@ const getOperators: GetOperatorsFunction = (
 
       // Apply access filters to initial change stream pipeline
       const formattedQuery = getFormattedQuery(filters, {}, user)
-      console.log("🚀 ~ getOperators ~ formattedQuery:", formattedQuery)
 
       const firstStep = formattedQuery.length ? {
         $match: {
@@ -354,12 +353,9 @@ const getOperators: GetOperatorsFunction = (
         firstStep,
         ...pipeline
       ].filter(Boolean) as Document[]
-      console.log("🚀 ~ getOperators ~ formattedPipeline:", formattedPipeline)
 
       const result = collection.watch(formattedPipeline, options)
-      console.log("🚀 ~ getOperators ~ result:", result)
       const originalOn = result.on.bind(result)
-      console.log("🚀 ~ getOperators ~ originalOn:", originalOn)
 
       /**
        * Validates a change event against the user's roles.
@@ -404,9 +400,7 @@ const getOperators: GetOperatorsFunction = (
         eventType: EventKey,
         listener: EventsDescription[EventKey]
       ) => {
-        console.log("🚀 ~ getOperators ~ eventType:", eventType)
         return originalOn(eventType, async (change: Document) => {
-          console.log("🚀 ~ getOperators ~ change:", change)
           const { status, document, updatedFieldsStatus, updatedFields } =
             await isValidChange(change)
           if (!status) return
@@ -419,14 +413,10 @@ const getOperators: GetOperatorsFunction = (
               updatedFields: updatedFieldsStatus ? updatedFields : {}
             }
           }
-          console.log("🚀 ~ getOperators ~ filteredChange:", filteredChange)
 
           listener(filteredChange)
         })
       }
-
-      console.log("result", result, options)
-
       return result
     }
 
