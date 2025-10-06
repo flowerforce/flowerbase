@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mongo Migration Tool</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h2>Inserisci i dettagli del progetto</h2>
+      <div class="links-container">
+        <a
+          href="https://account.mongodb.com/account/login"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="login-btn"
+        >
+          Accedi al tuo account MongoDB
+        </a>
+        <a href="/guide" target="_blank" rel="noopener noreferrer" class="login-btn">
+          Vai alla guida
+        </a>
+      </div>
+      <form id="dataForm">
+        <div class="formContent">
+          <label class="label" for="appId">APP ID</label>
+          <input type="text" name="appId" id="appId" placeholder="App ID" required />
+
+          <label class="label" for="groupId">GROUP ID</label>
+          <input
+            type="text"
+            name="groupId"
+            id="groupId"
+            placeholder="Group ID"
+            required
+          />
+
+          <label class="label" for="cookie">COOKIE</label>
+          <textarea name="cookie" id="cookie" placeholder="Cookie" required></textarea>
+
+          <label class="label" for="traceId">TRACE ID</label>
+          <input
+            type="text"
+            name="traceId"
+            id="traceId"
+            placeholder="Trace ID"
+            required
+          />
+
+          <label class="label" for="traceId">DEFAULT PASSWORD</label>
+          <input
+            type="text"
+            name="password"
+            id="password"
+            placeholder="Default password"
+            required
+          />
+
+          <label class="label" for="projectName">NOME PROGETTO</label>
+          <input
+            type="text"
+            name="projectName"
+            id="projectName"
+            placeholder="Nome Progetto"
+            required
+          />
+        </div>
+
+        <div class="buttonContainer">
+          <button type="submit">Invia</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="loader-container" id="loader">
+      <div class="loader"></div>
+    </div>
+
+    <script>
+      document.getElementById('dataForm').addEventListener('submit', function (event) {
+        event.preventDefault()
+        const loader = document.getElementById('loader')
+        loader.style.display = 'flex'
+
+        const formData = new FormData(this)
+        fetch('/submit', {
+          method: 'POST',
+          body: new URLSearchParams(formData)
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            const blob = new Blob([JSON.stringify(data)], {
+              type: 'application/json'
+            })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${document.getElementById('projectName').value}-users.json`
+            a.click()
+            URL.revokeObjectURL(url)
+          })
+          .catch((error) => alert('Qualcosa non ha funzionato'))
+          .finally(() => {
+            loader.style.display = 'none'
+          })
+      })
+    </script>
+  </body>
+</html>

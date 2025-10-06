@@ -11,6 +11,7 @@
     "build": "cd packages/flowerbase && rm -rf dist/ && tsc",
     "dev": "nodemon index.ts",
     "lint:fds": "eslint packages/flowerbase",
+    "start:exporter": "cd packages/users-exporter && npm start",
     "format:fds": "prettier --write 'packages/flowerbase/**/*.ts'",
     "fix:fds": "npm run format:fds && npm run lint:fds -- --fix",
     "start:demo": "cd packages/demo && npm start",
