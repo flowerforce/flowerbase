@@ -100,7 +100,11 @@ export const functionsController: FunctionController = async (
 
     res.header('Content-Type', 'text/event-stream')
     res.header('Cache-Control', 'no-cache')
+    res.header("content-encoding", "gzip")
     res.header('Connection', 'keep-alive')
+    res.header("access-control-allow-credentials", true)
+    res.header("access-control-allow-origin", "*")
+    res.header("access-control-allow-headers", "X-Stitch-Location, X-Baas-Location, Location")
     res.raw.flushHeaders()
 
     changeStream.on('change', (change) => {

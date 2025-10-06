@@ -1,0 +1,247 @@
+/* ====== MongoDB-Themed Styles ====== */
+:root {
+  --bg: #0b1c1a; /* sfondo scuro verdastro */
+  --panel: #122f26; /* pannello/input */
+  --panel-2: #102820; /* variante pannello */
+  --border: #1e3a30; /* bordo neutro */
+  --muted: #a9c3b8; /* testo attenuato */
+  --text: #e9f5ee; /* testo principale */
+  --accent: #13aa52; /* verde MongoDB */
+  --accent-2: #23d160; /* verde chiaro */
+  --accent-dark: #0f8c45; /* hover/active */
+  --link: #13aa52;
+  --overlay: rgba(0, 0, 0, 0.5);
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --radius: 12px;
+}
+
+/* Base */
+body {
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Arial,
+    sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: var(--bg);
+  color: var(--text);
+  margin: 0;
+  overflow-y: hidden;
+}
+
+/* Layout */
+.container {
+  text-align: center;
+  display: flex;
+  width: 60%;
+  height: 100vh;
+  padding: 16px;
+  flex-direction: column;
+  row-gap: 20px;
+  overflow-y: scroll;
+  margin-top: 20px;
+}
+
+.container::-webkit-scrollbar {
+  display: none; /* Chrome, Safari e Opera */
+}
+
+/* Form */
+#dataForm {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  row-gap: 20px;
+  width: 100%;
+}
+
+h2 {
+  margin: 6px 0 8px;
+  font-size: 20px;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+
+/* Inputs */
+input,
+textarea {
+  width: calc(100% - 32px);
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--panel);
+  color: var(--text);
+  font-size: 16px;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+textarea {
+  resize: none;
+  height: 100px;
+}
+
+/* Focus ring in stile MongoDB */
+input:focus,
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(19, 170, 82, 0.25);
+  background-color: var(--panel-2);
+}
+
+/* Autofill */
+input:-webkit-autofill {
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: var(--text) !important;
+}
+
+/* Gruppi / layout interni */
+.buttonContainer {
+  display: flex;
+  width: 100%;
+}
+.formContent {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  align-items: start;
+  row-gap: 16px;
+}
+
+/* Button primario */
+button {
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+  color: white;
+  transition:
+    transform 0.06s ease,
+    filter 0.2s ease,
+    box-shadow 0.2s ease;
+  box-shadow: 0 6px 20px rgba(19, 170, 82, 0.25);
+}
+
+button:hover {
+  filter: brightness(1.03);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 3px rgba(19, 170, 82, 0.3),
+    0 6px 20px rgba(19, 170, 82, 0.25);
+}
+
+/* Loader overlay */
+.loader-container {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--overlay);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.loader {
+  width: 80px;
+  height: 80px;
+  border: 8px solid rgba(233, 245, 238, 0.3);
+  border-top: 8px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Animazione */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Sezione login / link */
+.login-section {
+  width: 100%;
+  text-align: center;
+}
+
+.login-btn {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.95rem;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.06s ease;
+  box-shadow: 0 6px 20px rgba(19, 170, 82, 0.25);
+}
+.login-btn:hover {
+  background: var(--accent-dark);
+}
+.login-btn:active {
+  transform: translateY(1px);
+}
+.login-btn:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 3px rgba(19, 170, 82, 0.3),
+    0 6px 20px rgba(19, 170, 82, 0.25);
+}
+
+/* Link container */
+.links-container {
+  display: flex;
+  column-gap: 16px;
+}
+.links-container a {
+  flex: 1;
+  color: var(--text);
+}
+
+/* Scrollbar (webkit) in tema MongoDB */
+.container::-webkit-scrollbar {
+  width: 10px;
+}
+.container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+.container::-webkit-scrollbar-thumb {
+  background: #1a4d3d;
+  border-radius: 10px;
+  border: 2px solid rgba(11, 28, 26, 0.6);
+}
+.container::-webkit-scrollbar-thumb:hover {
+  background: #176e54;
+}
+
+/* Ridimensionamento mobile */
+@media (max-width: 900px) {
+  .container {
+    width: 92%;
+  }
+}

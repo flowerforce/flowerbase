@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Guida – Tool di esportazione utenti da MongoDB Realm</title>
+  <style>
+    :root{
+      --bg:#0b1c1a;
+      --panel:#132420;
+      --muted:#a9c3b8;
+      --text:#e9f5ee;
+      --accent:#13aa52;
+      --accent-2:#23d160;
+      --ok:#23d160;
+      --warn:#f1c40f;
+      --danger:#ff6b6b;
+    }
+
+    html,body{
+      background:var(--bg);
+      color:var(--text);
+      font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,sans-serif;
+      margin:0;padding:0
+    }
+
+    .wrap{max-width:920px;margin:40px auto;padding:0 20px}
+
+    header{display:flex;gap:16px;align-items:center;margin-bottom:20px}
+    header h1{font-weight:800;font-size:clamp(1.4rem,2.6vw,2rem);margin:0}
+    header .tag{font-size:.8rem;border:1px solid #244c3c;color:var(--muted);padding:4px 8px;border-radius:999px}
+
+    .card{
+      background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));
+      border:1px solid #1e3a30;
+      border-radius:16px;
+      padding:22px;
+      margin:16px 0;
+      box-shadow:0 6px 30px rgba(0,0,0,.25)
+    }
+
+    .lead{color:var(--muted)}
+
+    .grid{display:grid;gap:16px}
+    .grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    @media (max-width:800px){.grid.cols-2{grid-template-columns:1fr}}
+
+    ol.steps{counter-reset:step;list-style:none;padding:0;margin:0}
+    ol.steps>li{
+      counter-increment:step;
+      display:grid;
+      grid-template-columns:auto 1fr;
+      gap:12px;
+      align-items:start;
+      padding:14px;
+      border-bottom:1px dashed #224437
+    }
+    ol.steps>li:last-child{border-bottom:none}
+    ol.steps>li::before{
+      content:counter(step);
+      display:inline-grid;
+      place-items:center;
+      width:28px;height:28px;
+      border-radius:7px;
+      background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      color:#fff;
+      font-weight:700
+    }
+
+    code{
+      background:#0f2d23;
+      border:1px solid #285c46;
+      padding:.1rem .35rem;
+      border-radius:6px
+    }
+
+    kbd{
+      background:#0f2d23;
+      border:1px solid #285c46;
+      border-bottom-width:3px;
+      padding:.15rem .35rem;
+      border-radius:6px;
+      font-family:ui-monospace,Menlo,Consolas,monospace;
+      font-size:.9em
+    }
+
+    .hint{font-size:.95rem;color:var(--muted)}
+    .badge{display:inline-block;padding:.2rem .5rem;border-radius:999px;border:1px solid #244c3c;color:var(--muted);font-size:.8rem}
+
+    .callout{border-left:4px solid var(--accent);padding:12px 16px;background:#102820;border-radius:8px}
+    .callout.warn{border-color:var(--warn)}
+    .callout.danger{border-color:var(--danger)}
+    .callout.ok{border-color:var(--ok)}
+
+    table{width:100%;border-collapse:collapse}
+    th,td{border:1px solid #1e3a30;padding:10px;text-align:left}
+    th{background:#122f26}
+    .muted{color:var(--muted)}
+
+    .footer{margin:32px 0;color:var(--muted);font-size:.9rem}
+
+    a{color:var(--accent)}
+    a:hover{color:var(--accent-2)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Tool di esportazione utenti da <span class="badge">MongoDB Realm</span></h1>
+    </header>
+
+    <p class="lead">Questa guida spiega come recuperare i parametri necessari (<code>groupId</code>, <code>appId</code>, <code>cookie</code>, <code>traceId</code>) dall’interfaccia MongoDB Realm per utilizzare il tool di esportazione utenti, e come impostare una password di default e il nome file di output contenente gli utenti.</p>
+
+        <div class="card">
+      <h2>Prerequisiti</h2>
+      <ul>
+        <li>Accesso all’account MongoDB Atlas/Realm con permessi adeguati.</li>
+        <li>Browser desktop (Chrome o equivalente) con strumenti di sviluppo (DevTools).</li>
+      </ul>
+      <p class="hint">Apri DevTools con <kbd>F12</kbd>, oppure <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (Windows/Linux) o <kbd>⌥</kbd>+<kbd>⌘</kbd>+<kbd>I</kbd> (macOS).</p>
+    </div>
+
+    <div class="card">
+      <h2>Procedura passo–passo</h2>
+      <ol class="steps">
+        <li>
+          <div>
+            Accedi a <a href="https://account.mongodb.com/account/login" target="_blank" rel="noopener">account.mongodb.com</a>.
+          </div>
+        </li>
+        <li>
+          <div>
+            Dal menù in alto a sinistra, seleziona il <strong>progetto</strong> desiderato.
+          </div>
+        </li>
+        <li>
+          <div>
+            Nella sidebar sinistra, clicca su <strong>Triggers</strong>.
+          </div>
+        </li>
+        <li>
+          <div>
+            In alto a destra, clicca sul bottone <strong>View All Apps</strong>.
+          </div>
+        </li>
+        <li>
+          <div>
+            Seleziona l’<strong>app</strong> per la quale vuoi esportare gli utenti.
+          </div>
+        </li>
+        <li>
+          <div>
+            Apri l’<strong>Inspector</strong> (DevTools) e, nel menu di sinistra dell’app, vai su <strong>App Users</strong>.
+          </div>
+        </li>
+        <li>
+          <div>
+            Nella scheda <strong>Network</strong> dei DevTools, filtra e seleziona la chiamata <code>users</code>.
+          </div>
+        </li>
+        <li>
+          <div>
+            Nell’URL della chiamata <code>users</code> sono presenti due ID: il primo è il <code>groupId</code>, il secondo è l’<code>appId</code>.
+            <div class="callout">
+              <strong>Esempio</strong>: <span class="muted">/api/admin/v3.0/groups/<code>1234567890abcdef</code>/apps/<code>myapp-abcde</code>/users</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div>
+            Il parametro <code>cookie</code> si recupera dall’header <code>Cookie</code> della stessa chiamata.
+          </div>
+        </li>
+        <li>
+          <div>
+            Il <strong>trace Id</strong> è il valore dell’header <code>sentry-trace</code> della chiamata.
+          </div>
+        </li>
+        <li>
+          <div>
+            Nel tool, puoi scegliere una <strong>password di default</strong> da assegnare agli utenti esportati e il <strong>nome del file</strong> che verrà scaricato (es. <code>utenti_realm.json</code>).
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Parametri da inserire nel tool</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>Descrizione</th>
+            <th>Dove trovarlo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>groupId</code></td>
+            <td>ID del progetto (Group) in Atlas/Realm.</td>
+            <td>Nell’URL della chiamata <code>users</code>, primo ID.</td>
+          </tr>
+          <tr>
+            <td><code>appId</code></td>
+            <td>ID dell’app Realm.</td>
+            <td>Nell’URL della chiamata <code>users</code>, secondo ID.</td>
+          </tr>
+          <tr>
+            <td><code>cookie</code></td>
+            <td>Valore completo dell’header <code>Cookie</code> per l’autenticazione.</td>
+            <td>Headers della chiamata.</td>
+          </tr>
+          <tr>
+            <td><code>traceId</code></td>
+            <td>Valore dell’header <code>sentry-trace</code> (utile per il tracciamento).</td>
+            <td>Headers della chiamata.</td>
+          </tr>
+          <tr>
+            <td><code>defaultPassword</code></td>
+            <td>Password di default da assegnare agli utenti esportati.</td>
+            <td>Scelta dall'utente.</td>
+          </tr>
+          <tr>
+            <td><code>outputFile</code></td>
+            <td>Nome del file di esportazione (es. <code>export-utenti.json</code>).</td>
+            <td>Scelta dall'utente.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Esempio di compilazione</h2>
+      <pre><code>{
+  "groupId": "1234567890abcdef",
+  "appId": "myapp-abcde",
+  "cookie": "mdb_at=...; mdbUser=...; __Host-some=...",
+  "traceId": "d3b07384d113edec49eaa6238ad5ff00-5f2c-9",
+  "defaultPassword": "PasswordSicura!2025",
+  "outputFile": "utenti_realm.json"
+}
+</code></pre>
+      <p class="hint">I valori sopra sono di esempio: sostituiscili con quelli reali recuperati dalla tua sessione.</p>
+    </div>
+
+  </div>
+</body>
+</html>
