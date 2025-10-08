@@ -83,7 +83,13 @@ const config: Config = {
           type: 'docSidebar',
           sidebarId: 'tutorialSidebar',
           position: 'left',
-          label: 'Tutorial',
+          label: 'Developer Guide',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'usersExportSidebar',
+          position: 'left',
+          label: 'Users Export',
         },
         {
           href: 'https://github.com/flowerforce/flowerbase',
