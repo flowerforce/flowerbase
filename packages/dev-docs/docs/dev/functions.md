@@ -8,7 +8,7 @@ This section describes the **functions** system located in `src/auth/functions`.
 
 ---
 
-## Overview
+## 🌎 Overview
 
 The `functions` module manages how custom functions and database operations are exposed and executed through Fastify routes.
 
