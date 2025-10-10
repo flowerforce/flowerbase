@@ -5,7 +5,7 @@ import { themes as prismThemes } from 'prism-react-renderer';
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const config: Config = {
-  title: 'Flowerbase Dev Docs',
+  title: 'Flowerbase',
   tagline: 'Official Flowerbase developer documentation',
   favicon: 'img/favicon.ico',
   future: {
@@ -73,9 +73,9 @@ const config: Config = {
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: 'Flowerbase Dev Docs',
+      title: 'Flowerbase',
       logo: {
-        alt: 'Flowerbase Dev Docs',
+        alt: 'Flowerbase',
         src: 'https://flower.stackhouse.dev/_next/static/media/flower-logo.bb32f863.svg',
       },
       items: [
@@ -90,6 +90,12 @@ const config: Config = {
           sidebarId: 'usersExportSidebar',
           position: 'left',
           label: 'Users Export',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'contributeSidebar',
+          position: 'left',
+          label: 'Contribute',
         },
         {
           href: 'https://github.com/flowerforce/flowerbase',
