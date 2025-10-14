@@ -91,21 +91,25 @@ export const functionsController: FunctionController = async (
       .collection(collection)
       .watch([], { fullDocument: 'whenAvailable' })
 
-    res.header('Content-Type', 'text/event-stream')
-    res.header('Cache-Control', 'no-cache')
-    res.header("content-encoding", "gzip")
-    res.header('Connection', 'keep-alive')
-    res.header("access-control-allow-credentials", true)
-    res.header("access-control-allow-origin", "*")
-    res.header("access-control-allow-headers", "X-Stitch-Location, X-Baas-Location, Location")
-    res.raw.flushHeaders()
+    const headers = {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      "access-control-allow-credentials": "true",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "X-Stitch-Location, X-Baas-Location, Location",
+    }
+
+    res.raw.writeHead(200, headers)
+    res.raw.flushHeaders();
 
     changeStream.on('change', (change) => {
-      res.raw.write(`data: ${JSON.stringify(change)}\n\n`)
-    })
+      res.raw.write(`data: ${JSON.stringify(change)}\n\n`);
+    });
 
     req.raw.on('close', () => {
-      changeStream.close()
-    })
+      console.log("change stream closed")
+      changeStream.close();
+    });
   })
 }
