@@ -1,3 +1,15 @@
+## 1.2.0 (2025-10-14)
+
+
+### 🚀 Features
+
+- add users exporter ([9e40926](https://github.com/flowerforce/flowerbase/commit/9e40926))
+
+
+### 🩹 Fixes
+
+- isClient as last parameter ([7b0aa7b](https://github.com/flowerforce/flowerbase/commit/7b0aa7b))
+
 ## 1.1.1 (2025-09-12)
 
 
