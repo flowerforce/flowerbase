@@ -1,5 +1,5 @@
 import { ObjectId } from 'bson'
-
+import { DEFAULT_CONFIG } from '../../constants'
 import { services } from '../../services'
 import { StateManager } from '../../state'
 import { GenerateContext } from '../../utils/context'
@@ -83,6 +83,18 @@ export const functionsController: FunctionController = async (
     const app = StateManager.select('app')
     const services = StateManager.select('services')
 
+    const headers = {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      "access-control-allow-credentials": "true",
+      "access-control-allow-origin": `${DEFAULT_CONFIG.HTTPS_SCHEMA}://${req.headers.host}`,
+      "access-control-allow-headers": "X-Stitch-Location, X-Baas-Location, Location",
+    }
+
+    res.raw.writeHead(200, headers)
+    res.raw.flushHeaders();
+
     const changeStream = await services['mongodb-atlas'](app, {
       user,
       rules
@@ -90,18 +102,6 @@ export const functionsController: FunctionController = async (
       .db(database)
       .collection(collection)
       .watch([], { fullDocument: 'whenAvailable' })
-
-    const headers = {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      "access-control-allow-credentials": "true",
-      "access-control-allow-origin": "*",
-      "access-control-allow-headers": "X-Stitch-Location, X-Baas-Location, Location",
-    }
-
-    res.raw.writeHead(200, headers)
-    res.raw.flushHeaders();
 
     changeStream.on('change', (change) => {
       res.raw.write(`data: ${JSON.stringify(change)}\n\n`);
