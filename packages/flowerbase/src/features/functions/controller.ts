@@ -1,11 +1,13 @@
 import { ObjectId } from 'bson'
-import { DEFAULT_CONFIG } from '../../constants'
+import { ChangeStream, Document } from 'mongodb';
 import { services } from '../../services'
 import { StateManager } from '../../state'
 import { GenerateContext } from '../../utils/context'
 import { Base64Function, FunctionCallBase64Dto, FunctionCallDto } from './dtos'
 import { FunctionController } from './interface'
 import { executeQuery } from './utils'
+
+
 
 /**
  * > Creates a pre handler for every query
@@ -18,6 +20,8 @@ export const functionsController: FunctionController = async (
   { functionsList, rules }
 ) => {
   app.addHook('preHandler', app.jwtAuthentication)
+
+  const streams = {} as Record<string, ChangeStream<Document, Document>>
 
   app.post<{ Body: FunctionCallDto }>('/call', async (req, res) => {
     const { user } = req
@@ -88,28 +92,43 @@ export const functionsController: FunctionController = async (
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
       "access-control-allow-credentials": "true",
-      "access-control-allow-origin": `${DEFAULT_CONFIG.HTTPS_SCHEMA}://${req.headers.host}`,
+      "access-control-allow-origin": '*',
       "access-control-allow-headers": "X-Stitch-Location, X-Baas-Location, Location",
-    }
+    };
 
     res.raw.writeHead(200, headers)
     res.raw.flushHeaders();
 
-    const changeStream = await services['mongodb-atlas'](app, {
+    const requestKey = baas_request || stitch_request
+
+    if (!requestKey) return
+
+    const changeStream = streams[requestKey]
+
+    if (changeStream) {
+      changeStream.on('change', (change) => {
+        res.raw.write(`data: ${JSON.stringify(change)}\n\n`);
+      });
+
+      req.raw.on('close', () => {
+        console.log("change stream closed");
+        changeStream?.close?.();
+        delete streams[requestKey]
+      });
+      return
+    }
+
+    streams[requestKey] = await services['mongodb-atlas'](app, {
       user,
       rules
     })
       .db(database)
       .collection(collection)
-      .watch([], { fullDocument: 'whenAvailable' })
+      .watch([], { fullDocument: 'whenAvailable' });
 
-    changeStream.on('change', (change) => {
+
+    streams[requestKey].on('change', (change) => {
       res.raw.write(`data: ${JSON.stringify(change)}\n\n`);
-    });
-
-    req.raw.on('close', () => {
-      console.log("change stream closed")
-      changeStream.close();
     });
   })
 }
