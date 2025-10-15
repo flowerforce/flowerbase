@@ -1,4 +1,5 @@
 import { loadAuthConfig, loadCustomUserData } from './auth/utils'
+import { ALLOWED_METHODS } from './'
 
 const {
   database_name,
@@ -15,7 +16,11 @@ export const DEFAULT_CONFIG = {
   API_VERSION: process.env.API_VERSION || 'v2.0',
   HTTPS_SCHEMA: process.env.HTTPS_SCHEMA || 'https',
   HOST: process.env.HOST || '0.0.0.0',
-  ENABLE_LOGGER: process.env.ENABLE_LOGGER
+  ENABLE_LOGGER: process.env.ENABLE_LOGGER,
+  CORS_OPTIONS: {
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELTE"] as ALLOWED_METHODS[]
+  }
 }
 export const API_VERSION = `/api/client/${DEFAULT_CONFIG.API_VERSION}`
 export const HTTPS_SCHEMA = DEFAULT_CONFIG.HTTPS_SCHEMA

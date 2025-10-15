@@ -2,6 +2,7 @@ import cors from '@fastify/cors'
 import fastifyMongodb from '@fastify/mongodb'
 import { FastifyInstance } from 'fastify'
 import fastifyRawBody from 'fastify-raw-body'
+import { CorsConfig } from '../../'
 import { authController } from '../../auth/controller'
 import jwtAuthPlugin from '../../auth/plugins/jwt'
 import { customFunctionController } from '../../auth/providers/custom-function/controller'
@@ -17,6 +18,7 @@ type RegisterPluginsParams = {
   mongodbUrl: string
   jwtSecret: string
   functionsList: Functions
+  corsConfig?: CorsConfig
 }
 
 type RegisterConfig = {
@@ -36,12 +38,14 @@ export const registerPlugins = async ({
   register,
   mongodbUrl,
   jwtSecret,
-  functionsList
+  functionsList,
+  corsConfig
 }: RegisterPluginsParams) => {
   try {
     const registersConfig = await getRegisterConfig({
       mongodbUrl,
       jwtSecret,
+      corsConfig,
       functionsList
     })
 
@@ -67,18 +71,16 @@ export const registerPlugins = async ({
  */
 const getRegisterConfig = async ({
   mongodbUrl,
-  jwtSecret
-}: Pick<RegisterPluginsParams, 'jwtSecret' | 'mongodbUrl' | 'functionsList'>): Promise<
+  jwtSecret,
+  corsConfig
+}: Pick<RegisterPluginsParams, 'jwtSecret' | 'mongodbUrl' | 'functionsList' | 'corsConfig'>): Promise<
   RegisterConfig[]
 > => {
   return [
     {
       pluginName: 'cors',
       plugin: cors,
-      options: {
-        origin: '*',
-        methods: ['POST', 'GET', 'DELETE']
-      }
+      options: corsConfig
     },
     {
       pluginName: 'fastifyMongodb',

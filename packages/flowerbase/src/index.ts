@@ -14,12 +14,21 @@ import { exposeRoutes } from './utils/initializer/exposeRoutes'
 import { registerPlugins } from './utils/initializer/registerPlugins'
 export * from './model'
 
+
+export type ALLOWED_METHODS = "GET" | "POST" | "PUT" | "DELETE"
+
+export type CorsConfig = {
+  origin: string
+  methods: ALLOWED_METHODS[]
+}
+
 export type InitializeConfig = {
   projectId: string
   mongodbUrl?: string
   jwtSecret?: string
   port?: number
   host?: string
+  corsConfig?: CorsConfig
 }
 
 /**
@@ -35,7 +44,8 @@ export async function initialize({
   host = DEFAULT_CONFIG.HOST,
   jwtSecret = DEFAULT_CONFIG.JWT_SECRET,
   port = DEFAULT_CONFIG.PORT,
-  mongodbUrl = DEFAULT_CONFIG.MONGODB_URL
+  mongodbUrl = DEFAULT_CONFIG.MONGODB_URL,
+  corsConfig = DEFAULT_CONFIG.CORS_OPTIONS
 }: InitializeConfig) {
   const fastify = Fastify({
     logger: !!DEFAULT_CONFIG.ENABLE_LOGGER
@@ -91,7 +101,8 @@ export async function initialize({
     register: fastify.register,
     mongodbUrl,
     jwtSecret,
-    functionsList
+    functionsList,
+    corsConfig
   })
 
   console.log('Plugins registration COMPLETED')
