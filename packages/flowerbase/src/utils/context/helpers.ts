@@ -71,6 +71,9 @@ export const generateContextData = ({
           services
         })
       }
-    }
+    },
+    Buffer,
+    http: services.api(),
+    https: services.api()
   }
 })
