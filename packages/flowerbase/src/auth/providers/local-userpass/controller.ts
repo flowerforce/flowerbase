@@ -1,5 +1,5 @@
 import sendGrid from '@sendgrid/mail'
-import { FastifyInstance } from 'fastify'
+import { FastifyInstance, FastifyPluginOptions } from 'fastify'
 import { AUTH_CONFIG, DB_NAME } from '../../../constants'
 import { services } from '../../../services'
 import handleUserRegistration from '../../../shared/handleUserRegistration'
@@ -27,7 +27,10 @@ import {
  * @testable
  * @param {FastifyInstance} app - The Fastify instance.
  */
-export async function localUserPassController(app: FastifyInstance) {
+export async function localUserPassController(
+  app: FastifyInstance,
+  options: FastifyPluginOptions
+) {
   const functionsList = StateManager.select('functions')
 
   const {
@@ -36,7 +39,9 @@ export async function localUserPassController(app: FastifyInstance) {
     user_id_field,
     on_user_creation_function_name
   } = AUTH_CONFIG
-  const db = app.mongo.client.db(DB_NAME)
+  const { databaseName: dbNameFromInit } = options
+  const dbName = DB_NAME || dbNameFromInit
+  const db = app.mongo.client.db(dbName)
 
   /**
    * Endpoint for user registration.
@@ -52,8 +57,11 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: REGISTRATION_SCHEMA
     },
     async (req, res) => {
-
-      const result = await handleUserRegistration(app, { run_as_system: true, provider: PROVIDER.LOCAL_USERPASS })({ email: req.body.email.toLowerCase(), password: req.body.password })
+      const result = await handleUserRegistration(app, {
+        run_as_system: true,
+        provider: PROVIDER.LOCAL_USERPASS,
+        databaseName: dbName
+      })({ email: req.body.email.toLowerCase(), password: req.body.password })
 
       res?.status(201)
       return { userId: result?.insertedId.toString() }
@@ -81,10 +89,7 @@ export async function localUserPassController(app: FastifyInstance) {
         throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
       }
 
-      const passwordMatches = await comparePassword(
-        req.body.password,
-        authUser.password
-      )
+      const passwordMatches = await comparePassword(req.body.password, authUser.password)
 
       if (!passwordMatches) {
         throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
@@ -93,12 +98,16 @@ export async function localUserPassController(app: FastifyInstance) {
       const user =
         user_id_field && userCollection
           ? await db!
-            .collection(userCollection)
-            .findOne({ [user_id_field]: authUser._id.toString() })
+              .collection(userCollection)
+              .findOne({ [user_id_field]: authUser._id.toString() })
           : {}
       delete authUser?.password
 
-      const userWithCustomData = { ...authUser, user_data: user, id: authUser._id.toString() }
+      const userWithCustomData = {
+        ...authUser,
+        user_data: user,
+        id: authUser._id.toString()
+      }
 
       if (authUser && authUser.status === 'pending') {
         try {
@@ -139,7 +148,10 @@ export async function localUserPassController(app: FastifyInstance) {
             services
           })
         } catch (error) {
-          console.log('localUserPassController - /login - GenerateContext - CATCH:', error)
+          console.log(
+            'localUserPassController - /login - GenerateContext - CATCH:',
+            error
+          )
         }
       }
 

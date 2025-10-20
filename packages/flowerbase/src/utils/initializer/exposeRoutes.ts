@@ -11,7 +11,7 @@ import { hashPassword } from '../crypto'
  * @param fastify -> the fastify instance
  * @tested
  */
-export const exposeRoutes = async (fastify: FastifyInstance) => {
+export const exposeRoutes = async (fastify: FastifyInstance, dbNameFromInit?: string) => {
   try {
     fastify.get(`${API_VERSION}/app/:appId/location`, async (req) => ({
       deployment_model: 'LOCAL',
@@ -25,57 +25,60 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
       uptime: uptime()
     }))
 
-    fastify.post<RegistrationDto>(AUTH_ENDPOINTS.FIRST_USER, {
-      schema: REGISTRATION_SCHEMA
-    }, async function (req, res) {
-      const { authCollection } = AUTH_CONFIG
-      const db = fastify.mongo.client.db(DB_NAME)
-      const { email, password } = req.body
-      const hashedPassword = await hashPassword(password)
+    fastify.post<RegistrationDto>(
+      AUTH_ENDPOINTS.FIRST_USER,
+      {
+        schema: REGISTRATION_SCHEMA
+      },
+      async function (req, res) {
+        const { authCollection } = AUTH_CONFIG
+        const dbName = DB_NAME || dbNameFromInit
+        const db = fastify.mongo.client.db(dbName)
+        const { email, password } = req.body
+        const hashedPassword = await hashPassword(password)
 
-      const users = db.collection(authCollection!).find()
+        const users = db.collection(authCollection!).find()
 
-      const list = await users?.toArray()
+        const list = await users?.toArray()
 
-      if (list?.length) {
-        res.status(409)
-        return {
-          error: `The ${authCollection} collection is not empty`
-        }
-      }
-
-      const result = await db.collection(authCollection!).insertOne({
-        email: email,
-        password: hashedPassword,
-        custom_data: {}
-      })
-
-      await db?.collection(authCollection!).updateOne(
-        {
-          email: email
-        },
-        {
-          $set: {
-            identities: [
-              {
-                id: result?.insertedId.toString(),
-                provider_id: result?.insertedId.toString(),
-                provider_type: PROVIDER.LOCAL_USERPASS,
-                provider_data: { email }
-              }
-            ]
+        if (list?.length) {
+          res.status(409)
+          return {
+            error: `The ${authCollection} collection is not empty`
           }
         }
-      )
 
-      res.status(201)
-      return {
-        userId: result?.insertedId
+        const result = await db.collection(authCollection!).insertOne({
+          email: email,
+          password: hashedPassword,
+          custom_data: {}
+        })
+
+        await db?.collection(authCollection!).updateOne(
+          {
+            email: email
+          },
+          {
+            $set: {
+              identities: [
+                {
+                  id: result?.insertedId.toString(),
+                  provider_id: result?.insertedId.toString(),
+                  provider_type: PROVIDER.LOCAL_USERPASS,
+                  provider_data: { email }
+                }
+              ]
+            }
+          }
+        )
+
+        res.status(201)
+        return {
+          userId: result?.insertedId
+        }
       }
-    })
+    )
   } catch (e) {
     console.error('Error while exposing routes', (e as Error).message)
   }
 }
-
-

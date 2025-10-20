@@ -14,8 +14,7 @@ import { exposeRoutes } from './utils/initializer/exposeRoutes'
 import { registerPlugins } from './utils/initializer/registerPlugins'
 export * from './model'
 
-
-export type ALLOWED_METHODS = "GET" | "POST" | "PUT" | "DELETE"
+export type ALLOWED_METHODS = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
 export type CorsConfig = {
   origin: string
@@ -29,6 +28,7 @@ export type InitializeConfig = {
   port?: number
   host?: string
   corsConfig?: CorsConfig
+  databaseName?: string
 }
 
 /**
@@ -45,26 +45,27 @@ export async function initialize({
   jwtSecret = DEFAULT_CONFIG.JWT_SECRET,
   port = DEFAULT_CONFIG.PORT,
   mongodbUrl = DEFAULT_CONFIG.MONGODB_URL,
-  corsConfig = DEFAULT_CONFIG.CORS_OPTIONS
+  corsConfig = DEFAULT_CONFIG.CORS_OPTIONS,
+  databaseName
 }: InitializeConfig) {
   const fastify = Fastify({
     logger: !!DEFAULT_CONFIG.ENABLE_LOGGER
   })
 
   const basePath = require.main?.path
-  console.log("BASE PATH", basePath)
+  console.log('BASE PATH', basePath)
 
-  console.log("CURRENT PORT", port)
-  console.log("CURRENT HOST", host)
+  console.log('CURRENT PORT', port)
+  console.log('CURRENT HOST', host)
 
   const functionsList = await loadFunctions(basePath)
-  console.log("Functions LOADED")
+  console.log('Functions LOADED')
   const triggersList = await loadTriggers(basePath)
-  console.log("Triggers LOADED")
+  console.log('Triggers LOADED')
   const endpointsList = await loadEndpoints(basePath)
-  console.log("Endpoints LOADED")
+  console.log('Endpoints LOADED')
   const rulesList = await loadRules(basePath)
-  console.log("Rules LOADED")
+  console.log('Rules LOADED')
 
   const stateConfig = {
     functions: functionsList,
@@ -88,12 +89,18 @@ export async function initialize({
       deepLinking: false
     },
     uiHooks: {
-      onRequest: function (request, reply, next) { next() },
-      preHandler: function (request, reply, next) { next() }
+      onRequest: function (request, reply, next) {
+        next()
+      },
+      preHandler: function (request, reply, next) {
+        next()
+      }
     },
     staticCSP: true,
     transformStaticCSP: (header) => header,
-    transformSpecification: (swaggerObject,) => { return swaggerObject },
+    transformSpecification: (swaggerObject) => {
+      return swaggerObject
+    },
     transformSpecificationClone: true
   })
 
@@ -102,19 +109,21 @@ export async function initialize({
     mongodbUrl,
     jwtSecret,
     functionsList,
-    corsConfig
+    corsConfig,
+    databaseName
   })
 
   console.log('Plugins registration COMPLETED')
-  await exposeRoutes(fastify)
+  await exposeRoutes(fastify, databaseName)
   console.log('APP Routes registration COMPLETED')
   await registerFunctions({ app: fastify, functionsList, rulesList })
   console.log('Functions registration COMPLETED')
   await generateEndpoints({ app: fastify, functionsList, endpointsList, rulesList })
   console.log('HTTP Endpoints registration COMPLETED')
   fastify.ready(() => {
-    console.log("FASTIFY IS READY")
-    if (triggersList?.length > 0) activateTriggers({ fastify, triggersList, functionsList })
+    console.log('FASTIFY IS READY')
+    if (triggersList?.length > 0)
+      activateTriggers({ fastify, triggersList, functionsList })
   })
   await fastify.listen({ port, host })
 

@@ -19,6 +19,7 @@ type RegisterPluginsParams = {
   jwtSecret: string
   functionsList: Functions
   corsConfig?: CorsConfig
+  databaseName?: string
 }
 
 type RegisterConfig = {
@@ -39,14 +40,16 @@ export const registerPlugins = async ({
   mongodbUrl,
   jwtSecret,
   functionsList,
-  corsConfig
+  corsConfig,
+  databaseName
 }: RegisterPluginsParams) => {
   try {
     const registersConfig = await getRegisterConfig({
       mongodbUrl,
       jwtSecret,
       corsConfig,
-      functionsList
+      functionsList,
+      databaseName
     })
 
     registersConfig.forEach(({ plugin, options, pluginName }) => {
@@ -72,10 +75,12 @@ export const registerPlugins = async ({
 const getRegisterConfig = async ({
   mongodbUrl,
   jwtSecret,
-  corsConfig
-}: Pick<RegisterPluginsParams, 'jwtSecret' | 'mongodbUrl' | 'functionsList' | 'corsConfig'>): Promise<
-  RegisterConfig[]
-> => {
+  corsConfig,
+  databaseName
+}: Pick<
+  RegisterPluginsParams,
+  'jwtSecret' | 'mongodbUrl' | 'functionsList' | 'corsConfig' | 'databaseName'
+>): Promise<RegisterConfig[]> => {
   return [
     {
       pluginName: 'cors',
@@ -106,19 +111,20 @@ const getRegisterConfig = async ({
         encoding: 'utf8',
         runFirst: true,
         routes: [],
-        jsonContentTypes: [],
+        jsonContentTypes: []
       }
     },
     {
       pluginName: 'authController',
       plugin: authController,
-      options: { prefix: `${API_VERSION}/auth` }
+      options: { prefix: `${API_VERSION}/auth`, databaseName }
     },
     {
       pluginName: 'localUserPassController',
       plugin: localUserPassController,
       options: {
-        prefix: `${API_VERSION}/app/:appId/auth/providers/local-userpass`
+        prefix: `${API_VERSION}/app/:appId/auth/providers/local-userpass`,
+        databaseName
       }
     },
     {

@@ -1,5 +1,5 @@
 import { ObjectId } from 'bson'
-import { FastifyInstance } from 'fastify'
+import { FastifyInstance, FastifyPluginOptions } from 'fastify'
 import { AUTH_CONFIG, DB_NAME } from '../constants'
 import { SessionCreatedDto } from './dtos'
 import { AUTH_ENDPOINTS, AUTH_ERRORS } from './utils'
@@ -11,10 +11,14 @@ const HANDLER_TYPE = 'preHandler'
  * @testable
  * @param {FastifyInstance} app - The Fastify instance.
  */
-export async function authController(app: FastifyInstance) {
+export async function authController(
+  app: FastifyInstance,
+  options: FastifyPluginOptions
+) {
+  const { databaseName: dbNameFromInit } = options
   const { authCollection, userCollection } = AUTH_CONFIG
-
-  const db = app.mongo.client.db(DB_NAME)
+  const dbName = DB_NAME || dbNameFromInit
+  const db = app.mongo.client.db(dbName)
 
   app.addHook(HANDLER_TYPE, app.jwtAuthentication)
 
@@ -64,9 +68,12 @@ export async function authController(app: FastifyInstance) {
         throw new Error(`User with ID ${req.user.sub} not found`)
       }
 
-      const user = userCollection && AUTH_CONFIG.user_id_field
-        ? (await db!.collection(userCollection).findOne({ [AUTH_CONFIG.user_id_field]: req.user.sub }))
-        : {}
+      const user =
+        userCollection && AUTH_CONFIG.user_id_field
+          ? await db!
+              .collection(userCollection)
+              .findOne({ [AUTH_CONFIG.user_id_field]: req.user.sub })
+          : {}
 
       res.status(201)
       return {
@@ -78,12 +85,9 @@ export async function authController(app: FastifyInstance) {
     }
   )
   /**
-     * Endpoint to destroy the existing session.  
-     */
-  app.delete(
-    AUTH_ENDPOINTS.SESSION,
-    async function () {
-      return { status: "ok" }
-    }
-  )
+   * Endpoint to destroy the existing session.
+   */
+  app.delete(AUTH_ENDPOINTS.SESSION, async function () {
+    return { status: 'ok' }
+  })
 }
