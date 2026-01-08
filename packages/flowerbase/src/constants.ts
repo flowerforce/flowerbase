@@ -19,7 +19,7 @@ export const DEFAULT_CONFIG = {
   ENABLE_LOGGER: process.env.ENABLE_LOGGER,
   CORS_OPTIONS: {
     origin: "*",
-    methods: ["GET", "POST", "PUT", "DELTE"] as ALLOWED_METHODS[]
+    methods: ["GET", "POST", "PUT", "DELETE"] as ALLOWED_METHODS[]
   }
 }
 export const API_VERSION = `/api/client/${DEFAULT_CONFIG.API_VERSION}`
