@@ -26,6 +26,9 @@ export async function authController(app: FastifyInstance) {
    * @returns {Promise<Object>} A promise resolving with the user's profile data.
    */
   app.get(AUTH_ENDPOINTS.PROFILE, async function (req) {
+    if (req.user.typ !== 'access') {
+      throw new Error('Access token required')
+    }
     const user = await db
       .collection<Record<string, unknown>>(authCollection)
       .findOne({ _id: ObjectId.createFromHexString(req.user.id) })
