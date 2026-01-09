@@ -7,8 +7,10 @@ import { CRUD_OPERATIONS, GetOperatorsFunction, MongodbAtlasFunction } from './m
 import {
   applyAccessControlToPipeline,
   checkDenyOperation,
+  ensureClientPipelineStages,
   getFormattedProjection,
   getFormattedQuery,
+  getHiddenFieldsFromRulesConfig,
   normalizeQuery
 } from './utils'
 
@@ -425,29 +427,35 @@ const getOperators: GetOperatorsFunction = (
   },
   //TODO -> add filter & rules in aggregate
   aggregate: async (pipeline = [], options, isClient) => {
-    if (isClient) {
-      throw new Error("Aggregate operator from cliente is not implemented! Move it to a function")
-    }
     if (run_as_system || !isClient) {
       return collection.aggregate(pipeline, options)
     }
+
     checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.READ)
 
-    const { filters = [], roles = [] } = rules[collection.collectionName] || {}
+    const rulesConfig = rules[collName] || {}
+    const { filters = [], roles = [] } = rulesConfig
+
+    ensureClientPipelineStages(pipeline)
+
     const formattedQuery = getFormattedQuery(filters, {}, user)
     const projection = getFormattedProjection(filters)
+    const hiddenFields = getHiddenFieldsFromRulesConfig(rulesConfig)
+
+    const sanitizedPipeline = applyAccessControlToPipeline(
+      pipeline,
+      rules,
+      user,
+      collName,
+      { isClientPipeline: true }
+    )
 
     const guardedPipeline = [
+      ...(hiddenFields.length ? [{ $unset: hiddenFields }] : []),
       ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
       ...(projection ? [{ $project: projection }] : []),
-      ...applyAccessControlToPipeline(pipeline, rules, user)
+      ...sanitizedPipeline
     ]
-
-    // const pipelineCollections = getCollectionsFromPipeline(pipeline)
-
-    // console.log(pipelineCollections)
-
-    // pipelineCollections.every((collection) => checkDenyOperation(rules, collection, CRUD_OPERATIONS.READ))
 
     const originalCursor = collection.aggregate(guardedPipeline, options)
     const newCursor = Object.create(originalCursor)

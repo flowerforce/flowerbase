@@ -90,13 +90,21 @@ export const applyAccessControlToPipeline = (
       roles?: Role[]
     }
   >,
-  user: User
+  user: User,
+  collectionName: string,
+  options?: {
+    isClientPipeline?: boolean
+  }
 ): AggregationPipeline => {
+  const { isClientPipeline = false } = options || {}
+  const hiddenFieldsForCollection = isClientPipeline
+    ? getHiddenFieldsFromRulesConfig(rules[collectionName])
+    : []
+
   return pipeline.map((stage) => {
     const [stageName] = Object.keys(stage)
     const value = stage[stageName as keyof typeof stage]
 
-    // CASE LOOKUP
     if (stageName === STAGES_TO_SEARCH.LOOKUP) {
       const lookUpStage = value as LookupStage
       const currentCollection = lookUpStage.from
@@ -104,19 +112,32 @@ export const applyAccessControlToPipeline = (
       const formattedQuery = getFormattedQuery(lookupRules.filters, {}, user)
       const projection = getFormattedProjection(lookupRules.filters)
 
+      const nestedPipeline = applyAccessControlToPipeline(
+        lookUpStage.pipeline || [],
+        rules,
+        user,
+        currentCollection,
+        { isClientPipeline }
+      )
+
+      const lookupPipeline = [
+        ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
+        ...(projection ? [{ $project: projection }] : []),
+        ...nestedPipeline
+      ]
+
+      const pipelineWithHiddenFields = isClientPipeline
+        ? prependUnsetStage(lookupPipeline, getHiddenFieldsFromRulesConfig(lookupRules))
+        : lookupPipeline
+
       return {
         $lookup: {
           ...lookUpStage,
-          pipeline: [
-            ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
-            ...(projection ? [{ $project: projection }] : []),
-            ...applyAccessControlToPipeline(lookUpStage.pipeline || [], rules, user)
-          ]
+          pipeline: pipelineWithHiddenFields
         }
       }
     }
 
-    // CASE LOOKUP
     if (stageName === STAGES_TO_SEARCH.UNION_WITH) {
       const unionWithStage = value as UnionWithStage
       const isSimpleStage = typeof unionWithStage === 'string'
@@ -125,26 +146,53 @@ export const applyAccessControlToPipeline = (
       const formattedQuery = getFormattedQuery(unionRules.filters, {}, user)
       const projection = getFormattedProjection(unionRules.filters)
 
-      const nestedPipeline = isSimpleStage ? [] : unionWithStage.pipeline || []
+      if (isSimpleStage) {
+        return stage
+      }
+
+      const nestedPipeline = unionWithStage.pipeline || []
+
+      const sanitizedNestedPipeline = applyAccessControlToPipeline(
+        nestedPipeline,
+        rules,
+        user,
+        currentCollection,
+        { isClientPipeline }
+      )
+
+      const unionPipeline = [
+        ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
+        ...(projection ? [{ $project: projection }] : []),
+        ...sanitizedNestedPipeline
+      ]
+
+      const pipelineWithHiddenFields = isClientPipeline
+        ? prependUnsetStage(unionPipeline, getHiddenFieldsFromRulesConfig(unionRules))
+        : unionPipeline
 
       return {
         $unionWith: {
-          coll: currentCollection,
-          pipeline: [
-            ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
-            ...(projection ? [{ $project: projection }] : []),
-            ...applyAccessControlToPipeline(nestedPipeline, rules, user)
-          ]
+          ...unionWithStage,
+          pipeline: pipelineWithHiddenFields
         }
       }
     }
 
-    // CASE FACET
     if (stageName === STAGES_TO_SEARCH.FACET) {
       const modifiedFacets = Object.fromEntries(
         (Object.entries(value) as [string, AggregationPipelineStage[]][]).map(
           ([facetKey, facetPipeline]) => {
-            return [facetKey, applyAccessControlToPipeline(facetPipeline, rules, user)]
+            const sanitizedFacetPipeline = applyAccessControlToPipeline(
+              facetPipeline,
+              rules,
+              user,
+              collectionName,
+              { isClientPipeline }
+            )
+            const facetPipelineWithHiddenFields = isClientPipeline
+              ? prependUnsetStage(sanitizedFacetPipeline, hiddenFieldsForCollection)
+              : sanitizedFacetPipeline
+            return [facetKey, facetPipelineWithHiddenFields]
           }
         )
       )
@@ -209,4 +257,84 @@ export const getCollectionsFromPipeline = (pipeline: Document[]) => {
 
     return acc
   }, [])
+}
+
+const CLIENT_STAGE_BLACKLIST = new Set([
+  '$replaceRoot',
+  '$merge',
+  '$out',
+  '$function',
+  '$where',
+  '$accumulator',
+  '$graphLookup'
+])
+
+export function ensureClientPipelineStages(pipeline: AggregationPipeline) {
+  pipeline.forEach((stage) => {
+    const [stageName] = Object.keys(stage)
+    if (!stageName) return
+
+    if (CLIENT_STAGE_BLACKLIST.has(stageName)) {
+      throw new Error(`Stage ${stageName} is not allowed in client aggregate pipelines`)
+    }
+
+    const value = stage[stageName as keyof typeof stage]
+
+    if (stageName === STAGES_TO_SEARCH.LOOKUP) {
+      ensureClientPipelineStages((value as LookupStage).pipeline || [])
+      return
+    }
+
+    if (stageName === STAGES_TO_SEARCH.UNION_WITH) {
+      if (typeof value === 'string') {
+        throw new Error('$unionWith must provide a pipeline when called from the client')
+      }
+      const unionStage = value as { pipeline?: AggregationPipeline }
+      ensureClientPipelineStages(unionStage.pipeline || [])
+      return
+    }
+
+    if (stageName === STAGES_TO_SEARCH.FACET) {
+      Object.values(value as Record<string, AggregationPipeline>).forEach((facetPipeline) =>
+        ensureClientPipelineStages(facetPipeline)
+      )
+    }
+  })
+}
+
+export function getHiddenFieldsFromRulesConfig(rulesConfig?: { roles?: Role[] }) {
+  if (!rulesConfig) {
+    return []
+  }
+  return collectHiddenFieldsFromRoles(rulesConfig.roles)
+}
+
+function collectHiddenFieldsFromRoles(roles: Role[] = []) {
+  const hiddenFields = new Set<string>()
+
+  const collectFromFields = (
+    fields?: Role['fields'] | Role['additional_fields']
+  ) => {
+    if (!fields) return
+    Object.entries(fields).forEach(([fieldName, permissions]) => {
+      const canRead = Boolean(permissions?.read || permissions?.write)
+      if (!canRead) {
+        hiddenFields.add(fieldName)
+      }
+    })
+  }
+
+  roles.forEach((role) => {
+    collectFromFields(role.fields)
+    collectFromFields(role.additional_fields)
+  })
+
+  return Array.from(hiddenFields)
+}
+
+export function prependUnsetStage(pipeline: AggregationPipeline, hiddenFields: string[]) {
+  if (!hiddenFields.length) {
+    return pipeline
+  }
+  return [{ $unset: hiddenFields }, ...pipeline]
 }
