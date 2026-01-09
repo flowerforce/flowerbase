@@ -24,7 +24,10 @@ export const functionsController: FunctionController = async (
   const streams = {} as Record<string, ChangeStream<Document, Document>>
 
   app.post<{ Body: FunctionCallDto }>('/call', async (req, res) => {
-    const { user } = req
+    if (req.user.typ !== 'access') {
+      throw new Error('Access token required')
+    }
+    const user = req.user
     const { name: method, arguments: args } = req.body
 
     if ('service' in req.body) {
@@ -76,7 +79,11 @@ export const functionsController: FunctionController = async (
   app.get<{
     Querystring: FunctionCallBase64Dto
   }>('/call', async (req, res) => {
-    const { query, user } = req
+    const { query } = req
+    if (req.user.typ !== 'access') {
+      throw new Error('Access token required')
+    }
+    const user = req.user
     const { baas_request, stitch_request } = query
 
     const config: Base64Function = JSON.parse(

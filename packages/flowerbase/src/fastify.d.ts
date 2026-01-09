@@ -1,7 +1,33 @@
-import { FastifyRequest as FastifyRequestType } from 'fastify'
+import { FastifyRequest as FastifyRequestType, FastifyReply } from 'fastify'
 
 type User = Record<string, unknown>
 type UserData = Record<string, unknown>
+type JwtUserData = UserData
+
+type JwtAccessPayload = {
+  typ: 'access'
+  id: string
+  user_data: JwtUserData
+  data: JwtUserData
+  custom_data?: JwtUserData
+}
+
+type JwtRefreshPayload = {
+  typ: 'refresh'
+  baas_id: string
+}
+
+type JwtPayload = JwtAccessPayload | JwtRefreshPayload
+
+type JwtAccessUser = JwtAccessPayload & {
+  sub: string
+}
+
+type JwtRefreshUser = JwtRefreshPayload & {
+  sub: string
+}
+
+type JwtUser = JwtAccessUser | JwtRefreshUser
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -9,20 +35,11 @@ declare module 'fastify' {
     createAccessToken(user: User): string
     createRefreshToken(user: User): string
   }
+}
 
-  interface FastifyRequest {
-    user:
-      | {
-          id: string
-          typ: 'refresh'
-          sub: string
-          user_data: UserData
-          user: User
-        }
-      | {
-          typ: 'access'
-          user_data: UserData
-          id: string
-        }
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
+    payload: JwtPayload
+    user: JwtUser
   }
 }
