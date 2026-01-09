@@ -31,6 +31,7 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
         email,
         password: hashedPassword,
         status: skipUserCheck ? 'confirmed' : 'pending',
+        createdAt: new Date(),
         custom_data: {
             // TODO: aggiungere dati personalizzati alla registrazione
         },
