@@ -98,7 +98,12 @@ export async function localUserPassController(app: FastifyInstance) {
           : {}
       delete authUser?.password
 
-      const userWithCustomData = { ...authUser, user_data: user, id: authUser._id.toString() }
+      const userWithCustomData = {
+        ...authUser,
+        user_data: { ...(user || {}), _id: authUser._id },
+        data: { email: authUser.email },
+        id: authUser._id.toString()
+      }
 
       if (authUser && authUser.status === 'pending') {
         try {
@@ -123,14 +128,7 @@ export async function localUserPassController(app: FastifyInstance) {
       ) {
         try {
           await GenerateContext({
-            args: [
-              {
-                operationType: 'CREATE',
-                providers: 'local-userpass',
-                user: userWithCustomData,
-                time: new Date().getTime()
-              }
-            ],
+            args: [userWithCustomData],
             app,
             rules: {},
             user: userWithCustomData,
