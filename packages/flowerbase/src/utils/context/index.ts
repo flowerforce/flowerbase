@@ -29,6 +29,7 @@ export async function GenerateContext({
   enqueue,
   request
 }: GenerateContextParams) {
+  if (!currentFunction) return
 
   const functionsQueue = StateManager.select("functionsQueue")
 
