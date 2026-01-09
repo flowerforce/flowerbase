@@ -27,6 +27,9 @@ export const generateContextData = ({
   console: {
     log: (...args: Arguments) => {
       console.log(...args)
+    },
+    error: (...args: Arguments) => {
+      console.error(...args)
     }
   },
   context: {
