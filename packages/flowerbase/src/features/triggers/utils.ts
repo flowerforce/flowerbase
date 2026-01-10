@@ -7,6 +7,41 @@ import { readJsonContent } from '../../utils'
 import { GenerateContext } from '../../utils/context'
 import { HandlerParams, Trigger, Triggers } from './interface'
 
+const registerOnClose = (
+  app: HandlerParams['app'],
+  handler: () => Promise<void> | void,
+  label: string
+) => {
+  if (app.server) {
+    app.server.once('close', () => {
+      Promise.resolve(handler()).catch((error) => {
+        console.error(`${label} close error`, error)
+      })
+    })
+    return
+  }
+
+  try {
+    app.addHook('onClose', async () => {
+      try {
+        await handler()
+      } catch (error) {
+        console.error(`${label} close error`, error)
+      }
+    })
+  } catch (error) {
+    console.error(`${label} hook registration error`, error)
+  }
+}
+
+const shouldIgnoreStreamError = (error: unknown) => {
+  const err = error as { name?: string; message?: string }
+  if (err?.name === 'MongoClientClosedError') return true
+  if (err?.message?.includes('client was closed')) return true
+  if (err?.message?.includes('Client is closed')) return true
+  return false
+}
+
 /**
  * Loads trigger files from the specified directory and returns them as an array of objects.
  * Each object contains the file name and the parsed JSON content.
@@ -54,7 +89,7 @@ const handleCronTrigger = async ({
   services,
   app
 }: HandlerParams) => {
-  cron.schedule(config.schedule, async () => {
+  const task = cron.schedule(config.schedule, async () => {
     await GenerateContext({
       args: [],
       app,
@@ -65,6 +100,7 @@ const handleCronTrigger = async ({
       services
     })
   })
+  registerOnClose(app, () => task.stop(), 'Scheduled trigger')
 }
 
 const handleAuthenticationTrigger = async ({
@@ -88,6 +124,10 @@ const handleAuthenticationTrigger = async ({
     .watch(pipeline, {
       fullDocument: 'whenAvailable'
     })
+  changeStream.on('error', (error) => {
+    if (shouldIgnoreStreamError(error)) return
+    console.error('Authentication trigger change stream error', error)
+  })
   changeStream.on('change', async function (change) {
     const document = change['fullDocument' as keyof typeof change] as Record<
       string,
@@ -120,6 +160,13 @@ const handleAuthenticationTrigger = async ({
       })
     }
   })
+  registerOnClose(
+    app,
+    async () => {
+      await changeStream.close()
+    },
+    'Authentication trigger'
+  )
 }
 
 /**
@@ -175,6 +222,10 @@ const handleDataBaseTrigger = async ({
       ? 'whenAvailable'
       : undefined
   })
+  changeStream.on('error', (error) => {
+    if (shouldIgnoreStreamError(error)) return
+    console.error('Database trigger change stream error', error)
+  })
   changeStream.on('change', async function ({ clusterTime, ...change }) {
     await GenerateContext({
       args: [change],
@@ -186,7 +237,13 @@ const handleDataBaseTrigger = async ({
       services
     })
   })
-  // TODO -> gestire close dello stream
+  registerOnClose(
+    app,
+    async () => {
+      await changeStream.close()
+    },
+    'Database trigger'
+  )
 }
 
 export const TRIGGER_HANDLERS = {

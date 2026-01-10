@@ -1,0 +1,26 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "todos",
+  "filters": [
+    {
+      "name": "onlyOwnTodos",
+      "apply_when": {},
+      "query": {
+        "userId": "%%user.id"
+      }
+    }
+  ],
+  "roles": [
+    {
+      "name": "todoOwner",
+      "apply_when": {
+        "userId": "%%user.id"
+      },
+      "insert": true,
+      "delete": true,
+      "search": true,
+      "read": true,
+      "write": true
+    }
+  ]
+}

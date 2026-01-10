@@ -1,23 +1,54 @@
-import { EventEmitterAsyncResourceOptions } from 'events'
 import isEqual from 'lodash/isEqual'
-import { Collection, Document, EventsDescription, FindCursor, WithId } from 'mongodb'
+import { Collection, Document, EventsDescription, WithId } from 'mongodb'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
 import { CRUD_OPERATIONS, GetOperatorsFunction, MongodbAtlasFunction } from './model'
 import {
   applyAccessControlToPipeline,
   checkDenyOperation,
+  ensureClientPipelineStages,
   getFormattedProjection,
   getFormattedQuery,
+  getHiddenFieldsFromRulesConfig,
   normalizeQuery
 } from './utils'
+import { Rules } from '../../features/rules/interface'
 
 //TODO aggiungere no-sql inject security
+const debugRules = process.env.DEBUG_RULES === 'true'
+const debugServices = process.env.DEBUG_SERVICES === 'true'
+
+const logDebug = (message: string, payload?: unknown) => {
+  if (!debugRules) return
+  const formatted = payload && typeof payload === 'object' ? JSON.stringify(payload) : payload
+  console.log(`[rules-debug] ${message}`, formatted ?? '')
+}
+
+const getUserId = (user?: unknown) => {
+  if (!user || typeof user !== 'object') return undefined
+  return (user as { id?: string }).id
+}
+
+const logService = (message: string, payload?: unknown) => {
+  if (!debugServices) return
+  console.log('[service-debug]', message, payload ?? '')
+}
+
 const getOperators: GetOperatorsFunction = (
   collection,
-  { rules = {}, collName, user, run_as_system }
-) => ({
-  /**
+  { rules, collName, user, run_as_system }
+) => {
+  const normalizedRules: Rules = rules ?? ({} as Rules)
+  const collectionRules = normalizedRules[collName]
+  const filters = collectionRules?.filters ?? []
+  const roles = collectionRules?.roles ?? []
+  const fallbackAccess = (doc: Document | null | undefined = undefined) => ({
+    status: false,
+    document: doc
+  })
+
+  return {
+    /**
    * Finds a single document in a MongoDB collection with optional role-based filtering and validation.
    *
    * @param {Filter<Document>} query - The MongoDB query used to match the document.
@@ -34,16 +65,38 @@ const getOperators: GetOperatorsFunction = (
    */
   findOne: async (query) => {
     if (!run_as_system) {
-      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.READ)
-      const { filters, roles } = rules[collName] || {}
-
+      checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
       // Apply access control filters to the query
       const formattedQuery = getFormattedQuery(filters, query, user)
+      logDebug('update formattedQuery', {
+        collection: collName,
+        query,
+        formattedQuery
+      })
+      logDebug('find formattedQuery', {
+        collection: collName,
+        query,
+        formattedQuery,
+        rolesLength: roles.length
+      })
 
-      const result = await collection.findOne({ $and: formattedQuery })
+      logService('findOne query', { collName, formattedQuery })
+      const safeQuery = normalizeQuery(formattedQuery)
+      logService('findOne normalizedQuery', { collName, safeQuery })
+      const result = await collection.findOne({ $and: safeQuery })
+      logDebug('findOne result', {
+        collection: collName,
+        result
+      })
+      logService('findOne result', { collName, result })
 
       const winningRole = getWinningRole(result, user, roles)
 
+      logDebug('findOne winningRole', {
+        collection: collName,
+        winningRoleName: winningRole?.name ?? null,
+        userId: getUserId(user)
+      })
       const { status, document } = winningRole
         ? await checkValidation(
           winningRole,
@@ -55,7 +108,7 @@ const getOperators: GetOperatorsFunction = (
           },
           user
         )
-        : { status: true, document: result }
+        : fallbackAccess(result)
 
       // Return validated document or empty object if not permitted
       return Promise.resolve(status ? document : {})
@@ -82,9 +135,7 @@ const getOperators: GetOperatorsFunction = (
    */
   deleteOne: async (query = {}) => {
     if (!run_as_system) {
-      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.DELETE)
-      const { filters, roles } = rules[collName] || {}
-
+      checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
       // Apply access control filters
       const formattedQuery = getFormattedQuery(filters, query, user)
 
@@ -92,6 +143,11 @@ const getOperators: GetOperatorsFunction = (
       const result = await collection.findOne({ $and: formattedQuery })
       const winningRole = getWinningRole(result, user, roles)
 
+      logDebug('delete winningRole', {
+        collection: collName,
+        userId: getUserId(user),
+        winningRoleName: winningRole?.name ?? null
+      })
       const { status } = winningRole
         ? await checkValidation(
           winningRole,
@@ -103,7 +159,7 @@ const getOperators: GetOperatorsFunction = (
           },
           user
         )
-        : { status: true }
+        : fallbackAccess(result)
 
       if (!status) {
         throw new Error('Delete not permitted')
@@ -134,10 +190,8 @@ const getOperators: GetOperatorsFunction = (
    * This ensures that only users with the correct permissions can insert data into the collection.
    */
   insertOne: async (data, options) => {
-    const { roles } = rules[collName] || {}
-
     if (!run_as_system) {
-      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.CREATE)
+      checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.CREATE)
       const winningRole = getWinningRole(data, user, roles)
 
       const { status, document } = winningRole
@@ -151,12 +205,19 @@ const getOperators: GetOperatorsFunction = (
           },
           user
         )
-        : { status: true, document: data }
+        : fallbackAccess(data)
 
       if (!status || !isEqual(data, document)) {
         throw new Error('Insert not permitted')
       }
-      return collection.insertOne(data, options)
+      logService('insertOne payload', { collName, data })
+      const insertResult = await collection.insertOne(data, options)
+      logService('insertOne result', {
+        collName,
+        insertedId: insertResult.insertedId.toString(),
+        document: data
+      })
+      return insertResult
     }
     // System mode: insert without validation
     return collection.insertOne(data, options)
@@ -185,8 +246,7 @@ const getOperators: GetOperatorsFunction = (
   updateOne: async (query, data, options) => {
     if (!run_as_system) {
 
-      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
-      const { filters, roles } = rules[collName] || {}
+      checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
       // Apply access control filters
 
       // Normalize _id
@@ -210,10 +270,9 @@ const getOperators: GetOperatorsFunction = (
       // const docToCheck = hasOperators
       //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
       //   : data
-      const [matchQuery] = formattedQuery;  // TODO da chiedere/capire perchè è solo uno. tutti gli altri { $match: { $and: formattedQuery } }
       const pipeline = [
         {
-          $match: matchQuery
+          $match: { $and: safeQuery }
         },
         {
           $limit: 1
@@ -235,14 +294,14 @@ const getOperators: GetOperatorsFunction = (
           },
           user
         )
-        : { status: true, document: docToCheck }
+        : fallbackAccess(docToCheck)
       // Ensure no unauthorized changes are made
       const areDocumentsEqual = isEqual(document, docToCheck)
 
       if (!status || !areDocumentsEqual) {
         throw new Error('Update not permitted')
       }
-      return collection.updateOne({ $and: formattedQuery }, data, options)
+      return collection.updateOne({ $and: safeQuery }, data, options)
     }
     return collection.updateOne(query, data, options)
   },
@@ -265,32 +324,32 @@ const getOperators: GetOperatorsFunction = (
    */
   find: (query) => {
     if (!run_as_system) {
-      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.READ)
-      const { filters, roles } = rules[collName] || {}
-
+      checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
       // Pre-query filtering based on access control rules
       const formattedQuery = getFormattedQuery(filters, query, user)
       const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
       // aggiunto filter per evitare questo errore: $and argument's entries must be objects
-      const originalCursor = collection.find(currentQuery)
-      // Clone the cursor to override `toArray` with post-query validation
-      const client = originalCursor[
-        'client' as keyof typeof originalCursor
-      ] as EventEmitterAsyncResourceOptions
-      const newCursor = new FindCursor(client)
+      const cursor = collection.find(currentQuery)
+      const originalToArray = cursor.toArray.bind(cursor)
 
       /**
        * Overridden `toArray` method that validates each document for read access.
        *
        * @returns {Promise<Document[]>} An array of documents the user is authorized to read.
        */
-      newCursor.toArray = async () => {
-        const response = await originalCursor.toArray()
+      cursor.toArray = async () => {
+        const response = await originalToArray()
 
         const filteredResponse = await Promise.all(
           response.map(async (currentDoc) => {
             const winningRole = getWinningRole(currentDoc, user, roles)
 
+            logDebug('find winningRole', {
+              collection: collName,
+              userId: getUserId(user),
+              winningRoleName: winningRole?.name ?? null,
+              rolesLength: roles.length
+            })
             const { status, document } = winningRole
               ? await checkValidation(
                 winningRole,
@@ -302,16 +361,16 @@ const getOperators: GetOperatorsFunction = (
                 },
                 user
               )
-              : { status: !roles.length, document: currentDoc }
+              : fallbackAccess(currentDoc)
 
             return status ? document : undefined
           })
         )
 
-        return filteredResponse.filter(Boolean)
+        return filteredResponse.filter(Boolean) as WithId<Document>[]
       }
 
-      return newCursor
+      return cursor
     }
     // System mode: return original unfiltered cursor
     return collection.find(query)
@@ -337,9 +396,7 @@ const getOperators: GetOperatorsFunction = (
    */
   watch: (pipeline = [], options) => {
     if (!run_as_system) {
-      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.READ)
-      const { filters, roles } = rules[collName] || {}
-
+      checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
       // Apply access filters to initial change stream pipeline
       const formattedQuery = getFormattedQuery(filters, {}, user)
 
@@ -377,7 +434,7 @@ const getOperators: GetOperatorsFunction = (
             },
             user
           )
-          : { status: true, document: fullDocument }
+          : fallbackAccess(fullDocument)
 
         const { status: updatedFieldsStatus, document: updatedFields } = winningRole
           ? await checkValidation(
@@ -390,7 +447,7 @@ const getOperators: GetOperatorsFunction = (
             },
             user
           )
-          : { status: true, document: updateDescription?.updatedFields }
+          : fallbackAccess(updateDescription?.updatedFields)
 
         return { status, document, updatedFieldsStatus, updatedFields }
       }
@@ -425,52 +482,48 @@ const getOperators: GetOperatorsFunction = (
   },
   //TODO -> add filter & rules in aggregate
   aggregate: async (pipeline = [], options, isClient) => {
-    if (isClient) {
-      throw new Error("Aggregate operator from cliente is not implemented! Move it to a function")
-    }
     if (run_as_system || !isClient) {
       return collection.aggregate(pipeline, options)
     }
-    checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.READ)
 
-    const { filters = [], roles = [] } = rules[collection.collectionName] || {}
+    checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+
+    const rulesConfig = collectionRules ?? { filters, roles }
+
+    ensureClientPipelineStages(pipeline)
+
     const formattedQuery = getFormattedQuery(filters, {}, user)
+    logDebug('aggregate formattedQuery', {
+      collection: collName,
+      formattedQuery,
+      pipeline
+    })
     const projection = getFormattedProjection(filters)
+    const hiddenFields = getHiddenFieldsFromRulesConfig(rulesConfig)
+
+    const sanitizedPipeline = applyAccessControlToPipeline(
+      pipeline,
+      normalizedRules,
+      user,
+      collName,
+      { isClientPipeline: true }
+    )
+    logDebug('aggregate sanitizedPipeline', {
+      collection: collName,
+      sanitizedPipeline
+    })
 
     const guardedPipeline = [
+      ...(hiddenFields.length ? [{ $unset: hiddenFields }] : []),
       ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
       ...(projection ? [{ $project: projection }] : []),
-      ...applyAccessControlToPipeline(pipeline, rules, user)
+      ...sanitizedPipeline
     ]
-
-    // const pipelineCollections = getCollectionsFromPipeline(pipeline)
-
-    // console.log(pipelineCollections)
-
-    // pipelineCollections.every((collection) => checkDenyOperation(rules, collection, CRUD_OPERATIONS.READ))
 
     const originalCursor = collection.aggregate(guardedPipeline, options)
     const newCursor = Object.create(originalCursor)
 
-    newCursor.toArray = async () => {
-      const results = await originalCursor.toArray()
-
-      const filtered = await Promise.all(
-        results.map(async (doc) => {
-          const role = getWinningRole(doc, user, roles)
-          const { status, document } = role
-            ? await checkValidation(
-              role,
-              { type: 'read', roles, cursor: doc, expansions: {} },
-              user
-            )
-            : { status: !roles?.length, document: doc }
-          return status ? document : undefined
-        })
-      )
-
-      return filtered.filter(Boolean)
-    }
+    newCursor.toArray = async () => originalCursor.toArray()
 
     return newCursor
   },
@@ -493,8 +546,7 @@ const getOperators: GetOperatorsFunction = (
    */
   insertMany: async (documents, options) => {
     if (!run_as_system) {
-      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.CREATE)
-      const { roles } = rules[collName] || {}
+      checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.CREATE)
       // Validate each document against user's roles
       const filteredItems = await Promise.all(
         documents.map(async (currentDoc) => {
@@ -511,7 +563,7 @@ const getOperators: GetOperatorsFunction = (
               },
               user
             )
-            : { status: !roles.length, document: currentDoc }
+          : fallbackAccess(currentDoc)
 
           return status ? document : undefined
         })
@@ -530,8 +582,7 @@ const getOperators: GetOperatorsFunction = (
   },
   updateMany: async (query, data, options) => {
     if (!run_as_system) {
-      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
-      const { filters, roles } = rules[collName] || {}
+      checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
       // Apply access control filters
       const formattedQuery = getFormattedQuery(filters, query, user)
 
@@ -576,7 +627,7 @@ const getOperators: GetOperatorsFunction = (
               },
               user
             )
-            : { status: !roles.length, document: currentDoc }
+          : fallbackAccess(currentDoc)
 
           return status ? document : undefined
         })
@@ -611,9 +662,7 @@ const getOperators: GetOperatorsFunction = (
    */
   deleteMany: async (query = {}) => {
     if (!run_as_system) {
-      checkDenyOperation(rules, collection.collectionName, CRUD_OPERATIONS.DELETE)
-      const { filters, roles } = rules[collName] || {}
-
+      checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
       // Apply access control filters
       const formattedQuery = getFormattedQuery(filters, query, user)
 
@@ -636,7 +685,7 @@ const getOperators: GetOperatorsFunction = (
               },
               user
             )
-            : { status: !roles.length, document: currentDoc }
+            : fallbackAccess(currentDoc)
 
           return status ? document : undefined
         })
@@ -662,7 +711,8 @@ const getOperators: GetOperatorsFunction = (
     // If running as system, bypass access control and delete directly
     return collection.deleteMany(query)
   }
-})
+  }
+}
 
 const MongodbAtlas: MongodbAtlasFunction = (
   app,
@@ -671,9 +721,12 @@ const MongodbAtlas: MongodbAtlasFunction = (
   db: (dbName: string) => {
     return {
       collection: (collName: string) => {
-        const collection: Collection<Document> = app.mongo.client
-          .db(dbName)
-          .collection(collName)
+        const mongoClient = app.mongo.client as unknown as {
+          db: (database: string) => {
+            collection: (name: string) => Collection<Document>
+          }
+        }
+        const collection: Collection<Document> = mongoClient.db(dbName).collection(collName)
         return getOperators(collection, {
           rules,
           collName,

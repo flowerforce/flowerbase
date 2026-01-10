@@ -1,5 +1,6 @@
 import { ObjectId } from 'bson'
 import { ChangeStream, Document } from 'mongodb';
+import type { FastifyRequest } from 'fastify'
 import { services } from '../../services'
 import { StateManager } from '../../state'
 import { GenerateContext } from '../../utils/context'
@@ -7,7 +8,31 @@ import { Base64Function, FunctionCallBase64Dto, FunctionCallDto } from './dtos'
 import { FunctionController } from './interface'
 import { executeQuery } from './utils'
 
+const normalizeUser = (payload: Record<string, any> | undefined) => {
+  if (!payload) return undefined
+  const nestedUser =
+    payload.data ?? payload.user_data ?? payload.custom_data ?? payload
+  const flattened =
+    typeof nestedUser === 'object' && nestedUser !== null ? nestedUser : {}
 
+  return {
+    ...payload,
+    ...flattened,
+    custom_data: payload.custom_data ?? flattened,
+    user_data: payload.user_data ?? flattened,
+    data: payload.data ?? flattened
+  }
+}
+
+const getRequestUser = (req: FastifyRequest) => {
+  const candidate = req.user as Record<string, any> | undefined
+  return normalizeUser(candidate)
+}
+
+const logFunctionCall = (method: string, user: Record<string, any> | undefined, args: unknown[]) => {
+  if (process.env.DEBUG_FUNCTIONS !== 'true') return
+  console.log('[functions-debug]', method, user ? { id: user.id, role: user.role, email: user.email } : 'no-user', args)
+}
 
 /**
  * > Creates a pre handler for every query
@@ -24,10 +49,10 @@ export const functionsController: FunctionController = async (
   const streams = {} as Record<string, ChangeStream<Document, Document>>
 
   app.post<{ Body: FunctionCallDto }>('/call', async (req, res) => {
-    if (req.user.typ !== 'access') {
+    const user = getRequestUser(req)
+    if (!user || user.typ !== 'access') {
       throw new Error('Access token required')
     }
-    const user = req.user
     const { name: method, arguments: args } = req.body
 
     if ('service' in req.body) {
@@ -42,6 +67,7 @@ export const functionsController: FunctionController = async (
         .db(database)
         .collection(collection)[method]
 
+      logFunctionCall(`service:${req.body.service}:${method}`, user, args)
       const operatorsByType = await executeQuery({
         currentMethod,
         query,
@@ -64,6 +90,7 @@ export const functionsController: FunctionController = async (
       throw new Error(`Function "${req.body.name}" is private`)
     }
 
+    logFunctionCall(`function:${method}`, user, args)
     const result = await GenerateContext({
       args: req.body.arguments,
       app,
@@ -80,10 +107,10 @@ export const functionsController: FunctionController = async (
     Querystring: FunctionCallBase64Dto
   }>('/call', async (req, res) => {
     const { query } = req
-    if (req.user.typ !== 'access') {
+    const user = getRequestUser(req)
+    if (!user || user.typ !== 'access') {
       throw new Error('Access token required')
     }
-    const user = req.user
     const { baas_request, stitch_request } = query
 
     const config: Base64Function = JSON.parse(

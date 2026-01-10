@@ -3,7 +3,7 @@ import { evaluateExpression } from '../helpers'
 import { DocumentFiltersPermissions } from '../interface'
 import { MachineContext } from './interface'
 
-const readOnlyPermissions = ['read']
+const readOnlyPermissions = ['read', 'search']
 const readWritePermissions = ['write', 'delete', 'insert', ...readOnlyPermissions]
 
 export const evaluateDocumentFiltersFn = async (
@@ -23,11 +23,16 @@ export const evaluateTopLevelPermissionsFn = async (
   { params, role, user }: MachineContext,
   currentType: MachineContext['params']['type']
 ) => {
-  return role[currentType]
-    ? await evaluateExpression(params, role[currentType], user)
-    : undefined
+  const permission = role?.[currentType]
+  if (typeof permission === 'undefined') {
+    return undefined
+  }
+
+  return await evaluateExpression(params, permission, user)
 }
 
 export const checkFieldsPropertyExists = ({ role }: MachineContext) => {
-  return !!Object.keys(role.fields ?? {}).length
+  const hasFields = !!Object.keys(role?.fields ?? {}).length
+  const hasAdditional = !!Object.keys(role?.additional_fields ?? {}).length
+  return hasFields || hasAdditional
 }

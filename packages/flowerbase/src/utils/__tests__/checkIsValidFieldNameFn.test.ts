@@ -32,7 +32,12 @@ describe('checkIsValidFieldNameFn', () => {
     }
 
     const result = checkIsValidFieldNameFn(context as MachineContext)
-    expect(result).toEqual({ name: 'Alice', email: 'alice@example.com', _id: mockId })
+    expect(result).toEqual({
+      _id: mockId,
+      name: 'Alice',
+      email: 'alice@example.com',
+      age: 25
+    })
   })
   it("should exclude _id if role doesn't allows it", () => {
     const mockedRole = {
@@ -127,7 +132,7 @@ describe('checkIsValidFieldNameFn', () => {
 
     const result = checkIsValidFieldNameFn(context as MachineContext)
 
-    expect(result).toEqual({})
+    expect(result).toEqual({ email: 'charlie@example.com' })
   })
 
   it('should handle additional_fields correctly for read permission', () => {
@@ -147,7 +152,7 @@ describe('checkIsValidFieldNameFn', () => {
     }
 
     const result = checkIsValidFieldNameFn(context as MachineContext)
-    expect(result).toEqual({ _id: mockId, phone: '123456789' })
+    expect(result).toEqual({ _id: mockId, phone: '123456789', address: 'Unknown' })
   })
   it('should handle additional_fields correctly for write permission', () => {
     const mockedRole = {
@@ -186,6 +191,6 @@ describe('checkIsValidFieldNameFn', () => {
     }
 
     const result = checkIsValidFieldNameFn(context as MachineContext)
-    expect(result).toEqual({ _id: mockId })
+    expect(result).toEqual({ _id: mockId, phone: '123456789', address: 'Unknown' })
   })
 })

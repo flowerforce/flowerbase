@@ -76,7 +76,7 @@ describe('STEP_D_STATES', () => {
     })
     expect(next).toHaveBeenCalledWith('evaluateRead')
   })
-  it('checkIsValidFieldName should end a failed validation, with an empty document', async () => {
+  it('checkIsValidFieldName should end a successful validation, with a document', async () => {
     const mockedLogInfo = jest
       .spyOn(Utils, 'logMachineInfo')
       .mockImplementation(() => 'Mocked Value')
@@ -95,7 +95,7 @@ describe('STEP_D_STATES', () => {
       next,
       initialStep: null
     })
-    expect(endValidation).toHaveBeenCalledWith({ success: false, document: {} })
+    expect(endValidation).toHaveBeenCalledWith({ success: true, document: { name: 'test' } })
     expect(mockedLogInfo).toHaveBeenCalledWith({
       enabled: mockContext.enableLog,
       machine: 'D',

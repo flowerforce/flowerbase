@@ -13,12 +13,21 @@ import { hashPassword } from '../crypto'
  */
 export const exposeRoutes = async (fastify: FastifyInstance) => {
   try {
-    fastify.get(`${API_VERSION}/app/:appId/location`, async (req) => ({
-      deployment_model: 'LOCAL',
-      location: 'IE',
-      hostname: `${DEFAULT_CONFIG.HTTPS_SCHEMA}://${req.headers.host}`,
-      ws_hostname: `${DEFAULT_CONFIG.HTTPS_SCHEMA === 'https' ? 'wss' : 'ws'}://${req.headers.host}`
-    }))
+    fastify.get(`${API_VERSION}/app/:appId/location`, async (req) => {
+      const schema = DEFAULT_CONFIG?.HTTPS_SCHEMA ?? 'http'
+      const headerHost = req.headers.host ?? 'localhost:3000'
+      const hostname = headerHost.split(':')[0]
+      const port = DEFAULT_CONFIG?.PORT ?? 3000
+      const host = `${hostname}:${port}`
+      const wsSchema = 'wss'
+
+      return {
+        deployment_model: 'LOCAL',
+        location: 'IE',
+        hostname: `${schema}://${host}`,
+        ws_hostname: `${wsSchema}://${host}`
+      }
+    })
 
     fastify.get('/health', async () => ({
       status: 'ok',
@@ -77,5 +86,3 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
     console.error('Error while exposing routes', (e as Error).message)
   }
 }
-
-

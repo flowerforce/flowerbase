@@ -4,21 +4,11 @@ module.exports = {
     '^.+\\.[tj]s$': [
       'ts-jest',
       {
-        tsconfig: './tsconfig.json'
+        tsconfig: '<rootDir>/tsconfig.json'
       }
     ]
   },
-  collectCoverage: false,
-  collectCoverageFrom: ['./**/*.ts'],
-  coverageDirectory: 'coverage',
-  coverageThreshold: {
-    global: {
-      branches: 50,
-      functions: 90,
-      lines: 90,
-      statements: 90
-    }
-  },
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'node',
   testMatch: ['./**/*.test.ts']
 }

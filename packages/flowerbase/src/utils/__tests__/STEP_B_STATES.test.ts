@@ -11,7 +11,7 @@ const {
   evaluateDocumentsFiltersWrite
 } = STEP_B_STATES
 
-jest.mock('../roles/machines/B/validators', () => ({
+jest.mock('../roles/machines/read/B/validators', () => ({
   evaluateDocumentFiltersReadFn: jest.fn(),
   evaluateDocumentFiltersWriteFn: jest.fn()
 }))

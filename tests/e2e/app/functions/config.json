@@ -1,0 +1,28 @@
+[
+  {
+    "name": "isAuthorizedUser",
+    "private": false,
+    "run_as_system": false
+  },
+  {
+    "name": "isAuthorizedMyUser",
+    "private": false,
+    "run_as_system": false
+  },
+  {
+    "name": "isAuthorizedAdmin",
+    "private": false,
+    "run_as_system": false
+  }
+  ,
+  {
+    "name": "logTriggerEvent",
+    "private": false,
+    "run_as_system": true
+  },
+  {
+    "name": "api_checkWorkspace",
+    "private": false,
+    "run_as_system": false
+  }
+]

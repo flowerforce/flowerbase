@@ -1,0 +1,44 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "activityLogs",
+  "filters": [
+    {
+      "name": "adminAccess",
+      "apply_when": {
+        "%%user.custom_data.role": "admin"
+      },
+      "query": {}
+    },
+    {
+      "name": "activeOnly",
+      "apply_when": {},
+      "query": {
+        "status": "active"
+      }
+    }
+  ],
+  "roles": [
+    {
+      "name": "activeLogRole",
+      "apply_when": {
+        "status": "active"
+      },
+      "insert": false,
+      "delete": false,
+      "search": true,
+      "read": true,
+      "write": false
+    },
+    {
+      "name": "adminAuditRole",
+      "apply_when": {
+        "%%user.custom_data.role": "admin"
+      },
+      "insert": true,
+      "delete": true,
+      "search": true,
+      "read": true,
+      "write": true
+    }
+  ]
+}

@@ -9,7 +9,12 @@
             "delete": false,
             "search": false,
             "read": false,
-            "write": false
+            "write": false,
+            "fields": {
+                "password": {
+                    "read": false
+                }
+            }
         }
     ]
 }

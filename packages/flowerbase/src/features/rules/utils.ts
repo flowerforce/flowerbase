@@ -5,11 +5,20 @@ import { Rules, RulesConfig } from './interface'
 
 export const loadRules = async (rootDir = process.cwd()): Promise<Rules> => {
   const rulesRoot = path.join(rootDir, 'data_sources', 'mongodb-atlas')
-  const files = fs.readdirSync(rulesRoot, { recursive: true }) as string[]
+  const recursivelyCollectFiles = (dir: string): string[] => {
+    return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const fullPath = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        return recursivelyCollectFiles(fullPath)
+      }
+      return entry.isFile() ? [fullPath] : []
+    })
+  }
+  const files = recursivelyCollectFiles(rulesRoot)
   const rulesFiles = files.filter((x) => (x as string).endsWith('rules.json'))
 
   const rulesByCollection = rulesFiles.reduce((acc, rulesFile) => {
-    const filePath = path.join(rulesRoot, rulesFile)
+    const filePath = rulesFile
     const collectionRules = readJsonContent(filePath) as RulesConfig
     acc[collectionRules.collection] = collectionRules
 

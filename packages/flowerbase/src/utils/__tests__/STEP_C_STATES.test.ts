@@ -12,7 +12,7 @@ const endValidation = jest.fn()
 const goToNextValidationStage = jest.fn()
 const next = jest.fn()
 
-jest.mock('../roles/machines/C/validators', () => ({
+jest.mock('../roles/machines/read/C/validators', () => ({
   evaluateTopLevelReadFn: jest.fn(),
   checkFieldsPropertyExists: jest.fn(),
   evaluateTopLevelWriteFn: jest.fn()

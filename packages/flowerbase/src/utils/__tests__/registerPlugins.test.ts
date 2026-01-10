@@ -2,6 +2,8 @@ import cors from '@fastify/cors'
 import fastifyMongodb from '@fastify/mongodb'
 import { authController } from '../../auth/controller'
 import jwtAuthPlugin from '../../auth/plugins/jwt'
+import fastifyRawBody from 'fastify-raw-body'
+import { customFunctionController } from '../../auth/providers/custom-function/controller'
 import { localUserPassController } from '../../auth/providers/local-userpass/controller'
 import { Functions } from '../../features/functions/interface'
 import { registerPlugins } from '../initializer/registerPlugins'
@@ -34,7 +36,7 @@ describe('registerPlugins', () => {
     })
 
     // Check Plugins Registration
-    expect(registerMock).toHaveBeenCalledTimes(5)
+    expect(registerMock).toHaveBeenCalledTimes(7)
     expect(registerMock).toHaveBeenCalledWith(cors, {
       origin: '*',
       methods: ['POST', 'GET']
@@ -50,10 +52,22 @@ describe('registerPlugins', () => {
     expect(registerMock).toHaveBeenCalledWith(localUserPassController, {
       prefix: `${MOCKED_API_VERSION}/app/:appId/auth/providers/local-userpass`
     })
+    expect(registerMock).toHaveBeenCalledWith(fastifyRawBody, {
+      field: 'rawBody',
+      global: false,
+      encoding: 'utf8',
+      runFirst: true,
+      routes: [],
+      jsonContentTypes: []
+    })
+    expect(registerMock).toHaveBeenCalledWith(customFunctionController, {
+      prefix: `${MOCKED_API_VERSION}/app/:appId/auth/providers/custom-function`
+    })
   })
 
   it('should handle errors in the catch block', async () => {
     const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {})
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
 
     await registerPlugins({
       register: errorMock,
@@ -67,5 +81,6 @@ describe('registerPlugins', () => {
       'Plugin registration failed'
     )
     errorLog.mockRestore()
+    logSpy.mockRestore()
   })
 })

@@ -1,0 +1,76 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "projects",
+  "filters": [
+    {
+      "name": "adminAccess",
+      "apply_when": {
+        "%%user.custom_data.role": "admin"
+      },
+      "query": {}
+    },
+    {
+      "name": "ownerAccess",
+      "apply_when": {
+        "ownerId": "%%user.id"
+      },
+      "query": {
+        "ownerId": "%%user.id"
+      },
+      "projection": {
+        "name": 1,
+        "ownerId": 1,
+        "summary": 1
+      }
+    }
+  ],
+  "roles": [
+    {
+      "name": "projectOwner",
+      "apply_when": {
+        "ownerId": "%%user.id"
+      },
+      "insert": true,
+      "delete": false,
+      "search": true,
+      "read": true,
+      "write": {
+        "%%true": {
+          "%function": {
+            "arguments": ["%%root"],
+            "name": "isAuthorizedUser"
+          }
+        }
+      },
+      "fields": {
+        "secretNotes": {
+          "read": false,
+          "write": false
+        }
+      },
+      "additional_fields": {
+        "internalCode": {
+          "read": false,
+          "write": false
+        }
+      }
+    },
+    {
+      "name": "projectAdmin",
+      "apply_when": {
+        "%%user.custom_data.role": "admin"
+      },
+      "insert": true,
+      "delete": true,
+      "search": true,
+      "read": true,
+      "write": true,
+      "fields": {
+        "secretNotes": {
+          "read": true,
+          "write": true
+        }
+      }
+    }
+  ]
+}
