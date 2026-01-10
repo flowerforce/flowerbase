@@ -1008,12 +1008,13 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('gestisce il reset password tramite reset/send e confirm reset', async () => {
+    const requestedPassword = 'request-pass-1'
+    const newPassword = 'new-pass-1'
     const resetCall = await appInstance!.inject({
       method: 'POST',
       url: `${AUTH_BASE_URL}/reset/send`,
       payload: {
-        email: 'auth-owner@example.com',
-        password: 'new-pass-1'
+        email: 'auth-owner@example.com'
       }
     })
     expect(resetCall.statusCode).toBe(200)
@@ -1028,7 +1029,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       method: 'POST',
       url: `${AUTH_BASE_URL}/reset`,
       payload: {
-        password: 'new-pass-1',
+        password: newPassword,
         token: resetRequest?.token,
         tokenId: resetRequest?.tokenId
       }
@@ -1040,7 +1041,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       url: `${AUTH_BASE_URL}/login`,
       payload: {
         username: 'auth-owner@example.com',
-        password: 'new-pass-1'
+        password: newPassword
       }
     })
     expect(login.statusCode).toBe(200)
@@ -1073,12 +1074,14 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     })
     expect(loginOld.statusCode).toBe(200)
 
+    const requestedPassword = 'request-pass-2'
     const resetCall = await appInstance!.inject({
       method: 'POST',
-      url: `${AUTH_BASE_URL}/reset/send`,
+      url: `${AUTH_BASE_URL}/reset/call`,
       payload: {
         email,
-        password: newPassword
+        password: requestedPassword,
+        arguments: []
       }
     })
     expect(resetCall.statusCode).toBe(200)
