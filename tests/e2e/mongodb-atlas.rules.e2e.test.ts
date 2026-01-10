@@ -136,7 +136,14 @@ const callServiceOperation = async ({
   pipeline
 }: {
   collection: string
-  method: 'find' | 'findOne' | 'deleteOne' | 'insertOne' | 'updateOne' | 'aggregate'
+  method:
+    | 'find'
+    | 'findOne'
+    | 'deleteOne'
+    | 'deleteMany'
+    | 'insertOne'
+    | 'updateOne'
+    | 'aggregate'
   user: TestUser | null
   query?: Document
   update?: Document
@@ -199,7 +206,9 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
   insertOne: (document: Document) => callServiceOperation({ collection, method: 'insertOne', user, document }),
   updateOne: (query: Document, update: Document) =>
     callServiceOperation({ collection, method: 'updateOne', user, query, update }),
-  deleteOne: (query: Document) => callServiceOperation({ collection, method: 'deleteOne', user, query })
+  deleteOne: (query: Document) => callServiceOperation({ collection, method: 'deleteOne', user, query }),
+  deleteMany: (query: Document = {}) =>
+    callServiceOperation({ collection, method: 'deleteMany', user, query }),
 })
 
 const getTodosCollection = (user: TestUser | null) => createCollectionProxy(TODO_COLLECTION, user)
@@ -634,6 +643,66 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(summary[0]).toEqual({ _id: ownerUser.id, count: 2 })
   })
 
+  it('blocca le pipeline con stage non permessi nelle aggregate', async () => {
+    const pipeline: Document[] = [
+      {
+        $out: 'forbidden'
+      }
+    ]
+
+    await expect(
+      getTodosCollection(ownerUser).aggregate(pipeline).toArray()
+    ).rejects.toThrow('Stage $out is not allowed in client aggregate pipelines')
+  })
+
+  it('richiede una pipeline per unionWith nelle aggregate client', async () => {
+    const pipeline: Document[] = [
+      {
+        $unionWith: 'projects'
+      }
+    ]
+
+    await expect(
+      getTodosCollection(ownerUser).aggregate(pipeline).toArray()
+    ).rejects.toThrow('$unionWith must provide a pipeline when called from the client')
+  })
+
+  it('applica i filtri anche nelle aggregazioni activityLogs per utenti non admin', async () => {
+    const pipeline: Document[] = [
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]
+
+    const summary = (await getActivityLogsCollection(ownerUser)
+      .aggregate(pipeline)
+      .toArray()) as Array<{ _id: string; count: number }>
+
+    expect(summary).toHaveLength(1)
+    expect(summary[0]._id).toBe('active')
+  })
+
+  it('consente agli admin di aggregare tutti gli activityLogs', async () => {
+    const pipeline: Document[] = [
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]
+
+    const summary = (await getActivityLogsCollection(adminUser)
+      .aggregate(pipeline)
+      .toArray()) as Array<{ _id: string; count: number }>
+
+    const statuses = summary.map((item) => item._id).sort()
+    expect(statuses).toEqual(['active', 'inactive'])
+  })
+
   it('prevents deleting todos that do not belong to the user', async () => {
     await expect(
       getTodosCollection(ownerUser).deleteOne({ _id: todoIds.otherUser })
@@ -643,6 +712,34 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   it('allows deleting owned todos', async () => {
     const deleteResult = (await getTodosCollection(ownerUser).deleteOne({
       _id: todoIds.ownerFirst
+    })) as DeleteResult
+    expect(deleteResult.deletedCount).toBe(1)
+  })
+
+  it('consente agli utenti di cancellare solo i propri todo con deleteMany', async () => {
+    const deleteResult = (await getTodosCollection(ownerUser).deleteMany({})) as DeleteResult
+    expect(deleteResult.deletedCount).toBe(2)
+
+    const remainingOwner = (await getTodosCollection(ownerUser).find({}).toArray()) as TodoDoc[]
+    expect(remainingOwner).toHaveLength(0)
+
+    const remainingGuest = (await getTodosCollection(guestUser).find({}).toArray()) as TodoDoc[]
+    expect(remainingGuest).toHaveLength(1)
+  })
+
+  it('non cancella documenti altrui con deleteMany', async () => {
+    const deleteResult = (await getTodosCollection(ownerUser).deleteMany({
+      userId: guestUser.id
+    })) as DeleteResult
+    expect(deleteResult.deletedCount).toBe(0)
+
+    const remainingOwner = (await getTodosCollection(ownerUser).find({}).toArray()) as TodoDoc[]
+    expect(remainingOwner).toHaveLength(2)
+  })
+
+  it('consente al guest di cancellare il proprio todo con deleteOne', async () => {
+    const deleteResult = (await getTodosCollection(guestUser).deleteOne({
+      _id: todoIds.otherUser
     })) as DeleteResult
     expect(deleteResult.deletedCount).toBe(1)
   })
