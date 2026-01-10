@@ -17,6 +17,7 @@ const USER_COLLECTION = 'users'
 const ACTIVITIES_COLLECTION = 'activities'
 const COUNTERS_COLLECTION = 'counters'
 const AUTH_USERS_COLLECTION = 'auth_users'
+const RESET_PASSWORD_COLLECTION = 'reset-password-requests'
 const MANAGE_REPLICA_SET = process.env.MANAGE_REPLICA_SET === 'true'
 const REPLICA_SET_NAME = process.env.REPLICA_SET_NAME ?? 'rs0'
 const REPLICA_SET_HOST = process.env.REPLICA_SET_HOST ?? 'mongo:27017'
@@ -109,6 +110,7 @@ const adminUser: TestUser = {
 const TRIGGER_EVENTS_COLLECTION = 'triggerEvents'
 const PROJECT_ID = 'flowerbase-e2e'
 const FUNCTION_CALL_URL = `${API_VERSION}/app/${PROJECT_ID}/functions/call`
+const AUTH_BASE_URL = `${API_VERSION}/app/${PROJECT_ID}/auth/providers/local-userpass`
 const TOKEN_MAP: Record<string, string> = {}
 
 const serializeValue = (value: unknown) => {
@@ -137,13 +139,13 @@ const callServiceOperation = async ({
 }: {
   collection: string
   method:
-    | 'find'
-    | 'findOne'
-    | 'deleteOne'
-    | 'deleteMany'
-    | 'insertOne'
-    | 'updateOne'
-    | 'aggregate'
+  | 'find'
+  | 'findOne'
+  | 'deleteOne'
+  | 'deleteMany'
+  | 'insertOne'
+  | 'updateOne'
+  | 'aggregate'
   user: TestUser | null
   query?: Document
   update?: Document
@@ -971,6 +973,152 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       workspace: 'workspace-1',
       source: 'api_checkWorkspace'
     })
+  })
+
+  it('permette registrazione e login tramite local-userpass', async () => {
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email: 'new-user@example.com',
+        password: 'new-user-pass'
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+    const registrationBody = registration.json() as { userId?: string }
+    expect(registrationBody.userId).toBeDefined()
+
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: 'auth-owner@example.com',
+        password: 'top-secret'
+      }
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as {
+      access_token?: string
+      refresh_token?: string
+      user_id?: string
+    }
+    expect(loginBody.access_token).toBeDefined()
+    expect(loginBody.refresh_token).toBeDefined()
+    expect(loginBody.user_id).toBe(authUserIds.owner.toString())
+  })
+
+  it('gestisce il reset password tramite reset/send e confirm reset', async () => {
+    const resetCall = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/reset/send`,
+      payload: {
+        email: 'auth-owner@example.com',
+        password: 'new-pass-1'
+      }
+    })
+    expect(resetCall.statusCode).toBe(200)
+
+    const resetRequest = await client
+      .db(DB_NAME)
+      .collection(RESET_PASSWORD_COLLECTION)
+      .findOne({ email: 'auth-owner@example.com' })
+    expect(resetRequest).toBeDefined()
+
+    const confirmReset = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/reset`,
+      payload: {
+        password: 'new-pass-1',
+        token: resetRequest?.token,
+        tokenId: resetRequest?.tokenId
+      }
+    })
+    expect(confirmReset.statusCode).toBe(200)
+
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: 'auth-owner@example.com',
+        password: 'new-pass-1'
+      }
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as { access_token?: string }
+    expect(loginBody.access_token).toBeDefined()
+  })
+
+  it('consente di cambiare password e invalida la vecchia', async () => {
+    const email = 'change-pass@example.com'
+    const oldPassword = 'old-pass-1'
+    const newPassword = 'new-pass-2'
+
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email,
+        password: oldPassword
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+
+    const loginOld = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: email,
+        password: oldPassword
+      }
+    })
+    expect(loginOld.statusCode).toBe(200)
+
+    const resetCall = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/reset/send`,
+      payload: {
+        email,
+        password: newPassword
+      }
+    })
+    expect(resetCall.statusCode).toBe(200)
+
+    const resetRequest = await client
+      .db(DB_NAME)
+      .collection(RESET_PASSWORD_COLLECTION)
+      .findOne({ email })
+    expect(resetRequest).toBeDefined()
+
+    const confirmReset = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/reset`,
+      payload: {
+        password: newPassword,
+        token: resetRequest?.token,
+        tokenId: resetRequest?.tokenId
+      }
+    })
+    expect(confirmReset.statusCode).toBe(200)
+
+    const loginOldAgain = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: email,
+        password: oldPassword
+      }
+    })
+    expect(loginOldAgain.statusCode).toBe(500)
+
+    const loginNew = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: email,
+        password: newPassword
+      }
+    })
+    expect(loginNew.statusCode).toBe(200)
   })
 
 
