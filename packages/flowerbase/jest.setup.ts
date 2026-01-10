@@ -2,7 +2,7 @@ import { Blob as NodeBlob } from 'buffer'
 import path from 'node:path'
 
 if (!process.env.FLOWERBASE_APP_PATH) {
-  process.env.FLOWERBASE_APP_PATH = path.resolve(__dirname, 'e2e/app')
+  process.env.FLOWERBASE_APP_PATH = path.resolve(__dirname, '../../tests/e2e/app')
 }
 
 const BaseBlob = typeof globalThis.Blob !== 'undefined' ? globalThis.Blob : NodeBlob

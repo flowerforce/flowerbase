@@ -55,8 +55,13 @@ export async function localUserPassController(app: FastifyInstance) {
 
       const result = await handleUserRegistration(app, { run_as_system: true, provider: PROVIDER.LOCAL_USERPASS })({ email: req.body.email.toLowerCase(), password: req.body.password })
 
+      if (!result?.insertedId) {
+        res?.status(500)
+        throw new Error('Failed to register user')
+      }
+
       res?.status(201)
-      return { userId: result?.insertedId.toString() }
+      return { userId: result.insertedId.toString() }
     }
   )
 

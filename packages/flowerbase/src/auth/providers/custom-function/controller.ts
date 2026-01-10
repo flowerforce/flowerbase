@@ -77,18 +77,21 @@ export async function customFunctionController(app: FastifyInstance) {
 
       if (res.id) {
         const user = await handleUserRegistration(app, { run_as_system: true, skipUserCheck: true, provider: PROVIDER.CUSTOM_FUNCTION })({ email: res.id, password: generatePassword() })
+        if (!user?.insertedId) {
+          throw new Error('Failed to register custom user')
+        }
 
         const currentUserData = {
           _id: user.insertedId,
           user_data: {
-            _id: user.insertedId,
+            _id: user.insertedId
           }
         }
         return {
           access_token: this.createAccessToken(currentUserData),
           refresh_token: this.createRefreshToken(currentUserData),
           device_id: '',
-          user_id: user.insertedId.toString(),
+          user_id: user.insertedId.toString()
         }
       }
 

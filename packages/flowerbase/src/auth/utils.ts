@@ -115,13 +115,16 @@ export interface CustomUserDataConfig {
   on_user_creation_function_name: string
 }
 
+const resolveAppPath = () =>
+  process.env.FLOWERBASE_APP_PATH ?? require.main?.path ?? process.cwd()
+
 
 /**
  * > Loads the auth config json file
  * @testable
  */
 export const loadAuthConfig = (): AuthConfig => {
-  const authPath = path.join(require.main!.path, 'auth/providers.json')
+  const authPath = path.join(resolveAppPath(), 'auth/providers.json')
   return JSON.parse(fs.readFileSync(authPath, 'utf-8'))
 }
 
@@ -130,7 +133,7 @@ export const loadAuthConfig = (): AuthConfig => {
  * @testable
  */
 export const loadCustomUserData = (): CustomUserDataConfig => {
-  const userDataPath = path.join(require.main!.path, 'auth/custom_user_data.json')
+  const userDataPath = path.join(resolveAppPath(), 'auth/custom_user_data.json')
   return JSON.parse(fs.readFileSync(userDataPath, 'utf-8'))
 }
 

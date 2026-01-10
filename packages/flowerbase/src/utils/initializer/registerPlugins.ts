@@ -56,6 +56,7 @@ export const registerPlugins = async ({
       } catch (e) {
         console.log('Registration FAILED --->', pluginName)
         console.log('Error --->', e)
+        throw e
       }
     })
   } catch (e) {
@@ -76,11 +77,16 @@ const getRegisterConfig = async ({
 }: Pick<RegisterPluginsParams, 'jwtSecret' | 'mongodbUrl' | 'functionsList' | 'corsConfig'>): Promise<
   RegisterConfig[]
 > => {
+  const corsOptions = corsConfig ?? {
+    origin: '*',
+    methods: ['POST', 'GET']
+  }
+
   return [
     {
       pluginName: 'cors',
       plugin: cors,
-      options: corsConfig
+      options: corsOptions
     },
     {
       pluginName: 'fastifyMongodb',

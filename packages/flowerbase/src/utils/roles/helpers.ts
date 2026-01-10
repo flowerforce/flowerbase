@@ -22,7 +22,7 @@ export const evaluateExpression = async (
     '%%true': true
   }
   const conditions = expandQuery(expression, value)
-  const complexCondition = Object.entries<Record<string, any>>(conditions).find(([key]) =>
+  const complexCondition = Object.entries(conditions as Record<string, any>).find(([key]) =>
     functionsConditions.includes(key)
   )
   return complexCondition
@@ -37,12 +37,29 @@ const evaluateComplexExpression = async (
 ) => {
   const [key, config] = condition
 
-  const { name } = config['%function']
+  const functionConfig = config['%function']
+  const { name, arguments: fnArguments } = functionConfig
   const functionsList = StateManager.select('functions')
   const app = StateManager.select('app')
   const currentFunction = functionsList[name]
+
+  const expansionContext = {
+    ...params.expansions,
+    ...params.cursor,
+    '%%root': params.cursor,
+    '%%user': user,
+    '%%true': true,
+    '%%false': false
+  }
+
+  const expandedArguments =
+    fnArguments && fnArguments.length
+      ? ((expandQuery({ args: fnArguments }, expansionContext) as { args: unknown[] })
+          .args ?? [])
+      : [params.cursor]
+
   const response = await GenerateContext({
-    args: [params.cursor],
+    args: expandedArguments,
     app,
     rules: StateManager.select("rules"),
     user,

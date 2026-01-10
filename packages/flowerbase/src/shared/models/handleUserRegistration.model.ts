@@ -1,5 +1,4 @@
 import { FastifyInstance } from "fastify/types/instance"
-import { InsertOneResult } from "mongodb/mongodb"
 import { User } from "../../auth/dtos"
 import { Rules } from "../../features/rules/interface"
 
@@ -16,10 +15,16 @@ export type Options = {
   run_as_system?: boolean
 }
 
+type RegistrationResult = {
+  insertedId?: {
+    toString: () => string
+  }
+}
+
 export type HandleUserRegistration = (
   app: FastifyInstance,
   opt: Options
-) => (params: RegistrationParams) => Promise<InsertOneResult<Document>>
+) => (params: RegistrationParams) => Promise<RegistrationResult>
 
 export enum PROVIDER {
   LOCAL_USERPASS = "local-userpass",

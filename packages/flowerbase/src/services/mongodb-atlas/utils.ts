@@ -37,7 +37,7 @@ export const getValidRule = <T extends Role | Filter>({
     // checkRule valuta se i campi del record soddisfano quella condizione. 
     // Quindi le regole vengono effettivamente rispettate.
     const valid = rulesMatcherUtils.checkRule(
-      conditions,
+      conditions as Parameters<typeof rulesMatcherUtils.checkRule>[0],
       {
         ...(record ?? {}),
         '%%user': user,
@@ -57,10 +57,16 @@ export const getFormattedQuery = (
 ) => {
   const preFilter = getValidRule({ filters, user })
   const isValidPreFilter = !!preFilter?.length
-  return [
-    isValidPreFilter && expandQuery(preFilter[0].query, { '%%user': user }),
-    query
-  ].filter(Boolean).filter(r => Object.keys(r).length > 0)
+  const formatted: FilterMongoDB<Document>[] = []
+  if (isValidPreFilter) {
+    formatted.push(
+      expandQuery(preFilter[0].query, { '%%user': user }) as FilterMongoDB<Document>
+    )
+  }
+  if (query && Object.keys(query).length > 0) {
+    formatted.push(query as FilterMongoDB<Document>)
+  }
+  return formatted
 }
 
 export const getFormattedProjection = (
@@ -108,6 +114,7 @@ export const applyAccessControlToPipeline = (
     if (stageName === STAGES_TO_SEARCH.LOOKUP) {
       const lookUpStage = value as LookupStage
       const currentCollection = lookUpStage.from
+      checkDenyOperation(rules as Rules, currentCollection, CRUD_OPERATIONS.READ)
       const lookupRules = rules[currentCollection] || {}
       const formattedQuery = getFormattedQuery(lookupRules.filters, {}, user)
       const projection = getFormattedProjection(lookupRules.filters)
@@ -142,6 +149,7 @@ export const applyAccessControlToPipeline = (
       const unionWithStage = value as UnionWithStage
       const isSimpleStage = typeof unionWithStage === 'string'
       const currentCollection = isSimpleStage ? unionWithStage : unionWithStage.coll
+      checkDenyOperation(rules as Rules, currentCollection, CRUD_OPERATIONS.READ)
       const unionRules = rules[currentCollection] || {}
       const formattedQuery = getFormattedQuery(unionRules.filters, {}, user)
       const projection = getFormattedProjection(unionRules.filters)

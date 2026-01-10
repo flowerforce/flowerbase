@@ -29,6 +29,7 @@ export type InitializeConfig = {
   port?: number
   host?: string
   corsConfig?: CorsConfig
+  basePath?: string
 }
 
 /**
@@ -45,25 +46,26 @@ export async function initialize({
   jwtSecret = DEFAULT_CONFIG.JWT_SECRET,
   port = DEFAULT_CONFIG.PORT,
   mongodbUrl = DEFAULT_CONFIG.MONGODB_URL,
-  corsConfig = DEFAULT_CONFIG.CORS_OPTIONS
+  corsConfig = DEFAULT_CONFIG.CORS_OPTIONS,
+  basePath
 }: InitializeConfig) {
+  const resolvedBasePath = basePath ?? require.main?.path ?? process.cwd()
   const fastify = Fastify({
     logger: !!DEFAULT_CONFIG.ENABLE_LOGGER
   })
 
-  const basePath = require.main?.path
-  console.log("BASE PATH", basePath)
+  console.log("BASE PATH", resolvedBasePath)
 
   console.log("CURRENT PORT", port)
   console.log("CURRENT HOST", host)
 
-  const functionsList = await loadFunctions(basePath)
+  const functionsList = await loadFunctions(resolvedBasePath)
   console.log("Functions LOADED")
-  const triggersList = await loadTriggers(basePath)
+  const triggersList = await loadTriggers(resolvedBasePath)
   console.log("Triggers LOADED")
-  const endpointsList = await loadEndpoints(basePath)
+  const endpointsList = await loadEndpoints(resolvedBasePath)
   console.log("Endpoints LOADED")
-  const rulesList = await loadRules(basePath)
+  const rulesList = await loadRules(resolvedBasePath)
   console.log("Rules LOADED")
 
   const stateConfig = {
