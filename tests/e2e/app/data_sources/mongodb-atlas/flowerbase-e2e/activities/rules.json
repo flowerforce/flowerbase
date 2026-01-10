@@ -1,0 +1,50 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "activities",
+  "filters": [
+    {
+      "name": "workspace visibility",
+      "apply_when": {
+        "%%true": true
+      },
+      "query": {
+        "$or": [
+          {
+            "ownerId": "%%user.id"
+          },
+          {
+            "visibility.type": {
+              "$ne": "onlyme"
+            }
+          }
+        ],
+        "workspace": {
+          "$in": "%%user.custom_data.workspaces"
+        }
+      }
+    }
+  ],
+  "roles": [
+    {
+      "name": "workspace members",
+      "apply_when": {
+        "workspace": {
+          "$in": "%%user.custom_data.workspaces"
+        }
+      },
+      "insert": true,
+      "delete": true,
+      "search": true,
+      "read": true,
+      "write": {
+        "%%true": {
+          "%function": {
+            "arguments": ["%%root"],
+            "name": "isAuthorizedUser"
+          }
+        }
+      },
+      "additional_fields": {}
+    }
+  ]
+}

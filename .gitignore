@@ -31,3 +31,4 @@ logs
 dist
 .nx/cache
 .nx/workspace-data
+.tsc-e2e

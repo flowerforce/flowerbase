@@ -316,3 +316,20 @@ This ensures isolation and allows access to useful resources during execution.
 - `context.http`: Ability to make outgoing HTTP requests  
 - `context.values`: Read application-wide configuration variables
 
+---
+
+## 🧪 End-to-end rule validation
+
+Le end-to-end risiedono in `tests/e2e` e vengono ora eseguite insieme agli unit test con `npm test`. Il root `jest.config.ts` contiene due progetti (`packages/flowerbase` + `tests`), perciò il comando fa partire:
+
+- le suite `packages/flowerbase/src/**` (unit)
+- i test `tests/e2e/**/*.test.ts` (E2E)
+
+Per gli E2E viene caricato automaticamente `.env.e2e` (se presente) tramite `dotenv`, quindi il file può contenere `DB_CONNECTION_STRING` e altre variabili custom. Se preferisci non salvare le credenziali nel repo, basta esportare `DB_CONNECTION_STRING` prima di `npm test`:
+
+```bash
+export DB_CONNECTION_STRING="mongodb+srv://user:pass@cluster.mongodb.net/dbname"
+npm test
+```
+
+In mancanza di un valore esplicito, il test fallirà perché il server remoto non sarà raggiungibile: assicurati che la stringa punti a un cluster che esegue le regole attese (per esempio `flowerbase-e2e`). Non serve più avviare Docker o Replica Set locali.

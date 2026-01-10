@@ -1,0 +1,78 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "counters",
+  "filters": [
+    {
+      "name": "adminAccess",
+      "apply_when": {
+        "%%user.custom_data.role": "admin"
+      },
+      "query": {}
+    },
+    {
+      "name": "visibility matrix",
+      "apply_when": {
+        "%%true": true
+      },
+      "query": {
+        "$or": [
+          {
+            "ownerId": "%%user.id"
+          },
+          {
+            "visibility.type": "all"
+          },
+          {
+            "visibility.users": {
+              "$in": [
+                "%%user.id"
+              ]
+            }
+          },
+          {
+            "$and": [
+              {
+                "workspace": {
+                  "$in": "%%user.custom_data.adminIn"
+                }
+              },
+              {
+                "visibility.type": {
+                  "$ne": "onlyme"
+                }
+              }
+            ]
+          }
+        ],
+        "workspace": {
+          "$in": "%%user.custom_data.workspaces"
+        }
+      }
+    }
+  ],
+  "roles": [
+    {
+      "name": "workspace counters",
+      "apply_when": {
+        "workspace": {
+          "$in": "%%user.custom_data.workspaces"
+        }
+      },
+      "insert": true,
+      "delete": true,
+      "search": true,
+      "read": true,
+      "write": {
+        "%%true": {
+          "%function": {
+            "arguments": [
+              "%%root"
+            ],
+            "name": "isAuthorizedAdmin"
+          }
+        }
+      },
+      "additional_fields": {}
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "users",
+  "filters": [
+    {
+      "name": "workspace or owner",
+      "query": {
+        "$or": [
+          {
+            "workspaces": {
+              "$in": "%%user.custom_data.workspaces"
+            }
+          },
+          {
+            "userId": "%%user.id"
+          }
+        ]
+      },
+      "apply_when": {}
+    }
+  ],
+  "roles": [
+    {
+      "name": "workspace members",
+      "apply_when": {
+        "%%true": true
+      },
+      "insert": false,
+      "delete": false,
+      "search": true,
+      "read": true,
+      "fields": {
+        "avatar": {
+          "write": {
+            "%%true": {
+              "%function": {
+                "arguments": ["%%root"],
+                "name": "isAuthorizedMyUser"
+              }
+            }
+          }
+        },
+        "name": {
+          "write": {
+            "%%true": {
+              "%function": {
+                "arguments": ["%%root"],
+                "name": "isAuthorizedMyUser"
+              }
+            }
+          }
+        },
+        "tags": {
+          "write": {
+            "%%true": {
+              "%function": {
+                "arguments": ["%%root"],
+                "name": "isAuthorizedMyUser"
+              }
+            }
+          }
+        },
+        "updatedAt": {
+          "write": {
+            "%%true": {
+              "%function": {
+                "arguments": ["%%root"],
+                "name": "isAuthorizedMyUser"
+              }
+            }
+          }
+        }
+      },
+      "additional_fields": {}
+    }
+  ]
+}
