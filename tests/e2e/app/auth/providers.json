@@ -10,10 +10,11 @@
     "disabled": false,
     "config": {
       "autoConfirm": true,
+      "resetFunctionName": "resetPasswordHandler",
       "resetPasswordSubject": "reset",
       "resetPasswordUrl": "http://localhost/reset",
       "runConfirmationFunction": false,
-      "runResetFunction": false,
+      "runResetFunction": true,
       "mailConfig": {
         "from": "no-reply@example.com",
         "subject": "Password Reset",

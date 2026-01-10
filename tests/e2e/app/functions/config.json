@@ -24,5 +24,10 @@
     "name": "api_checkWorkspace",
     "private": false,
     "run_as_system": false
+  },
+  {
+    "name": "resetPasswordHandler",
+    "private": false,
+    "run_as_system": true
   }
 ]
