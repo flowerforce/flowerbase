@@ -36,6 +36,6 @@ export const comparePassword = async (plaintext: string, storedPassword: string)
  * > Generate a random token
  * @param length -> the token length
  */
-export const generateToken = (length = 32) => {
+export const generateToken = (length = 64) => {
   return crypto.randomBytes(length).toString('hex')
 }

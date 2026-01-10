@@ -14,13 +14,15 @@ import {
   getMailConfig,
   LOGIN_SCHEMA,
   REGISTRATION_SCHEMA,
-  RESET_SCHEMA
+  RESET_CALL_SCHEMA,
+  RESET_SEND_SCHEMA
 } from '../../utils'
 import {
   ConfirmResetPasswordDto,
   LoginDto,
   RegistrationDto,
-  ResetPasswordDto
+  ResetPasswordCallDto,
+  ResetPasswordSendDto
 } from './dtos'
 /**
  * Controller for handling local user registration and login.
@@ -37,6 +39,66 @@ export async function localUserPassController(app: FastifyInstance) {
     on_user_creation_function_name
   } = AUTH_CONFIG
   const db = app.mongo.client.db(DB_NAME)
+  const handleResetPasswordRequest = async (
+    email: string,
+    password?: string,
+    extraArguments?: unknown[]
+  ) => {
+    const { resetPasswordCollection, resetPasswordConfig } = AUTH_CONFIG
+    const authUser = await db.collection(authCollection!).findOne({
+      email
+    })
+
+    if (!authUser) {
+      throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
+    }
+
+    const token = generateToken()
+    const tokenId = generateToken()
+
+    await db
+      ?.collection(resetPasswordCollection)
+      .updateOne(
+        { email },
+        { $set: { token, tokenId, email, createdAt: new Date() } },
+        { upsert: true }
+      )
+
+    if (resetPasswordConfig.runResetFunction && resetPasswordConfig.resetFunctionName) {
+      const functionsList = StateManager.select('functions')
+      const services = StateManager.select('services')
+      const currentFunction = functionsList[resetPasswordConfig.resetFunctionName]
+      const baseArgs = { token, tokenId, email, password }
+      const args = Array.isArray(extraArguments) ? [baseArgs, ...extraArguments] : [baseArgs]
+      await GenerateContext({
+        args,
+        app,
+        rules: {},
+        user: {},
+        currentFunction,
+        functionsList,
+        services
+      })
+      return
+    }
+
+    try {
+      const { from, subject, mailToken, body } = getMailConfig(
+        resetPasswordConfig,
+        token,
+        tokenId
+      )
+      sendGrid.setApiKey(mailToken)
+      await sendGrid.send({
+        to: email,
+        from,
+        subject,
+        html: body
+      })
+    } catch (error) {
+      console.log("Error send mail reset:", error)
+    }
+  }
 
   /**
    * Endpoint for user registration.
@@ -158,65 +220,31 @@ export async function localUserPassController(app: FastifyInstance) {
   /**
    * Endpoint for reset password.
    *
-   * @route {POST} /reset/call
+   * @route {POST} /reset/send
    * @param {ResetPasswordDto} req - The request object with th reset request.
    * @returns {Promise<void>}
    */
-  app.post<ResetPasswordDto>(
+  app.post<ResetPasswordSendDto>(
     AUTH_ENDPOINTS.RESET,
     {
-      schema: RESET_SCHEMA
+      schema: RESET_SEND_SCHEMA
     },
     async function (req) {
-      const { resetPasswordCollection, resetPasswordConfig } = AUTH_CONFIG
-      const email = req.body.email
-      const authUser = await db.collection(authCollection!).findOne({
-        email
-      })
+      await handleResetPasswordRequest(req.body.email)
+    }
+  )
 
-      if (!authUser) {
-        throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
-      }
-
-      const token = generateToken()
-      const tokenId = generateToken()
-
-      await db
-        ?.collection(resetPasswordCollection)
-        .updateOne(
-          { email },
-          { $set: { token, tokenId, email, createdAt: new Date() } },
-          { upsert: true }
-        )
-
-      if (resetPasswordConfig.runResetFunction && resetPasswordConfig.resetFunctionName) {
-        const functionsList = StateManager.select('functions')
-        const services = StateManager.select('services')
-        const currentFunction = functionsList[resetPasswordConfig.resetFunctionName]
-        await GenerateContext({
-          args: [{ token, tokenId, email }],
-          app,
-          rules: {},
-          user: {},
-          currentFunction,
-          functionsList,
-          services
-        })
-        return
-      }
-
-      const { from, subject, mailToken, body } = getMailConfig(
-        resetPasswordConfig,
-        token,
-        tokenId
+  app.post<ResetPasswordCallDto>(
+    AUTH_ENDPOINTS.RESET_CALL,
+    {
+      schema: RESET_CALL_SCHEMA
+    },
+    async function (req) {
+      await handleResetPasswordRequest(
+        req.body.email,
+        req.body.password,
+        req.body.arguments
       )
-      sendGrid.setApiKey(mailToken)
-      await sendGrid.send({
-        to: email,
-        from,
-        subject,
-        html: body
-      })
     }
   )
 

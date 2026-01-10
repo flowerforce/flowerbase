@@ -24,10 +24,17 @@ export interface LoginDto {
   Reply: LoginSuccessDto
 }
 
-export interface ResetPasswordDto {
+export interface ResetPasswordSendDto {
+  Body: {
+    email: string
+  }
+}
+
+export interface ResetPasswordCallDto {
   Body: {
     email: string
     password: string
+    arguments?: unknown[]
   }
 }
 

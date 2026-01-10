@@ -15,12 +15,23 @@ export const LOGIN_SCHEMA = {
   }
 }
 
-export const RESET_SCHEMA = {
+export const RESET_SEND_SCHEMA = {
+  body: {
+    type: 'object',
+    properties: {
+      email: { type: 'string' }
+    },
+    required: ['email']
+  }
+}
+
+export const RESET_CALL_SCHEMA = {
   body: {
     type: 'object',
     properties: {
       email: { type: 'string' },
-      password: { type: 'string' }
+      password: { type: 'string' },
+      arguments: { type: 'array' }
     },
     required: ['email', 'password']
   }
@@ -37,6 +48,8 @@ export const CONFIRM_RESET_SCHEMA = {
     required: ['password', 'token', 'tokenId']
   }
 }
+
+export const RESET_SCHEMA = RESET_SEND_SCHEMA
 
 export const REGISTRATION_SCHEMA = {
   body: {
@@ -55,6 +68,7 @@ export enum AUTH_ENDPOINTS {
   PROFILE = '/profile',
   SESSION = '/session',
   RESET = '/reset/send',
+  RESET_CALL = '/reset/call',
   CONFIRM_RESET = "/reset",
   FIRST_USER = '/setup/first-user'
 }
