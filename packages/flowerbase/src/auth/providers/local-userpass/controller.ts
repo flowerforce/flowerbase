@@ -294,7 +294,12 @@ export async function localUserPassController(app: FastifyInstance) {
     {
       schema: CONFIRM_RESET_SCHEMA
     },
-    async function (req) {
+    async function (req, res) {
+      const key = `reset-confirm:${req.ip}`
+      if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
+        res.status(429)
+        return { message: 'Too many requests' }
+      }
       const { token, tokenId, password } = req.body
 
       const resetRequest = await db
