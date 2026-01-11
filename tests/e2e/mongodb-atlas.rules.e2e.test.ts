@@ -586,7 +586,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     await resetCollections()
   })
 
-  it('richiede l\'autenticazione per accedere ai servizi MongoDB', async () => {
+  it('requires authentication to access MongoDB services', async () => {
     await expect(getTodosCollection(null).find({}).toArray()).rejects.toThrow()
   })
 
@@ -626,7 +626,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(inserted?.userId).toBe(ownerUser.id)
   })
 
-  it('applica i filtri anche alle aggregazioni', async () => {
+  it('applies filters to aggregations as well', async () => {
     const pipeline: Document[] = [
       {
         $group: {
@@ -645,7 +645,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(summary[0]).toEqual({ _id: ownerUser.id, count: 2 })
   })
 
-  it('blocca le pipeline con stage non permessi nelle aggregate', async () => {
+  it('blocks pipelines with disallowed stages in aggregates', async () => {
     const pipeline: Document[] = [
       {
         $out: 'forbidden'
@@ -657,7 +657,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     ).rejects.toThrow('Stage $out is not allowed in client aggregate pipelines')
   })
 
-  it('richiede una pipeline per unionWith nelle aggregate client', async () => {
+  it('requires a pipeline for unionWith in client aggregates', async () => {
     const pipeline: Document[] = [
       {
         $unionWith: 'projects'
@@ -669,7 +669,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     ).rejects.toThrow('$unionWith must provide a pipeline when called from the client')
   })
 
-  it('applica i filtri anche nelle aggregazioni activityLogs per utenti non admin', async () => {
+  it('applies filters in activityLogs aggregations for non-admin users', async () => {
     const pipeline: Document[] = [
       {
         $group: {
@@ -687,7 +687,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(summary[0]._id).toBe('active')
   })
 
-  it('consente agli admin di aggregare tutti gli activityLogs', async () => {
+  it('allows admins to aggregate all activityLogs', async () => {
     const pipeline: Document[] = [
       {
         $group: {
@@ -718,7 +718,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(deleteResult.deletedCount).toBe(1)
   })
 
-  it('consente agli utenti di cancellare solo i propri todo con deleteMany', async () => {
+  it('allows users to delete only their own todos with deleteMany', async () => {
     const deleteResult = (await getTodosCollection(ownerUser).deleteMany({})) as DeleteResult
     expect(deleteResult.deletedCount).toBe(2)
 
@@ -729,7 +729,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(remainingGuest).toHaveLength(1)
   })
 
-  it('non cancella documenti altrui con deleteMany', async () => {
+  it('does not delete others\' documents with deleteMany', async () => {
     const deleteResult = (await getTodosCollection(ownerUser).deleteMany({
       userId: guestUser.id
     })) as DeleteResult
@@ -739,14 +739,14 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(remainingOwner).toHaveLength(2)
   })
 
-  it('consente al guest di cancellare il proprio todo con deleteOne', async () => {
+  it('allows guests to delete their own todo with deleteOne', async () => {
     const deleteResult = (await getTodosCollection(guestUser).deleteOne({
       _id: todoIds.otherUser
     })) as DeleteResult
     expect(deleteResult.deletedCount).toBe(1)
   })
 
-  it('limita i profili ai workspace condivisi', async () => {
+  it('limits profiles to shared workspaces', async () => {
     const ownerUsers = (await getUsersCollection(ownerUser).find({}).toArray()) as UserDoc[]
     expect(ownerUsers).toHaveLength(1)
     expect(ownerUsers[0].workspaces).toContain('workspace-1')
@@ -761,7 +761,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(adminUsers).toHaveLength(2)
   })
 
-  it('consente di aggiornare il profilo solo al proprietario', async () => {
+  it('allows profile updates only for the owner', async () => {
     const updatedName = 'Owner updated'
     const updateResult = await getUsersCollection(ownerUser).updateOne(
       { _id: userIds.owner },
@@ -779,13 +779,13 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     ).rejects.toThrow('Update not permitted')
   })
 
-  it('blocca l\'accesso alla collection auth_users senza regole', async () => {
+  it('blocks access to auth_users collection without rules', async () => {
     await expect(getAuthUsersCollection(ownerUser).find({}).toArray()).rejects.toThrow(
       'READ FORBIDDEN!'
     )
   })
 
-  it('blocca gli inserimenti su auth_users senza regole', async () => {
+  it('blocks inserts into auth_users without rules', async () => {
     await expect(
       getAuthUsersCollection(ownerUser).insertOne({
         userId: ownerUser.id,
@@ -861,7 +861,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     ).rejects.toThrow('Insert not permitted')
   })
 
-  it('rispetta i filtri workspace/visibility per le attività', async () => {
+  it('respects workspace/visibility filters for activities', async () => {
     const ownerActivities = (await getActivitiesCollection(ownerUser).find({}).toArray()) as ActivityDoc[]
     expect(ownerActivities).toHaveLength(2)
     expect(ownerActivities.every((activity) => activity.workspace === 'workspace-1')).toBe(true)
@@ -871,7 +871,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(guestActivities[0].workspace).toBe('workspace-2')
   })
 
-  it('limita la scrittura delle attività a proprietario o admin', async () => {
+  it('restricts activity writes to owner or admin', async () => {
     const newTitle = 'Updated private activity'
     const updateResult = await getActivitiesCollection(ownerUser).updateOne(
       { _id: activityIds.ownerPrivate },
@@ -903,7 +903,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(adminActivity?.title).toBe('Admin changed')
   })
 
-  it('applica i filtri complessi di visibilità sui contatori', async () => {
+  it('applies complex visibility filters on counters', async () => {
     const ownerCounters = (await getCountersCollection(ownerUser).find({}).toArray()) as CounterDoc[]
     expect(ownerCounters).toHaveLength(3)
     expect(ownerCounters.every((counter) => counter.workspace === 'workspace-1')).toBe(true)
@@ -916,7 +916,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(adminCounters).toHaveLength(4)
   })
 
-  it('richiede privilegi admin per modificare contatori protetti', async () => {
+  it('requires admin privileges to modify protected counters', async () => {
     const ownerUpdate = await getCountersCollection(ownerUser).updateOne(
       { _id: counterIds.adminOnly },
       { $set: { value: 450 } }
@@ -944,7 +944,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(adminCounter?.value).toBe(500)
   })
 
-  it('attiva il trigger sullo stream di activityLogs e salva il log', async () => {
+  it('triggers activityLogs stream and saves the log', async () => {
     const newActivityId = new ObjectId()
     await getActivityLogsCollection(adminUser).insertOne({
       _id: newActivityId,
@@ -962,7 +962,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(recorded?.documentId).toBe(newActivityId.toString())
   })
 
-  it('esegue direttamente la function logTriggerEvent', async () => {
+  it('executes logTriggerEvent function directly', async () => {
     const changeEventId = new ObjectId()
     const token = getTokenFor(adminUser)
     expect(token).toBeDefined()
@@ -1012,7 +1012,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     })
   })
 
-  it('blocca la function impostata come private quando viene chiamata via API', async () => {
+  it('blocks private function when invoked via API', async () => {
     const token = getTokenFor(ownerUser)
     expect(token).toBeDefined()
 
@@ -1033,7 +1033,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(body.message).toBe('Function "privateEcho" is private')
   })
 
-  it('permette alla function run_as_system di leggere tutti gli utenti', async () => {
+  it('allows run_as_system function to read all users', async () => {
     const token = getTokenFor(adminUser)
     expect(token).toBeDefined()
 
@@ -1059,7 +1059,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     ])
   })
 
-  it('blocca la function run_as_system false su auth_users', async () => {
+  it('blocks run_as_system=false function from accessing auth_users', async () => {
     const token = getTokenFor(ownerUser)
     expect(token).toBeDefined()
 
@@ -1080,7 +1080,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(body.message).toBe('READ FORBIDDEN!')
   })
 
-  it('espone il nuovo endpoint API tramite la funzione dedicata', async () => {
+  it('exposes the new API endpoint through the dedicated function', async () => {
     const response = await appInstance!.inject({
       method: 'GET',
       url: `/app/${PROJECT_ID}/endpoint/api/checkWorkspace?workspace=workspace-1`
@@ -1093,7 +1093,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     })
   })
 
-  it('permette registrazione e login tramite local-userpass', async () => {
+  it('allows registration and login via local-userpass', async () => {
     const registration = await appInstance!.inject({
       method: 'POST',
       url: `${AUTH_BASE_URL}/register`,
@@ -1125,7 +1125,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(loginBody.user_id).toBe(authUserIds.owner.toString())
   })
 
-  it('rigetta la registrazione quando l\'email è già usata', async () => {
+  it('rejects registration when the email is already used', async () => {
     const payload = {
       email: 'duplicate@example.com',
       password: 'dup-pass'
@@ -1148,7 +1148,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(body.message).toBe('This email address is already used')
   })
 
-  it('gestisce il reset password tramite reset/send e confirm reset', async () => {
+  it('handles password reset via reset/send and confirm reset', async () => {
     const requestedPassword = 'request-pass-1'
     const newPassword = 'new-pass-1'
     const resetCall = await appInstance!.inject({
@@ -1190,7 +1190,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(loginBody.access_token).toBeDefined()
   })
 
-  it('consente di cambiare password e invalida la vecchia', async () => {
+  it('allows password changes and invalidates the old password', async () => {
     const email = 'change-pass@example.com'
     const oldPassword = 'old-pass-1'
     const newPassword = 'new-pass-2'
@@ -1265,7 +1265,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(loginNew.statusCode).toBe(200)
   })
 
-  it('rigetta il login con credenziali invalide', async () => {
+  it('rejects login with invalid credentials', async () => {
     const response = await appInstance!.inject({
       method: 'POST',
       url: `${AUTH_BASE_URL}/login`,
@@ -1280,7 +1280,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(body.message).toBe('Invalid credentials')
   })
 
-  it('blocca la richiesta di reset password per email non registrata', async () => {
+  it('blocks password reset requests for unregistered emails', async () => {
     const response = await appInstance!.inject({
       method: 'POST',
       url: `${AUTH_BASE_URL}/reset/send`,
@@ -1294,7 +1294,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(body.message).toBe('Invalid credentials')
   })
 
-  it('blocca la conferma reset senza token valido', async () => {
+  it('blocks reset confirmation without a valid token', async () => {
     const response = await appInstance!.inject({
       method: 'POST',
       url: `${AUTH_BASE_URL}/reset`,
@@ -1311,12 +1311,12 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   // CUSTOM TESTS
-  it('Provo a leggere da auth_users', async () => {
+  it('tries to read from auth_users', async () => {
     const res = getAuthUsersCollection(ownerUser).find({}).toArray()
     await expect(res).rejects.toThrow('READ FORBIDDEN!')
   })
 
-  it('Provo a leggere da auth_users passando da un lookup', async () => {
+  it('tries to read from auth_users via a lookup', async () => {
     const pipeline: Document[] = [
       {
         $lookup: {
@@ -1333,7 +1333,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     ).rejects.toThrow('READ FORBIDDEN!')
   })
 
-  it('blocca unionWith verso auth_users', async () => {
+  it('blocks unionWith to auth_users', async () => {
     const pipeline: Document[] = [
       {
         $unionWith: {
@@ -1354,7 +1354,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     ).rejects.toThrow('READ FORBIDDEN!')
   })
 
-  it('blocca lookup in facet verso auth_users', async () => {
+  it('blocks facet lookup to auth_users', async () => {
     const pipeline: Document[] = [
       {
         $facet: {
@@ -1383,7 +1383,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     ).rejects.toThrow('READ FORBIDDEN!')
   })
 
-  it('filtra i campi sensibili nelle lookup aggregate', async () => {
+  it('filters sensitive fields in aggregate lookups', async () => {
     const pipeline: Document[] = [
       {
         $match: {
