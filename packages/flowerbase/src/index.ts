@@ -94,7 +94,33 @@ export async function initialize({
       deepLinking: false
     },
     uiHooks: {
-      onRequest: function (request, reply, next) { next() },
+      onRequest: function (request, reply, next) {
+        const swaggerUser = DEFAULT_CONFIG.SWAGGER_UI_USER
+        const swaggerPassword = DEFAULT_CONFIG.SWAGGER_UI_PASSWORD
+        if (!swaggerUser && !swaggerPassword) {
+          next()
+          return
+        }
+        const authHeader = request.headers.authorization
+        if (!authHeader || !authHeader.startsWith('Basic ')) {
+          reply
+            .code(401)
+            .header('WWW-Authenticate', 'Basic realm="Swagger UI"')
+            .send({ message: 'Unauthorized' })
+          return
+        }
+        const encoded = authHeader.slice('Basic '.length)
+        const decoded = Buffer.from(encoded, 'base64').toString('utf8')
+        const [user, pass] = decoded.split(':')
+        if (user !== swaggerUser || pass !== swaggerPassword) {
+          reply
+            .code(401)
+            .header('WWW-Authenticate', 'Basic realm="Swagger UI"')
+            .send({ message: 'Unauthorized' })
+          return
+        }
+        next()
+      },
       preHandler: function (request, reply, next) { next() }
     },
     staticCSP: true,
