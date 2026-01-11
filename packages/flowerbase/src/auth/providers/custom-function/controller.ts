@@ -53,6 +53,7 @@ export async function customFunctionController(app: FastifyInstance) {
         id
       } = req
 
+      type CustomFunctionAuthResult = { id?: string }
       const res = await GenerateContext({
         args: [
           req.body
@@ -72,7 +73,7 @@ export async function customFunctionController(app: FastifyInstance) {
           ip,
           id
         }
-      })
+      }) as CustomFunctionAuthResult
 
 
       if (res.id) {
