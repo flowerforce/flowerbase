@@ -8,8 +8,13 @@ export const LOGIN_SCHEMA = {
   body: {
     type: 'object',
     properties: {
-      username: { type: 'string' },
-      password: { type: 'string' }
+      username: {
+        type: 'string',
+        pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
+        minLength: 3,
+        maxLength: 254
+      },
+      password: { type: 'string', minLength: 8, maxLength: 128 }
     },
     required: ['username', 'password']
   }
@@ -19,7 +24,12 @@ export const RESET_SEND_SCHEMA = {
   body: {
     type: 'object',
     properties: {
-      email: { type: 'string' }
+      email: {
+        type: 'string',
+        pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
+        minLength: 3,
+        maxLength: 254
+      }
     },
     required: ['email']
   }
@@ -29,8 +39,13 @@ export const RESET_CALL_SCHEMA = {
   body: {
     type: 'object',
     properties: {
-      email: { type: 'string' },
-      password: { type: 'string' },
+      email: {
+        type: 'string',
+        pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
+        minLength: 3,
+        maxLength: 254
+      },
+      password: { type: 'string', minLength: 8, maxLength: 128 },
       arguments: { type: 'array' }
     },
     required: ['email', 'password']
@@ -41,7 +56,7 @@ export const CONFIRM_RESET_SCHEMA = {
   body: {
     type: 'object',
     properties: {
-      password: { type: 'string' },
+      password: { type: 'string', minLength: 8, maxLength: 128 },
       token: { type: 'string' },
       tokenId: { type: 'string' }
     },
@@ -55,8 +70,13 @@ export const REGISTRATION_SCHEMA = {
   body: {
     type: 'object',
     properties: {
-      email: { type: 'string' },
-      password: { type: 'string' }
+      email: {
+        type: 'string',
+        pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
+        minLength: 3,
+        maxLength: 254
+      },
+      password: { type: 'string', minLength: 8, maxLength: 128 }
     },
     required: ['email', 'password']
   }

@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify'
-import { AUTH_CONFIG, DB_NAME } from '../../../constants'
+import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
 import { services } from '../../../services'
 import handleUserRegistration from '../../../shared/handleUserRegistration'
 import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
@@ -22,6 +22,17 @@ import {
   ResetPasswordCallDto,
   ResetPasswordSendDto
 } from './dtos'
+
+const rateLimitStore = new Map<string, number[]>()
+
+const isRateLimited = (key: string, maxAttempts: number, windowMs: number) => {
+  const now = Date.now()
+  const existing = rateLimitStore.get(key) ?? []
+  const recent = existing.filter((timestamp) => now - timestamp < windowMs)
+  recent.push(now)
+  rateLimitStore.set(key, recent)
+  return recent.length > maxAttempts
+}
 /**
  * Controller for handling local user registration and login.
  * @testable
@@ -36,19 +47,33 @@ export async function localUserPassController(app: FastifyInstance) {
     user_id_field,
     on_user_creation_function_name
   } = AUTH_CONFIG
+  const { resetPasswordCollection } = AUTH_CONFIG
   const db = app.mongo.client.db(DB_NAME)
+  const resetPasswordTtlSeconds = DEFAULT_CONFIG.RESET_PASSWORD_TTL_SECONDS
+  const rateLimitWindowMs = DEFAULT_CONFIG.AUTH_RATE_LIMIT_WINDOW_MS
+  const loginMaxAttempts = DEFAULT_CONFIG.AUTH_LOGIN_MAX_ATTEMPTS
+  const resetMaxAttempts = DEFAULT_CONFIG.AUTH_RESET_MAX_ATTEMPTS
+
+  try {
+    await db.collection(resetPasswordCollection).createIndex(
+      { createdAt: 1 },
+      { expireAfterSeconds: resetPasswordTtlSeconds }
+    )
+  } catch (error) {
+    console.error('Failed to ensure reset password TTL index', error)
+  }
   const handleResetPasswordRequest = async (
     email: string,
     password?: string,
     extraArguments?: unknown[]
   ) => {
-    const { resetPasswordCollection, resetPasswordConfig } = AUTH_CONFIG
+    const { resetPasswordConfig } = AUTH_CONFIG
     const authUser = await db.collection(authCollection!).findOne({
       email
     })
 
     if (!authUser) {
-      throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
+      return
     }
 
     const token = generateToken()
@@ -125,7 +150,12 @@ export async function localUserPassController(app: FastifyInstance) {
     {
       schema: LOGIN_SCHEMA
     },
-    async function (req) {
+    async function (req, res) {
+      const key = `login:${req.ip}`
+      if (isRateLimited(key, loginMaxAttempts, rateLimitWindowMs)) {
+        res.status(429).send({ message: 'Too many requests' })
+        return
+      }
       const authUser = await db.collection(authCollection!).findOne({
         email: req.body.username
       })
@@ -215,8 +245,17 @@ export async function localUserPassController(app: FastifyInstance) {
     {
       schema: RESET_SEND_SCHEMA
     },
-    async function (req) {
+    async function (req, res) {
+      const key = `reset:${req.ip}`
+      if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
+        res.status(429)
+        return { message: 'Too many requests' }
+      }
       await handleResetPasswordRequest(req.body.email)
+      res.status(202)
+      return {
+        status: 'ok'
+      }
     }
   )
 
@@ -225,12 +264,21 @@ export async function localUserPassController(app: FastifyInstance) {
     {
       schema: RESET_CALL_SCHEMA
     },
-    async function (req) {
+    async function (req, res) {
+      const key = `reset:${req.ip}`
+      if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
+        res.status(429)
+        return { message: 'Too many requests' }
+      }
       await handleResetPasswordRequest(
         req.body.email,
         req.body.password,
         req.body.arguments
       )
+      res.status(202)
+      return {
+        status: 'ok'
+      }
     }
   )
 
@@ -246,8 +294,12 @@ export async function localUserPassController(app: FastifyInstance) {
     {
       schema: CONFIRM_RESET_SCHEMA
     },
-    async function (req) {
-      const { resetPasswordCollection } = AUTH_CONFIG
+    async function (req, res) {
+      const key = `reset-confirm:${req.ip}`
+      if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
+        res.status(429)
+        return { message: 'Too many requests' }
+      }
       const { token, tokenId, password } = req.body
 
       const resetRequest = await db
@@ -255,6 +307,16 @@ export async function localUserPassController(app: FastifyInstance) {
         .findOne({ token, tokenId })
 
       if (!resetRequest) {
+        throw new Error(AUTH_ERRORS.INVALID_RESET_PARAMS)
+      }
+
+      const createdAt = resetRequest.createdAt ? new Date(resetRequest.createdAt) : null
+      const isExpired = !createdAt ||
+        Number.isNaN(createdAt.getTime()) ||
+        Date.now() - createdAt.getTime() > resetPasswordTtlSeconds * 1000
+
+      if (isExpired) {
+        await db?.collection(resetPasswordCollection).deleteOne({ _id: resetRequest._id })
         throw new Error(AUTH_ERRORS.INVALID_RESET_PARAMS)
       }
       const hashedPassword = await hashPassword(password)

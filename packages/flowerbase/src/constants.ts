@@ -17,6 +17,12 @@ export const DEFAULT_CONFIG = {
   HTTPS_SCHEMA: process.env.HTTPS_SCHEMA || 'https',
   HOST: process.env.HOST || '0.0.0.0',
   ENABLE_LOGGER: process.env.ENABLE_LOGGER,
+  RESET_PASSWORD_TTL_SECONDS: Number(process.env.RESET_PASSWORD_TTL_SECONDS) || 3600,
+  AUTH_RATE_LIMIT_WINDOW_MS: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  AUTH_LOGIN_MAX_ATTEMPTS: Number(process.env.AUTH_LOGIN_MAX_ATTEMPTS) || 10,
+  AUTH_RESET_MAX_ATTEMPTS: Number(process.env.AUTH_RESET_MAX_ATTEMPTS) || 5,
+  SWAGGER_UI_USER: process.env.SWAGGER_UI_USER || '',
+  SWAGGER_UI_PASSWORD: process.env.SWAGGER_UI_PASSWORD || '',
   CORS_OPTIONS: {
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"] as ALLOWED_METHODS[]
