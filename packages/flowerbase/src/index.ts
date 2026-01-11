@@ -49,6 +49,10 @@ export async function initialize({
   corsConfig = DEFAULT_CONFIG.CORS_OPTIONS,
   basePath
 }: InitializeConfig) {
+  if (!jwtSecret || jwtSecret.trim().length === 0) {
+    throw new Error('JWT secret missing: set JWT_SECRET or pass jwtSecret to initialize()')
+  }
+
   const resolvedBasePath = basePath ?? require.main?.path ?? process.cwd()
   const fastify = Fastify({
     logger: !!DEFAULT_CONFIG.ENABLE_LOGGER

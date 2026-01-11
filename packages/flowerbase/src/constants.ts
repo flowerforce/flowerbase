@@ -17,6 +17,7 @@ export const DEFAULT_CONFIG = {
   HTTPS_SCHEMA: process.env.HTTPS_SCHEMA || 'https',
   HOST: process.env.HOST || '0.0.0.0',
   ENABLE_LOGGER: process.env.ENABLE_LOGGER,
+  RESET_PASSWORD_TTL_SECONDS: Number(process.env.RESET_PASSWORD_TTL_SECONDS) || 3600,
   CORS_OPTIONS: {
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"] as ALLOWED_METHODS[]

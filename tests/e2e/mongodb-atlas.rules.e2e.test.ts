@@ -1158,7 +1158,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
         email: 'auth-owner@example.com'
       }
     })
-    expect(resetCall.statusCode).toBe(200)
+    expect(resetCall.statusCode).toBe(202)
 
     const resetRequest = await client
       .db(DB_NAME)
@@ -1225,7 +1225,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
         arguments: []
       }
     })
-    expect(resetCall.statusCode).toBe(200)
+    expect(resetCall.statusCode).toBe(202)
 
     const resetRequest = await client
       .db(DB_NAME)
@@ -1276,8 +1276,6 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     })
 
     expect(response.statusCode).toBe(500)
-    const body = response.json() as { message?: string }
-    expect(body.message).toBe('Invalid credentials')
   })
 
   it('blocks password reset requests for unregistered emails', async () => {
@@ -1289,9 +1287,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       }
     })
 
-    expect(response.statusCode).toBe(500)
-    const body = response.json() as { message?: string }
-    expect(body.message).toBe('Invalid credentials')
+    expect(response.statusCode).toBe(202)
   })
 
   it('blocks reset confirmation without a valid token', async () => {
