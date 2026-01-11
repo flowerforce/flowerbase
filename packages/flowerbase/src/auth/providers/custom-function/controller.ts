@@ -1,9 +1,10 @@
 import { FastifyInstance } from 'fastify'
-import { AUTH_CONFIG } from '../../../constants'
+import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
 import handleUserRegistration from '../../../shared/handleUserRegistration'
 import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
+import { hashToken } from '../../../utils/crypto'
 import {
   AUTH_ENDPOINTS,
   generatePassword,
@@ -22,6 +23,9 @@ export async function customFunctionController(app: FastifyInstance) {
 
   const functionsList = StateManager.select('functions')
   const services = StateManager.select('services')
+  const db = app.mongo.client.db(DB_NAME)
+  const { refreshTokensCollection } = AUTH_CONFIG
+  const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
 
   /**
    * Endpoint for user login.
@@ -88,9 +92,18 @@ export async function customFunctionController(app: FastifyInstance) {
             _id: user.insertedId
           }
         }
+        const refreshToken = this.createRefreshToken(currentUserData)
+        const refreshTokenHash = hashToken(refreshToken)
+        await db.collection(refreshTokensCollection).insertOne({
+          userId: user.insertedId,
+          tokenHash: refreshTokenHash,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + refreshTokenTtlMs),
+          revokedAt: null
+        })
         return {
           access_token: this.createAccessToken(currentUserData),
-          refresh_token: this.createRefreshToken(currentUserData),
+          refresh_token: refreshToken,
           device_id: '',
           user_id: user.insertedId.toString()
         }

@@ -21,6 +21,7 @@ export const DEFAULT_CONFIG = {
   AUTH_RATE_LIMIT_WINDOW_MS: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
   AUTH_LOGIN_MAX_ATTEMPTS: Number(process.env.AUTH_LOGIN_MAX_ATTEMPTS) || 10,
   AUTH_RESET_MAX_ATTEMPTS: Number(process.env.AUTH_RESET_MAX_ATTEMPTS) || 5,
+  REFRESH_TOKEN_TTL_DAYS: Number(process.env.REFRESH_TOKEN_TTL_DAYS) || 60,
   SWAGGER_UI_USER: process.env.SWAGGER_UI_USER || '',
   SWAGGER_UI_PASSWORD: process.env.SWAGGER_UI_PASSWORD || '',
   CORS_OPTIONS: {
@@ -36,7 +37,8 @@ export const DB_NAME = database_name
 export const AUTH_CONFIG = {
   authCollection: auth_collection,
   userCollection: collection_name,
-  resetPasswordCollection: 'reset-password-requests',
+  resetPasswordCollection: 'reset_password_requests',
+  refreshTokensCollection: 'auth_refresh_tokens',
   resetPasswordConfig: configuration['local-userpass']?.config,
   user_id_field,
   on_user_creation_function_name,

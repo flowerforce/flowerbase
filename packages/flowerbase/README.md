@@ -100,6 +100,7 @@ Ensure the following environment variables are set in your .env file or deployme
 | `AUTH_RATE_LIMIT_WINDOW_MS`  | Rate limit window for auth endpoints (in ms).                          | `900000`                                           |
 | `AUTH_LOGIN_MAX_ATTEMPTS`    | Max login attempts per window.                                         | `10`                                               |
 | `AUTH_RESET_MAX_ATTEMPTS`    | Max reset requests per window.                                         | `5`                                                |
+| `REFRESH_TOKEN_TTL_DAYS`     | Refresh token time-to-live (in days).                                  | `60`                                               |
 | `SWAGGER_UI_USER`      | Basic Auth username for Swagger UI (optional).                            | `admin`                                            |
 | `SWAGGER_UI_PASSWORD`  | Basic Auth password for Swagger UI (optional).                            | `change-me`                                        |
 
@@ -116,6 +117,7 @@ RESET_PASSWORD_TTL_SECONDS=3600
 AUTH_RATE_LIMIT_WINDOW_MS=900000
 AUTH_LOGIN_MAX_ATTEMPTS=10
 AUTH_RESET_MAX_ATTEMPTS=5
+REFRESH_TOKEN_TTL_DAYS=60
 SWAGGER_UI_USER=admin
 SWAGGER_UI_PASSWORD=change-me
 ```
@@ -422,6 +424,7 @@ Ensure the following environment variables are set in your .env file or deployme
 | `AUTH_RATE_LIMIT_WINDOW_MS`  | Rate limit window for auth endpoints (in ms).                          | `900000`                                           |
 | `AUTH_LOGIN_MAX_ATTEMPTS`    | Max login attempts per window.                                         | `10`                                               |
 | `AUTH_RESET_MAX_ATTEMPTS`    | Max reset requests per window.                                         | `5`                                                |
+| `REFRESH_TOKEN_TTL_DAYS`     | Refresh token time-to-live (in days).                                  | `60`                                               |
 | `SWAGGER_UI_USER`      | Basic Auth username for Swagger UI (optional).                            | `admin`                                            |
 | `SWAGGER_UI_PASSWORD`  | Basic Auth password for Swagger UI (optional).                            | `change-me`                                        |
 
@@ -438,6 +441,7 @@ RESET_PASSWORD_TTL_SECONDS=3600
 AUTH_RATE_LIMIT_WINDOW_MS=900000
 AUTH_LOGIN_MAX_ATTEMPTS=10
 AUTH_RESET_MAX_ATTEMPTS=5
+REFRESH_TOKEN_TTL_DAYS=60
 SWAGGER_UI_USER=admin
 SWAGGER_UI_PASSWORD=change-me
 ```
@@ -496,4 +500,3 @@ export default app;
 
 >🔗 The baseUrl should point to the backend URL you deployed earlier using Flowerbase.
 This tells the frontend SDK where to send authentication and data requests.
-
