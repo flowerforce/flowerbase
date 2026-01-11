@@ -1,4 +1,3 @@
-import sendGrid from '@sendgrid/mail'
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME } from '../../../constants'
 import { services } from '../../../services'
@@ -11,7 +10,6 @@ import {
   AUTH_ENDPOINTS,
   AUTH_ERRORS,
   CONFIRM_RESET_SCHEMA,
-  getMailConfig,
   LOGIN_SCHEMA,
   REGISTRATION_SCHEMA,
   RESET_CALL_SCHEMA,
@@ -64,6 +62,10 @@ export async function localUserPassController(app: FastifyInstance) {
         { upsert: true }
       )
 
+    if (!resetPasswordConfig.runResetFunction && !resetPasswordConfig.resetFunctionName) {
+      throw new Error(AUTH_ERRORS.MISSING_RESET_FUNCTION)
+    }
+
     if (resetPasswordConfig.runResetFunction && resetPasswordConfig.resetFunctionName) {
       const functionsList = StateManager.select('functions')
       const services = StateManager.select('services')
@@ -82,22 +84,6 @@ export async function localUserPassController(app: FastifyInstance) {
       return
     }
 
-    try {
-      const { from, subject, mailToken, body } = getMailConfig(
-        resetPasswordConfig,
-        token,
-        tokenId
-      )
-      sendGrid.setApiKey(mailToken)
-      await sendGrid.send({
-        to: email,
-        from,
-        subject,
-        html: body
-      })
-    } catch (error) {
-      console.log("Error send mail reset:", error)
-    }
   }
 
   /**
