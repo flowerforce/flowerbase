@@ -962,6 +962,124 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(recorded?.documentId).toBe(newActivityId.toString())
   })
 
+  it('esegue direttamente la function logTriggerEvent', async () => {
+    const changeEventId = new ObjectId()
+    const token = getTokenFor(adminUser)
+    expect(token).toBeDefined()
+
+    const changeEvent: Document = {
+      operationType: 'insert',
+      ns: {
+        coll: 'activityLogs',
+        db: DB_NAME
+      },
+      documentKey: {
+        _id: changeEventId
+      },
+      fullDocument: {
+        _id: changeEventId,
+        ownerId: adminUser.id,
+        workspace: 'workspace-1'
+      }
+    }
+
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      payload: {
+        name: 'logTriggerEvent',
+        arguments: [changeEvent]
+      }
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({
+      recorded: true,
+      documentId: changeEventId.toString()
+    })
+
+    const logged = await client.db(DB_NAME).collection(TRIGGER_EVENTS_COLLECTION).findOne({
+      documentId: changeEventId.toString()
+    })
+
+    expect(logged).toMatchObject({
+      operationType: 'insert',
+      collection: 'activityLogs',
+      documentId: changeEventId.toString()
+    })
+  })
+
+  it('blocca la function impostata come private quando viene chiamata via API', async () => {
+    const token = getTokenFor(ownerUser)
+    expect(token).toBeDefined()
+
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      payload: {
+        name: 'privateEcho',
+        arguments: []
+      }
+    })
+
+    expect(response.statusCode).toBe(500)
+    const body = response.json() as { message?: string }
+    expect(body.message).toBe('Function "privateEcho" is private')
+  })
+
+  it('permette alla function run_as_system di leggere tutti gli utenti', async () => {
+    const token = getTokenFor(adminUser)
+    expect(token).toBeDefined()
+
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      payload: {
+        name: 'systemListUsers',
+        arguments: []
+      }
+    })
+
+    expect(response.statusCode).toBe(200)
+    const body = response.json() as { count: number; users: Array<{ email: string }> }
+    expect(body.count).toBe(2)
+    expect(body.users).toHaveLength(2)
+    expect(body.users.map((user) => user.email).sort()).toEqual([
+      'guest@example.com',
+      'owner@example.com'
+    ])
+  })
+
+  it('blocca la function run_as_system false su auth_users', async () => {
+    const token = getTokenFor(ownerUser)
+    expect(token).toBeDefined()
+
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      payload: {
+        name: 'publicListAuthUsers',
+        arguments: []
+      }
+    })
+
+    expect(response.statusCode).toBe(500)
+    const body = response.json() as { message?: string }
+    expect(body.message).toBe('READ FORBIDDEN!')
+  })
+
   it('espone il nuovo endpoint API tramite la funzione dedicata', async () => {
     const response = await appInstance!.inject({
       method: 'GET',
