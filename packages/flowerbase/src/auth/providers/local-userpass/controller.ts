@@ -22,6 +22,17 @@ import {
   ResetPasswordCallDto,
   ResetPasswordSendDto
 } from './dtos'
+
+const rateLimitStore = new Map<string, number[]>()
+
+const isRateLimited = (key: string, maxAttempts: number, windowMs: number) => {
+  const now = Date.now()
+  const existing = rateLimitStore.get(key) ?? []
+  const recent = existing.filter((timestamp) => now - timestamp < windowMs)
+  recent.push(now)
+  rateLimitStore.set(key, recent)
+  return recent.length > maxAttempts
+}
 /**
  * Controller for handling local user registration and login.
  * @testable
@@ -39,6 +50,9 @@ export async function localUserPassController(app: FastifyInstance) {
   const { resetPasswordCollection } = AUTH_CONFIG
   const db = app.mongo.client.db(DB_NAME)
   const resetPasswordTtlSeconds = DEFAULT_CONFIG.RESET_PASSWORD_TTL_SECONDS
+  const rateLimitWindowMs = DEFAULT_CONFIG.AUTH_RATE_LIMIT_WINDOW_MS
+  const loginMaxAttempts = DEFAULT_CONFIG.AUTH_LOGIN_MAX_ATTEMPTS
+  const resetMaxAttempts = DEFAULT_CONFIG.AUTH_RESET_MAX_ATTEMPTS
 
   try {
     await db.collection(resetPasswordCollection).createIndex(
@@ -59,7 +73,6 @@ export async function localUserPassController(app: FastifyInstance) {
     })
 
     if (!authUser) {
-      console.warn('Password reset requested for unknown email')
       return
     }
 
@@ -137,7 +150,12 @@ export async function localUserPassController(app: FastifyInstance) {
     {
       schema: LOGIN_SCHEMA
     },
-    async function (req) {
+    async function (req, res) {
+      const key = `login:${req.ip}`
+      if (isRateLimited(key, loginMaxAttempts, rateLimitWindowMs)) {
+        res.status(429).send({ message: 'Too many requests' })
+        return
+      }
       const authUser = await db.collection(authCollection!).findOne({
         email: req.body.username
       })
@@ -228,6 +246,11 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: RESET_SEND_SCHEMA
     },
     async function (req, res) {
+      const key = `reset:${req.ip}`
+      if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
+        res.status(429)
+        return { message: 'Too many requests' }
+      }
       await handleResetPasswordRequest(req.body.email)
       res.status(202)
       return {
@@ -242,6 +265,11 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: RESET_CALL_SCHEMA
     },
     async function (req, res) {
+      const key = `reset:${req.ip}`
+      if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
+        res.status(429)
+        return { message: 'Too many requests' }
+      }
       await handleResetPasswordRequest(
         req.body.email,
         req.body.password,

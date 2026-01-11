@@ -4,7 +4,7 @@ import { MongoClient, ObjectId, Document, DeleteResult } from 'mongodb'
 import { EJSON } from 'bson'
 import { initialize } from '../../packages/flowerbase/src'
 import { StateManager } from '../../packages/flowerbase/src/state'
-import { API_VERSION } from '../../packages/flowerbase/src/constants'
+import { API_VERSION, DEFAULT_CONFIG } from '../../packages/flowerbase/src/constants'
 import { hashPassword } from '../../packages/flowerbase/src/utils/crypto'
 import type { User } from '../../packages/flowerbase/src/auth/dtos'
 
@@ -1146,6 +1146,104 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(second.statusCode).toBe(500)
     const body = second.json() as { message?: string }
     expect(body.message).toBe('This email address is already used')
+  })
+
+  it('rejects registration with invalid email or password', async () => {
+    const invalidEmail = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email: 'not-an-email',
+        password: 'valid-pass-1'
+      }
+    })
+    expect(invalidEmail.statusCode).toBe(400)
+
+    const invalidPassword = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email: 'valid-user@example.com',
+        password: 'short'
+      }
+    })
+    expect(invalidPassword.statusCode).toBe(400)
+  })
+
+  it('rejects login with invalid email or password format', async () => {
+    const invalidEmail = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: 'not-an-email',
+        password: 'top-secret'
+      }
+    })
+    expect(invalidEmail.statusCode).toBe(400)
+
+    const invalidPassword = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: 'auth-owner@example.com',
+        password: 'short'
+      }
+    })
+    expect(invalidPassword.statusCode).toBe(400)
+  })
+
+  it('rate limits login attempts by IP', async () => {
+    const limit = DEFAULT_CONFIG.AUTH_LOGIN_MAX_ATTEMPTS
+    const ip = '203.0.113.10'
+    for (let i = 0; i < limit; i += 1) {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/login`,
+        remoteAddress: ip,
+        payload: {
+          username: 'auth-owner@example.com',
+          password: 'wrong-password'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    }
+
+    const limited = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      remoteAddress: ip,
+      payload: {
+        username: 'auth-owner@example.com',
+        password: 'wrong-password'
+      }
+    })
+    expect(limited.statusCode).toBe(429)
+  })
+
+  it('rate limits reset requests by IP', async () => {
+    const limit = DEFAULT_CONFIG.AUTH_RESET_MAX_ATTEMPTS
+    const ip = '203.0.113.11'
+    for (let i = 0; i < limit; i += 1) {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/reset/send`,
+        remoteAddress: ip,
+        payload: {
+          email: 'auth-owner@example.com'
+        }
+      })
+      expect(response.statusCode).toBe(202)
+    }
+
+    const limited = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/reset/send`,
+      remoteAddress: ip,
+      payload: {
+        email: 'auth-owner@example.com'
+      }
+    })
+    expect(limited.statusCode).toBe(429)
   })
 
   it('handles password reset via reset/send and confirm reset', async () => {

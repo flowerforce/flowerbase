@@ -15,13 +15,17 @@ export type LoginSuccessDto = {
   user_id: string
 }
 
+export type ErrorResponseDto = {
+  message: string
+}
+
 export interface RegistrationDto {
   Body: RegisterUserDto
 }
 
 export interface LoginDto {
   Body: LoginUserDto
-  Reply: LoginSuccessDto
+  Reply: LoginSuccessDto | ErrorResponseDto
 }
 
 export interface ResetPasswordSendDto {

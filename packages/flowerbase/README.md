@@ -96,6 +96,10 @@ Ensure the following environment variables are set in your .env file or deployme
 | `APP_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
 | `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
 | `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
+| `RESET_PASSWORD_TTL_SECONDS` | Time-to-live for password reset tokens (in seconds).                  | `3600`                                             |
+| `AUTH_RATE_LIMIT_WINDOW_MS`  | Rate limit window for auth endpoints (in ms).                          | `900000`                                           |
+| `AUTH_LOGIN_MAX_ATTEMPTS`    | Max login attempts per window.                                         | `10`                                               |
+| `AUTH_RESET_MAX_ATTEMPTS`    | Max reset requests per window.                                         | `5`                                                |
 
 
 Example:
@@ -106,6 +110,10 @@ DB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/dbname
 APP_SECRET=your-jwt-secret
 HOST=0.0.0.0
 HTTPS_SCHEMA=http
+RESET_PASSWORD_TTL_SECONDS=3600
+AUTH_RATE_LIMIT_WINDOW_MS=900000
+AUTH_LOGIN_MAX_ATTEMPTS=10
+AUTH_RESET_MAX_ATTEMPTS=5
 ```
 
 🛡️ Note: Never commit .env files to source control. Use a .gitignore file to exclude it.
@@ -406,6 +414,10 @@ Ensure the following environment variables are set in your .env file or deployme
 | `APP_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
 | `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
 | `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
+| `RESET_PASSWORD_TTL_SECONDS` | Time-to-live for password reset tokens (in seconds).                  | `3600`                                             |
+| `AUTH_RATE_LIMIT_WINDOW_MS`  | Rate limit window for auth endpoints (in ms).                          | `900000`                                           |
+| `AUTH_LOGIN_MAX_ATTEMPTS`    | Max login attempts per window.                                         | `10`                                               |
+| `AUTH_RESET_MAX_ATTEMPTS`    | Max reset requests per window.                                         | `5`                                                |
 
 
 Example:
@@ -416,6 +428,10 @@ DB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/dbname
 APP_SECRET=your-jwt-secret
 HOST=0.0.0.0
 HTTPS_SCHEMA=http
+RESET_PASSWORD_TTL_SECONDS=3600
+AUTH_RATE_LIMIT_WINDOW_MS=900000
+AUTH_LOGIN_MAX_ATTEMPTS=10
+AUTH_RESET_MAX_ATTEMPTS=5
 ```
 
 🛡️ Note: Never commit .env files to source control. Use a .gitignore file to exclude it.
@@ -472,6 +488,5 @@ export default app;
 
 >🔗 The baseUrl should point to the backend URL you deployed earlier using Flowerbase.
 This tells the frontend SDK where to send authentication and data requests.
-
 
 
