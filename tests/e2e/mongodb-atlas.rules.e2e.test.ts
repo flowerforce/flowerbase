@@ -1007,6 +1007,29 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(loginBody.user_id).toBe(authUserIds.owner.toString())
   })
 
+  it('rigetta la registrazione quando l\'email è già usata', async () => {
+    const payload = {
+      email: 'duplicate@example.com',
+      password: 'dup-pass'
+    }
+
+    const first = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload
+    })
+    expect(first.statusCode).toBe(201)
+
+    const second = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload
+    })
+    expect(second.statusCode).toBe(500)
+    const body = second.json() as { message?: string }
+    expect(body.message).toBe('This email address is already used')
+  })
+
   it('gestisce il reset password tramite reset/send e confirm reset', async () => {
     const requestedPassword = 'request-pass-1'
     const newPassword = 'new-pass-1'
@@ -1124,6 +1147,50 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(loginNew.statusCode).toBe(200)
   })
 
+  it('rigetta il login con credenziali invalide', async () => {
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: 'auth-owner@example.com',
+        password: 'wrong-password'
+      }
+    })
+
+    expect(response.statusCode).toBe(500)
+    const body = response.json() as { message?: string }
+    expect(body.message).toBe('Invalid credentials')
+  })
+
+  it('blocca la richiesta di reset password per email non registrata', async () => {
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/reset/send`,
+      payload: {
+        email: 'missing-user@example.com'
+      }
+    })
+
+    expect(response.statusCode).toBe(500)
+    const body = response.json() as { message?: string }
+    expect(body.message).toBe('Invalid credentials')
+  })
+
+  it('blocca la conferma reset senza token valido', async () => {
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/reset`,
+      payload: {
+        password: 'any-password',
+        token: 'invalid',
+        tokenId: 'invalid'
+      }
+    })
+
+    expect(response.statusCode).toBe(500)
+    const body = response.json() as { message?: string }
+    expect(body.message).toBe('Invalid token or tokenId provided')
+  })
 
   // CUSTOM TESTS
   it('Provo a leggere da auth_users', async () => {
