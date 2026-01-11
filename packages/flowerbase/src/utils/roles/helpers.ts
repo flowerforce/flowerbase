@@ -34,7 +34,7 @@ const evaluateComplexExpression = async (
   condition: [string, Record<string, any>],
   params: MachineContext['params'],
   user: MachineContext['user']
-) => {
+): Promise<boolean> => {
   const [key, config] = condition
 
   const functionConfig = config['%function']
@@ -67,5 +67,6 @@ const evaluateComplexExpression = async (
     functionsList,
     services
   })
-  return key === '%%true' ? response : !response
+  const isTruthy = Boolean(response)
+  return key === '%%true' ? isTruthy : !isTruthy
 }
