@@ -70,7 +70,7 @@ export async function localUserPassController(app: FastifyInstance) {
       const functionsList = StateManager.select('functions')
       const services = StateManager.select('services')
       const currentFunction = functionsList[resetPasswordConfig.resetFunctionName]
-      const baseArgs = { token, tokenId, email, password }
+      const baseArgs = { token, tokenId, email, password, username: email }
       const args = Array.isArray(extraArguments) ? [baseArgs, ...extraArguments] : [baseArgs]
       await GenerateContext({
         args,
