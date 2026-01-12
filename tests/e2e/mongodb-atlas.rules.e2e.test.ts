@@ -1152,6 +1152,45 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(loginBody.user_id).toBe(authUserIds.owner.toString())
   })
 
+  it('auto-confirms users on registration when autoConfirm is enabled', async () => {
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email: 'autoconfirm-user@example.com',
+        password: 'auto-pass'
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+    const registrationBody = registration.json() as { userId?: string }
+    expect(registrationBody.userId).toBeDefined()
+
+    const authUser = await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .findOne({ _id: new ObjectId(registrationBody.userId) })
+    expect(authUser?.status).toBe('confirmed')
+  })
+
+  it('fires on_user_creation_function_name on auto-confirmed registrations', async () => {
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email: 'autoconfirm-trigger@example.com',
+        password: 'auto-pass'
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+    const registrationBody = registration.json() as { userId?: string }
+    expect(registrationBody.userId).toBeDefined()
+
+    const creationEvent = await waitForTriggerEvent(registrationBody.userId!)
+    expect(creationEvent).toBeDefined()
+    expect(creationEvent?.type).toBe('on_user_creation')
+    expect(creationEvent?.email).toBe('autoconfirm-trigger@example.com')
+  })
+
   it('calls on_user_creation_function_name when auth user becomes confirmed', async () => {
     const registration = await appInstance!.inject({
       method: 'POST',

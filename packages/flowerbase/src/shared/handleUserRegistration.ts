@@ -17,6 +17,7 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
     }
 
     const { authCollection } = AUTH_CONFIG
+    const autoConfirm = AUTH_CONFIG.localUserpassConfig?.autoConfirm === true
     const mongo = app?.mongo
     const db = mongo.client.db(DB_NAME)
     const hashedPassword = await hashPassword(password)
@@ -29,7 +30,7 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
     const result = await db?.collection(authCollection!).insertOne({
         email,
         password: hashedPassword,
-        status: skipUserCheck ? 'confirmed' : 'pending',
+        status: skipUserCheck || autoConfirm ? 'confirmed' : 'pending',
         createdAt: new Date(),
         custom_data: {
             // TODO: aggiungere dati personalizzati alla registrazione

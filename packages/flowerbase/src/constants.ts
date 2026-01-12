@@ -40,6 +40,7 @@ export const AUTH_CONFIG = {
   resetPasswordCollection: 'reset_password_requests',
   refreshTokensCollection: 'auth_refresh_tokens',
   resetPasswordConfig: configuration['local-userpass']?.config,
+  localUserpassConfig: configuration['local-userpass']?.config,
   user_id_field,
   on_user_creation_function_name,
   providers: {
