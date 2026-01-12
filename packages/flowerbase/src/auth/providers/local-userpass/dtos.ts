@@ -49,3 +49,10 @@ export interface ConfirmResetPasswordDto {
     password: string
   }
 }
+
+export interface ConfirmUserDto {
+  Body: {
+    token: string
+    tokenId: string
+  }
+}

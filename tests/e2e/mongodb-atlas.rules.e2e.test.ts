@@ -1152,6 +1152,138 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(loginBody.user_id).toBe(authUserIds.owner.toString())
   })
 
+  it('runs confirmation function when autoConfirm is false', async () => {
+    const originalConfig = AUTH_CONFIG.localUserpassConfig
+    AUTH_CONFIG.localUserpassConfig = {
+      ...originalConfig,
+      autoConfirm: false,
+      runConfirmationFunction: true,
+      confirmationFunctionName: 'confirmUser'
+    }
+
+    try {
+      const email = 'confirm-success@example.com'
+      const registration = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/register`,
+        payload: {
+          email,
+          password: 'auto-pass'
+        }
+      })
+      expect(registration.statusCode).toBe(201)
+
+      const confirmationEvent = await waitForTriggerEvent(email)
+      expect(confirmationEvent).toBeDefined()
+      expect(confirmationEvent?.type).toBe('user_confirmation')
+      expect(confirmationEvent?.email).toBe(email)
+
+      const authUser = await client
+        .db(DB_NAME)
+        .collection(AUTH_USERS_COLLECTION)
+        .findOne({ email })
+      expect(authUser?.status).toBe('confirmed')
+    } finally {
+      AUTH_CONFIG.localUserpassConfig = originalConfig
+    }
+  })
+
+  it('keeps users pending when confirmation function returns pending', async () => {
+    const originalConfig = AUTH_CONFIG.localUserpassConfig
+    AUTH_CONFIG.localUserpassConfig = {
+      ...originalConfig,
+      autoConfirm: false,
+      runConfirmationFunction: true,
+      confirmationFunctionName: 'confirmUser'
+    }
+
+    try {
+      const email = 'pending-user@example.com'
+      const registration = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/register`,
+        payload: {
+          email,
+          password: 'auto-pass'
+        }
+      })
+      expect(registration.statusCode).toBe(201)
+
+      const authUser = await client
+        .db(DB_NAME)
+        .collection(AUTH_USERS_COLLECTION)
+        .findOne({ email })
+      expect(authUser?.status).toBe('pending')
+
+      const login = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/login`,
+        payload: {
+          username: email,
+          password: 'auto-pass'
+        }
+      })
+      expect(login.statusCode).toBe(500)
+      const loginBody = login.json() as { message?: string }
+      expect(loginBody.message).toBe('User not confirmed')
+    } finally {
+      AUTH_CONFIG.localUserpassConfig = originalConfig
+    }
+  })
+
+  it('confirms users via token and tokenId from the client', async () => {
+    const originalConfig = AUTH_CONFIG.localUserpassConfig
+    AUTH_CONFIG.localUserpassConfig = {
+      ...originalConfig,
+      autoConfirm: false,
+      runConfirmationFunction: true,
+      confirmationFunctionName: 'confirmUser'
+    }
+
+    try {
+      const email = 'pending-confirm@example.com'
+      const password = 'auto-pass'
+      const registration = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/register`,
+        payload: {
+          email,
+          password
+        }
+      })
+      expect(registration.statusCode).toBe(201)
+
+      const authUser = await client
+        .db(DB_NAME)
+        .collection(AUTH_USERS_COLLECTION)
+        .findOne({ email }) as { confirmationToken?: string; confirmationTokenId?: string } | null
+      expect(authUser?.confirmationToken).toBeDefined()
+      expect(authUser?.confirmationTokenId).toBeDefined()
+
+      const confirm = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/confirm`,
+        payload: {
+          token: authUser!.confirmationToken,
+          tokenId: authUser!.confirmationTokenId
+        }
+      })
+      expect(confirm.statusCode).toBe(200)
+
+      const login = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/login`,
+        payload: {
+          username: email,
+          password
+        }
+      })
+      expect(login.statusCode).toBe(200)
+    } finally {
+      AUTH_CONFIG.localUserpassConfig = originalConfig
+    }
+  })
+
   it('auto-confirms users on registration when autoConfirm is enabled', async () => {
     const registration = await appInstance!.inject({
       method: 'POST',
