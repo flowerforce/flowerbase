@@ -119,11 +119,37 @@ export async function authController(app: FastifyInstance) {
       }
       const refreshToken = authHeader.slice('Bearer '.length).trim()
       const refreshTokenHash = hashToken(refreshToken)
-      await db.collection(refreshTokensCollection).updateOne(
+      const now = new Date()
+      const expiresAt = new Date(Date.now() + refreshTokenTtlMs)
+      const updateResult = await db.collection(refreshTokensCollection).findOneAndUpdate(
         { tokenHash: refreshTokenHash },
-        { $set: { revokedAt: new Date(), expiresAt: new Date(Date.now() + refreshTokenTtlMs) } }
+        {
+          $set: {
+            revokedAt: now,
+            expiresAt
+          }
+        },
+        { returnDocument: 'after' }
       )
-      return { status: "ok" }
+
+      const fromToken = req.user?.sub
+      let userId = updateResult?.value?.userId
+      if (!userId && fromToken) {
+        try {
+          userId = new ObjectId(fromToken)
+        } catch {
+          userId = fromToken
+        }
+      }
+
+      if (userId && authCollection) {
+        await db.collection(authCollection).updateOne(
+          { _id: userId },
+          { $set: { lastLogoutAt: now } }
+        )
+      }
+
+      return { status: 'ok' }
     }
   )
 }

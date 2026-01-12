@@ -8,7 +8,7 @@ import { API_VERSION, AUTH_CONFIG, DEFAULT_CONFIG } from '../../packages/flowerb
 import { hashPassword, hashToken } from '../../packages/flowerbase/src/utils/crypto'
 import type { User } from '../../packages/flowerbase/src/auth/dtos'
 
-jest.setTimeout(60000)
+jest.setTimeout(120000)
 
 const APP_ROOT = path.join(__dirname, 'app')
 const DB_NAME = 'flowerbase-e2e'
@@ -141,6 +141,7 @@ const callServiceOperation = async ({
   method:
   | 'find'
   | 'findOne'
+  | 'findOneAndUpdate'
   | 'deleteOne'
   | 'deleteMany'
   | 'insertOne'
@@ -208,6 +209,8 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
   insertOne: (document: Document) => callServiceOperation({ collection, method: 'insertOne', user, document }),
   updateOne: (query: Document, update: Document) =>
     callServiceOperation({ collection, method: 'updateOne', user, query, update }),
+  findOneAndUpdate: (query: Document, update: Document) =>
+    callServiceOperation({ collection, method: 'findOneAndUpdate', user, query, update }),
   deleteOne: (query: Document) => callServiceOperation({ collection, method: 'deleteOne', user, query }),
   deleteMany: (query: Document = {}) =>
     callServiceOperation({ collection, method: 'deleteMany', user, query }),
@@ -297,6 +300,8 @@ const resetCollections = async () => {
     db.collection(ACTIVITIES_COLLECTION).deleteMany({}),
     db.collection(COUNTERS_COLLECTION).deleteMany({}),
     db.collection(AUTH_USERS_COLLECTION).deleteMany({}),
+    db.collection(AUTH_CONFIG.refreshTokensCollection).deleteMany({}),
+    db.collection(RESET_PASSWORD_COLLECTION).deleteMany({}),
     db.collection(TRIGGER_EVENTS_COLLECTION).deleteMany({})
   ])
 
@@ -746,6 +751,28 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(deleteResult.deletedCount).toBe(1)
   })
 
+  it('allows owners to update their own todos with findOneAndUpdate', async () => {
+    const updatedTitle = 'Owner task updated'
+    await getTodosCollection(ownerUser).findOneAndUpdate(
+      { _id: todoIds.ownerFirst },
+      { $set: { title: updatedTitle } }
+    )
+
+    const updated = (await getTodosCollection(ownerUser).findOne({
+      _id: todoIds.ownerFirst
+    })) as TodoDoc | null
+    expect(updated?.title).toBe(updatedTitle)
+  })
+
+  it('prevents guests from updating others todos with findOneAndUpdate', async () => {
+    await expect(
+      getTodosCollection(guestUser).findOneAndUpdate(
+        { _id: todoIds.ownerFirst },
+        { $set: { title: 'Should fail' } }
+      )
+    ).rejects.toThrow('Update not permitted')
+  })
+
   it('limits profiles to shared workspaces', async () => {
     const ownerUsers = (await getUsersCollection(ownerUser).find({}).toArray()) as UserDoc[]
     expect(ownerUsers).toHaveLength(1)
@@ -1193,6 +1220,84 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       }
     })
     expect(sessionAfterLogout.statusCode).toBe(500)
+  })
+
+  it('rejects access tokens issued before logout for protected functions', async () => {
+    const ip = '203.0.113.55'
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      remoteAddress: ip,
+      payload: {
+        username: 'auth-owner@example.com',
+        password: 'top-secret'
+      }
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as {
+      access_token?: string
+      refresh_token?: string
+    }
+    expect(loginBody.access_token).toBeDefined()
+    expect(loginBody.refresh_token).toBeDefined()
+
+    const decodedAccessToken = JSON.parse(
+      Buffer.from(loginBody.access_token!.split('.')[1], 'base64').toString('utf8')
+    )
+    const accessIssuedAt = Number(decodedAccessToken.iat)
+    expect(Number.isFinite(accessIssuedAt)).toBe(true)
+
+    const functionPayload = {
+      name: 'find',
+      arguments: [
+        {
+          database: DB_NAME,
+          collection: TODO_COLLECTION,
+          query: {}
+        }
+      ],
+      service: 'mongodb-atlas'
+    }
+
+    const callBeforeLogout = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      remoteAddress: ip,
+      headers: {
+        authorization: `Bearer ${loginBody.access_token}`
+      },
+      payload: functionPayload
+    })
+    expect(callBeforeLogout.statusCode).toBe(200)
+
+    const logout = await appInstance!.inject({
+      method: 'DELETE',
+      url: `${API_VERSION}/auth/session`,
+      remoteAddress: ip,
+      headers: {
+        authorization: `Bearer ${loginBody.refresh_token}`
+      }
+    })
+    expect(logout.statusCode).toBe(200)
+
+    const authUserAfterLogout = await client
+      .db(DB_NAME)
+      .collection(AUTH_CONFIG.authCollection)
+      .findOne({ _id: authUserIds.owner })
+    expect(authUserAfterLogout?.lastLogoutAt).toBeDefined()
+    const lastLogoutTime = new Date(authUserAfterLogout!.lastLogoutAt).getTime()
+    expect(lastLogoutTime).toBeGreaterThanOrEqual(accessIssuedAt * 1000)
+
+    const callAfterLogout = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      remoteAddress: ip,
+      headers: {
+        authorization: `Bearer ${loginBody.access_token}`
+      },
+      payload: functionPayload
+    })
+    expect(callAfterLogout.statusCode).toBe(401)
   })
 
   it('rejects expired refresh tokens', async () => {

@@ -1,5 +1,13 @@
 import { FastifyInstance } from 'fastify'
-import { Collection, Document, FindCursor, WithId } from 'mongodb'
+import {
+  Collection,
+  Document,
+  Filter as MongoFilter,
+  FindCursor,
+  FindOneAndUpdateOptions,
+  UpdateFilter,
+  WithId
+} from 'mongodb'
 import { User } from '../../auth/dtos'
 import { Filter, Rules } from '../../features/rules/interface'
 import { Role } from '../../utils/roles/interface'
@@ -50,6 +58,11 @@ export type GetOperatorsFunction = (
   updateOne: (
     ...params: Parameters<Method<'updateOne'>>
   ) => ReturnType<Method<'updateOne'>>
+  findOneAndUpdate: (
+    filter: MongoFilter<Document>,
+    update: UpdateFilter<Document> | Document[],
+    options?: FindOneAndUpdateOptions
+  ) => Promise<Document | null>
   find: (...params: Parameters<Method<'find'>>) => FindCursor
   watch: (...params: Parameters<Method<'watch'>>) => ReturnType<Method<'watch'>>
   aggregate: (

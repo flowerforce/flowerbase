@@ -1,5 +1,13 @@
 import isEqual from 'lodash/isEqual'
-import { Collection, Document, EventsDescription, WithId } from 'mongodb'
+import {
+  Collection,
+  Document,
+  EventsDescription,
+  Filter as MongoFilter,
+  FindOneAndUpdateOptions,
+  UpdateFilter,
+  WithId
+} from 'mongodb'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
 import { CRUD_OPERATIONS, GetOperatorsFunction, MongodbAtlasFunction } from './model'
@@ -304,6 +312,96 @@ const getOperators: GetOperatorsFunction = (
       return collection.updateOne({ $and: safeQuery }, data, options)
     }
     return collection.updateOne(query, data, options)
+  },
+  /**
+   * Finds and updates a single document with role-based validation and access control.
+   *
+   * @param {Filter<Document>} query - The MongoDB query used to match the document to update.
+   * @param {UpdateFilter<Document> | Partial<Document>} data - The update operations or replacement document.
+   * @param {FindOneAndUpdateOptions} [options] - Optional settings for the findOneAndUpdate operation.
+   * @returns {Promise<FindAndModifyResult<Document>>} The result of the findOneAndUpdate operation.
+   *
+   * @throws {Error} If the user is not authorized to update the document.
+   */
+  findOneAndUpdate: async (
+    query: MongoFilter<Document>,
+    data: UpdateFilter<Document> | Document[],
+    options?: FindOneAndUpdateOptions
+  ) => {
+    if (!run_as_system) {
+      checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
+      const formattedQuery = getFormattedQuery(filters, query, user)
+      const safeQuery = Array.isArray(formattedQuery)
+        ? normalizeQuery(formattedQuery)
+        : formattedQuery
+
+      const result = await collection.findOne({ $and: safeQuery })
+
+      if (!result) {
+        throw new Error('Update not permitted')
+      }
+
+      const winningRole = getWinningRole(result, user, roles)
+      const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
+      const pipeline = [
+        {
+          $match: { $and: safeQuery }
+        },
+        {
+          $limit: 1
+        },
+        ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
+      ]
+      const [docToCheck] = hasOperators
+        ? await collection.aggregate(pipeline).toArray()
+        : ([data] as [Document])
+
+      const { status, document } = winningRole
+        ? await checkValidation(
+          winningRole,
+          {
+            type: 'write',
+            roles,
+            cursor: docToCheck,
+            expansions: {}
+          },
+          user
+        )
+        : fallbackAccess(docToCheck)
+
+      const areDocumentsEqual = isEqual(document, docToCheck)
+      if (!status || !areDocumentsEqual) {
+        throw new Error('Update not permitted')
+      }
+
+      const updateResult = options
+        ? await collection.findOneAndUpdate({ $and: safeQuery }, data, options)
+        : await collection.findOneAndUpdate({ $and: safeQuery }, data)
+      if (!updateResult) {
+        return updateResult
+      }
+
+      const readRole = getWinningRole(updateResult, user, roles)
+      const readResult = readRole
+        ? await checkValidation(
+          readRole,
+          {
+            type: 'read',
+            roles,
+            cursor: updateResult,
+            expansions: {}
+          },
+          user
+        )
+        : fallbackAccess(updateResult)
+
+      const sanitizedDoc = readResult.status ? (readResult.document ?? updateResult) : {}
+      return sanitizedDoc
+    }
+
+    return options
+      ? collection.findOneAndUpdate(query, data, options)
+      : collection.findOneAndUpdate(query, data)
   },
   /**
    * Finds documents in a MongoDB collection with optional role-based access control and post-query validation.

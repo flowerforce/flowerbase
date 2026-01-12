@@ -1,10 +1,16 @@
 import fastifyJwt from '@fastify/jwt'
 import fp from 'fastify-plugin'
 import { Document, ObjectId, WithId } from 'mongodb'
-import { DEFAULT_CONFIG } from '../../constants'
+import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../constants'
 
 type Options = {
   secret: string
+}
+
+type JwtAccessWithTimestamp = {
+  typ: 'access'
+  sub: string
+  iat?: number
 }
 
 /**
@@ -27,6 +33,57 @@ export default fp(async function (fastify, opts: Options) {
       await request.jwtVerify()
     } catch (err) {
       fastify.log.warn({ err }, 'JWT authentication failed')
+      reply.code(401).send({ message: 'Unauthorized' })
+      return
+    }
+
+    if (request.user?.typ !== 'access') {
+      return
+    }
+
+    const db = fastify.mongo?.client?.db(DB_NAME)
+    if (!db) {
+      fastify.log.warn('Mongo client unavailable while checking logout state')
+      return
+    }
+
+    if (!request.user.sub) {
+      reply.code(401).send({ message: 'Unauthorized' })
+      return
+    }
+
+    let authUser
+    try {
+      authUser = await db
+        .collection<Document>(AUTH_CONFIG.authCollection)
+        .findOne({ _id: new ObjectId(request.user.sub) })
+    } catch (err) {
+      fastify.log.warn({ err }, 'Failed to lookup user during JWT authentication')
+      reply.code(401).send({ message: 'Unauthorized' })
+      return
+    }
+
+    if (!authUser) {
+      reply.code(401).send({ message: 'Unauthorized' })
+      return
+    }
+
+    const lastLogoutAt = authUser.lastLogoutAt ? new Date(authUser.lastLogoutAt) : null
+    const accessUser = request.user as JwtAccessWithTimestamp
+    const rawIssuedAt = accessUser.iat
+    const issuedAt =
+      typeof rawIssuedAt === 'number'
+        ? rawIssuedAt
+        : typeof rawIssuedAt === 'string'
+          ? Number(rawIssuedAt)
+          : undefined
+    if (
+      lastLogoutAt &&
+      !Number.isNaN(lastLogoutAt.getTime()) &&
+      typeof issuedAt === 'number' &&
+      !Number.isNaN(issuedAt) &&
+      lastLogoutAt.getTime() >= issuedAt * 1000
+    ) {
       reply.code(401).send({ message: 'Unauthorized' })
       return
     }

@@ -67,6 +67,11 @@ export const executeQuery = async ({
         EJSON.deserialize(document)
       ),
     updateOne: () => currentMethod(EJSON.deserialize(query), EJSON.deserialize(update)),
+    findOneAndUpdate: () =>
+      (currentMethod as ReturnType<GetOperatorsFunction>['findOneAndUpdate'])(
+        EJSON.deserialize(query),
+        EJSON.deserialize(update)
+      ),
     aggregate: async () =>
       (await (currentMethod as ReturnType<GetOperatorsFunction>['aggregate'])(
         EJSON.deserialize(pipeline),
@@ -88,4 +93,3 @@ export const executeQuery = async ({
       )
   }
 }
-
