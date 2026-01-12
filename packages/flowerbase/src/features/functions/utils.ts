@@ -44,33 +44,50 @@ export const executeQuery = async ({
   currentMethod,
   query,
   update,
+  filter,
+  options,
+  returnNewDocument,
   document,
   documents,
   pipeline,
   isClient = false
 }: ExecuteQueryParams) => {
+  const resolvedQuery =
+    typeof query !== 'undefined'
+      ? query
+      : typeof filter !== 'undefined'
+        ? filter
+        : {}
+  const resolvedUpdate = typeof update !== 'undefined' ? update : {}
+  const resolvedOptions =
+    typeof options !== 'undefined'
+      ? options
+      : typeof returnNewDocument === 'boolean'
+        ? { returnDocument: returnNewDocument ? 'after' : 'before' }
+        : undefined
   return {
     find: async () =>
       await (currentMethod as ReturnType<GetOperatorsFunction>['find'])(
-        EJSON.deserialize(query)
+        EJSON.deserialize(resolvedQuery)
       ).toArray(),
     findOne: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['findOne'])(
-        EJSON.deserialize(query)
+        EJSON.deserialize(resolvedQuery)
       ),
     deleteOne: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['deleteOne'])(
-        EJSON.deserialize(query)
+        EJSON.deserialize(resolvedQuery)
       ),
     insertOne: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['insertOne'])(
         EJSON.deserialize(document)
       ),
-    updateOne: () => currentMethod(EJSON.deserialize(query), EJSON.deserialize(update)),
+    updateOne: () => currentMethod(EJSON.deserialize(resolvedQuery), EJSON.deserialize(resolvedUpdate)),
     findOneAndUpdate: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['findOneAndUpdate'])(
-        EJSON.deserialize(query),
-        EJSON.deserialize(update)
+        EJSON.deserialize(resolvedQuery),
+        EJSON.deserialize(resolvedUpdate),
+        resolvedOptions ? EJSON.deserialize(resolvedOptions) : undefined
       ),
     aggregate: async () =>
       (await (currentMethod as ReturnType<GetOperatorsFunction>['aggregate'])(
@@ -84,12 +101,12 @@ export const executeQuery = async ({
       ),
     updateMany: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['updateMany'])(
-        EJSON.deserialize(query),
-        EJSON.deserialize(update)
+        EJSON.deserialize(resolvedQuery),
+        EJSON.deserialize(resolvedUpdate)
       ),
     deleteMany: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['deleteMany'])(
-        EJSON.deserialize(query)
+        EJSON.deserialize(resolvedQuery)
       )
   }
 }
