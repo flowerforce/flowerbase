@@ -58,19 +58,25 @@ export async function initialize({
     logger: !!DEFAULT_CONFIG.ENABLE_LOGGER
   })
 
-  console.log("BASE PATH", resolvedBasePath)
+  const isTest = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined
+  const logInfo = (...args: unknown[]) => {
+    if (!isTest) {
+      console.log(...args)
+    }
+  }
 
-  console.log("CURRENT PORT", port)
-  console.log("CURRENT HOST", host)
+  logInfo("BASE PATH", resolvedBasePath)
+  logInfo("CURRENT PORT", port)
+  logInfo("CURRENT HOST", host)
 
   const functionsList = await loadFunctions(resolvedBasePath)
-  console.log("Functions LOADED")
+  logInfo("Functions LOADED")
   const triggersList = await loadTriggers(resolvedBasePath)
-  console.log("Triggers LOADED")
+  logInfo("Triggers LOADED")
   const endpointsList = await loadEndpoints(resolvedBasePath)
-  console.log("Endpoints LOADED")
+  logInfo("Endpoints LOADED")
   const rulesList = await loadRules(resolvedBasePath)
-  console.log("Rules LOADED")
+  logInfo("Rules LOADED")
 
   const stateConfig = {
     functions: functionsList,
@@ -137,15 +143,15 @@ export async function initialize({
     corsConfig
   })
 
-  console.log('Plugins registration COMPLETED')
+  logInfo('Plugins registration COMPLETED')
   await exposeRoutes(fastify)
-  console.log('APP Routes registration COMPLETED')
+  logInfo('APP Routes registration COMPLETED')
   await registerFunctions({ app: fastify, functionsList, rulesList })
-  console.log('Functions registration COMPLETED')
+  logInfo('Functions registration COMPLETED')
   await generateEndpoints({ app: fastify, functionsList, endpointsList, rulesList })
-  console.log('HTTP Endpoints registration COMPLETED')
+  logInfo('HTTP Endpoints registration COMPLETED')
   fastify.ready(() => {
-    console.log("FASTIFY IS READY")
+    logInfo("FASTIFY IS READY")
     if (triggersList?.length > 0) activateTriggers({ fastify, triggersList, functionsList })
   })
   await fastify.listen({ port, host })
