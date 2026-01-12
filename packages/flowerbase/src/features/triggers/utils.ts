@@ -111,54 +111,105 @@ const handleAuthenticationTrigger = async ({
   app
 }: HandlerParams) => {
   const { database } = config
+  const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
+  const collection = app.mongo.client.db(database || DB_NAME).collection(authCollection)
   const pipeline = [
     {
       $match: {
-        operationType: { $in: ['insert'] }
+        operationType: { $in: ['insert', 'update', 'replace'] }
       }
     }
   ]
-  const changeStream = app.mongo.client
-    .db(database || DB_NAME)
-    .collection(AUTH_CONFIG.authCollection)
-    .watch(pipeline, {
-      fullDocument: 'whenAvailable'
-    })
+  const changeStream = collection.watch(pipeline, {
+    fullDocument: 'whenAvailable'
+  })
   changeStream.on('error', (error) => {
     if (shouldIgnoreStreamError(error)) return
     console.error('Authentication trigger change stream error', error)
   })
   changeStream.on('change', async function (change) {
-    const document = change['fullDocument' as keyof typeof change] as Record<
-      string,
-      string
-    > //TODO -> define user type
-
-    if (document) {
-      delete document.password
-
-      const currentUser = { ...document }
-      delete currentUser.password
-      await GenerateContext({
-        args: [{
-          user: {
-            ...currentUser,
-            id: currentUser._id.toString(),
-            data: {
-              _id: currentUser._id.toString(),
-              email: currentUser.email
-            }
-          }
-        }],
-        app,
-        rules: StateManager.select("rules"),
-        user: {},  // TODO from currentUser ??
-        currentFunction: triggerHandler,
-        functionsList,
-        services,
-        runAsSystem: true
-      })
+    const operationType = change['operationType' as keyof typeof change] as string | undefined
+    const documentKey = change['documentKey' as keyof typeof change] as
+      | { _id?: unknown }
+      | undefined
+    const fullDocument = change['fullDocument' as keyof typeof change] as
+      | Record<string, unknown>
+      | null
+    if (!documentKey?._id) {
+      return
     }
+
+    const updateDescription = change[
+      'updateDescription' as keyof typeof change
+    ] as { updatedFields?: Record<string, unknown> } | undefined
+    const updatedStatus = updateDescription?.updatedFields?.status
+    let confirmedCandidate = false
+    let confirmedDocument =
+      fullDocument as Record<string, unknown> | null
+
+    if (operationType === 'update') {
+      if (updatedStatus === 'confirmed') {
+        confirmedCandidate = true
+      } else if (updatedStatus === undefined) {
+        const fetched = await collection.findOne({
+          _id: documentKey._id
+        }) as Record<string, unknown> | null
+        confirmedDocument = fetched ?? confirmedDocument
+        confirmedCandidate = (confirmedDocument as { status?: string } | null)?.status === 'confirmed'
+      }
+    } else {
+      confirmedCandidate = (confirmedDocument as { status?: string } | null)?.status === 'confirmed'
+    }
+
+    if (!confirmedCandidate) {
+      return
+    }
+
+    const updateResult = await collection.findOneAndUpdate(
+      {
+        _id: documentKey._id,
+        status: 'confirmed',
+        on_user_creation_triggered_at: { $exists: false }
+      },
+      {
+        $set: {
+          on_user_creation_triggered_at: new Date()
+        }
+      },
+      {
+        returnDocument: 'after'
+      }
+    )
+
+    const document =
+      (updateResult?.value as Record<string, unknown> | null) ?? confirmedDocument
+    if (!document) {
+      return
+    }
+
+    delete (document as { password?: unknown }).password
+
+    const currentUser = { ...document }
+    delete (currentUser as { password?: unknown }).password
+    await GenerateContext({
+      args: [{
+        user: {
+          ...currentUser,
+          id: (currentUser as { _id: { toString: () => string } })._id.toString(),
+          data: {
+            _id: (currentUser as { _id: { toString: () => string } })._id.toString(),
+            email: (currentUser as { email?: string }).email
+          }
+        }
+      }],
+      app,
+      rules: StateManager.select("rules"),
+      user: {},  // TODO from currentUser ??
+      currentFunction: triggerHandler,
+      functionsList,
+      services,
+      runAsSystem: true
+    })
   })
   registerOnClose(
     app,
