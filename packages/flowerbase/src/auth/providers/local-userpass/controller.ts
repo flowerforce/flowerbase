@@ -5,7 +5,7 @@ import handleUserRegistration from '../../../shared/handleUserRegistration'
 import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
-import { comparePassword, generateToken, hashPassword } from '../../../utils/crypto'
+import { comparePassword, generateToken, hashPassword, hashToken } from '../../../utils/crypto'
 import {
   AUTH_ENDPOINTS,
   AUTH_ERRORS,
@@ -48,11 +48,13 @@ export async function localUserPassController(app: FastifyInstance) {
     on_user_creation_function_name
   } = AUTH_CONFIG
   const { resetPasswordCollection } = AUTH_CONFIG
+  const { refreshTokensCollection } = AUTH_CONFIG
   const db = app.mongo.client.db(DB_NAME)
   const resetPasswordTtlSeconds = DEFAULT_CONFIG.RESET_PASSWORD_TTL_SECONDS
   const rateLimitWindowMs = DEFAULT_CONFIG.AUTH_RATE_LIMIT_WINDOW_MS
   const loginMaxAttempts = DEFAULT_CONFIG.AUTH_LOGIN_MAX_ATTEMPTS
   const resetMaxAttempts = DEFAULT_CONFIG.AUTH_RESET_MAX_ATTEMPTS
+  const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
 
   try {
     await db.collection(resetPasswordCollection).createIndex(
@@ -61,6 +63,15 @@ export async function localUserPassController(app: FastifyInstance) {
     )
   } catch (error) {
     console.error('Failed to ensure reset password TTL index', error)
+  }
+
+  try {
+    await db.collection(refreshTokensCollection).createIndex(
+      { expiresAt: 1 },
+      { expireAfterSeconds: 0 }
+    )
+  } catch (error) {
+    console.error('Failed to ensure refresh token TTL index', error)
   }
   const handleResetPasswordRequest = async (
     email: string,
@@ -224,9 +235,19 @@ export async function localUserPassController(app: FastifyInstance) {
         }
       }
 
+      const refreshToken = this.createRefreshToken(userWithCustomData)
+      const refreshTokenHash = hashToken(refreshToken)
+      await db.collection(refreshTokensCollection).insertOne({
+        userId: authUser._id,
+        tokenHash: refreshTokenHash,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + refreshTokenTtlMs),
+        revokedAt: null
+      })
+
       return {
         access_token: this.createAccessToken(userWithCustomData),
-        refresh_token: this.createRefreshToken(userWithCustomData),
+        refresh_token: refreshToken,
         device_id: '',
         user_id: authUser._id.toString()
       }

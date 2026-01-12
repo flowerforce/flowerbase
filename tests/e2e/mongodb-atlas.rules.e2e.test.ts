@@ -4,8 +4,8 @@ import { MongoClient, ObjectId, Document, DeleteResult } from 'mongodb'
 import { EJSON } from 'bson'
 import { initialize } from '../../packages/flowerbase/src'
 import { StateManager } from '../../packages/flowerbase/src/state'
-import { API_VERSION, DEFAULT_CONFIG } from '../../packages/flowerbase/src/constants'
-import { hashPassword } from '../../packages/flowerbase/src/utils/crypto'
+import { API_VERSION, AUTH_CONFIG, DEFAULT_CONFIG } from '../../packages/flowerbase/src/constants'
+import { hashPassword, hashToken } from '../../packages/flowerbase/src/utils/crypto'
 import type { User } from '../../packages/flowerbase/src/auth/dtos'
 
 jest.setTimeout(60000)
@@ -17,7 +17,7 @@ const USER_COLLECTION = 'users'
 const ACTIVITIES_COLLECTION = 'activities'
 const COUNTERS_COLLECTION = 'counters'
 const AUTH_USERS_COLLECTION = 'auth_users'
-const RESET_PASSWORD_COLLECTION = 'reset-password-requests'
+const RESET_PASSWORD_COLLECTION = 'reset_password_requests'
 const MANAGE_REPLICA_SET = process.env.MANAGE_REPLICA_SET === 'true'
 const REPLICA_SET_NAME = process.env.REPLICA_SET_NAME ?? 'rs0'
 const REPLICA_SET_HOST = process.env.REPLICA_SET_HOST ?? 'mongo:27017'
@@ -1146,6 +1146,89 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(second.statusCode).toBe(500)
     const body = second.json() as { message?: string }
     expect(body.message).toBe('This email address is already used')
+  })
+
+  it('revokes refresh tokens on logout', async () => {
+    const ip = '203.0.113.50'
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      remoteAddress: ip,
+      payload: {
+        username: 'auth-owner@example.com',
+        password: 'top-secret'
+      }
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as { refresh_token?: string }
+    expect(loginBody.refresh_token).toBeDefined()
+
+    const refreshToken = loginBody.refresh_token!
+    const session = await appInstance!.inject({
+      method: 'POST',
+      url: `${API_VERSION}/auth/session`,
+      remoteAddress: ip,
+      headers: {
+        authorization: `Bearer ${refreshToken}`
+      }
+    })
+    expect(session.statusCode).toBe(201)
+
+    const logout = await appInstance!.inject({
+      method: 'DELETE',
+      url: `${API_VERSION}/auth/session`,
+      remoteAddress: ip,
+      headers: {
+        authorization: `Bearer ${refreshToken}`
+      }
+    })
+    expect(logout.statusCode).toBe(200)
+
+    const sessionAfterLogout = await appInstance!.inject({
+      method: 'POST',
+      url: `${API_VERSION}/auth/session`,
+      remoteAddress: ip,
+      headers: {
+        authorization: `Bearer ${refreshToken}`
+      }
+    })
+    expect(sessionAfterLogout.statusCode).toBe(500)
+  })
+
+  it('rejects expired refresh tokens', async () => {
+    const ip = '203.0.113.51'
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      remoteAddress: ip,
+      payload: {
+        username: 'auth-owner@example.com',
+        password: 'top-secret'
+      }
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as { refresh_token?: string }
+    expect(loginBody.refresh_token).toBeDefined()
+
+    const refreshToken = loginBody.refresh_token!
+    const refreshTokenHash = hashToken(refreshToken)
+    await client
+      .db(DB_NAME)
+      .collection(AUTH_CONFIG.refreshTokensCollection)
+      .updateOne(
+        { tokenHash: refreshTokenHash },
+        { $set: { expiresAt: new Date(Date.now() - 1000) } }
+      )
+
+    const sessionAfterExpiry = await appInstance!.inject({
+      method: 'POST',
+      url: `${API_VERSION}/auth/session`,
+      remoteAddress: ip,
+      headers: {
+        authorization: `Bearer ${refreshToken}`
+      }
+    })
+    expect(sessionAfterExpiry.statusCode).toBe(500)
   })
 
   it('rejects registration with invalid email or password', async () => {

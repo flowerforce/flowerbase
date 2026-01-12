@@ -39,3 +39,7 @@ export const comparePassword = async (plaintext: string, storedPassword: string)
 export const generateToken = (length = 64) => {
   return crypto.randomBytes(length).toString('hex')
 }
+
+export const hashToken = (token: string) => {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}

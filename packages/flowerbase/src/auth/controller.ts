@@ -1,8 +1,9 @@
 import { ObjectId } from 'bson'
 import { FastifyInstance } from 'fastify'
-import { AUTH_CONFIG, DB_NAME } from '../constants'
+import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../constants'
 import { SessionCreatedDto } from './dtos'
 import { AUTH_ENDPOINTS, AUTH_ERRORS } from './utils'
+import { hashToken } from '../utils/crypto'
 
 const HANDLER_TYPE = 'preHandler'
 
@@ -12,9 +13,19 @@ const HANDLER_TYPE = 'preHandler'
  * @param {FastifyInstance} app - The Fastify instance.
  */
 export async function authController(app: FastifyInstance) {
-  const { authCollection, userCollection } = AUTH_CONFIG
+  const { authCollection, userCollection, refreshTokensCollection } = AUTH_CONFIG
 
   const db = app.mongo.client.db(DB_NAME)
+  const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
+
+  try {
+    await db.collection(refreshTokensCollection).createIndex(
+      { expiresAt: 1 },
+      { expireAfterSeconds: 0 }
+    )
+  } catch (error) {
+    console.error('Failed to ensure refresh token TTL index', error)
+  }
 
   app.addHook(HANDLER_TYPE, app.jwtAuthentication)
 
@@ -59,6 +70,21 @@ export async function authController(app: FastifyInstance) {
         throw new Error(AUTH_ERRORS.INVALID_TOKEN)
       }
 
+      const authHeader = req.headers.authorization
+      if (!authHeader?.startsWith('Bearer ')) {
+        throw new Error(AUTH_ERRORS.INVALID_TOKEN)
+      }
+      const refreshToken = authHeader.slice('Bearer '.length).trim()
+      const refreshTokenHash = hashToken(refreshToken)
+      const storedToken = await db.collection(refreshTokensCollection).findOne({
+        tokenHash: refreshTokenHash,
+        revokedAt: null,
+        expiresAt: { $gt: new Date() }
+      })
+      if (!storedToken) {
+        throw new Error(AUTH_ERRORS.INVALID_TOKEN)
+      }
+
       const auth_user = await db
         ?.collection(authCollection)
         .findOne({ _id: new this.mongo.ObjectId(req.user.sub) })
@@ -85,7 +111,18 @@ export async function authController(app: FastifyInstance) {
      */
   app.delete(
     AUTH_ENDPOINTS.SESSION,
-    async function () {
+    async function (req, res) {
+      const authHeader = req.headers.authorization
+      if (!authHeader?.startsWith('Bearer ')) {
+        res.status(204)
+        return
+      }
+      const refreshToken = authHeader.slice('Bearer '.length).trim()
+      const refreshTokenHash = hashToken(refreshToken)
+      await db.collection(refreshTokensCollection).updateOne(
+        { tokenHash: refreshTokenHash },
+        { $set: { revokedAt: new Date(), expiresAt: new Date(Date.now() + refreshTokenTtlMs) } }
+      )
       return { status: "ok" }
     }
   )

@@ -1,6 +1,7 @@
 import fastifyJwt from '@fastify/jwt'
 import fp from 'fastify-plugin'
 import { Document, ObjectId, WithId } from 'mongodb'
+import { DEFAULT_CONFIG } from '../../constants'
 
 type Options = {
   secret: string
@@ -67,7 +68,7 @@ export default fp(async function (fastify, opts: Options) {
       },
       {
         sub: user._id.toJSON(),
-        expiresIn: '60d'
+        expiresIn: `${DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS}d`
       }
     )
   })
