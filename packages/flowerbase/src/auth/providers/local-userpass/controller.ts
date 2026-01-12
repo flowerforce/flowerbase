@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify'
+import { ObjectId } from 'mongodb'
 import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
 import handleUserRegistration from '../../../shared/handleUserRegistration'
 import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
@@ -165,7 +166,7 @@ export async function localUserPassController(app: FastifyInstance) {
       const existing = await db.collection(authCollection!).findOne({
         confirmationToken: req.body.token,
         confirmationTokenId: req.body.tokenId
-      }) as { _id: unknown; status?: string } | null
+      }) as { _id: ObjectId; status?: string } | null
 
       if (!existing) {
         res.status(500)
