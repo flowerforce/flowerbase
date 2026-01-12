@@ -8,6 +8,10 @@ loadEnv({
   override: false
 })
 
+if (!process.env.FLOWERBASE_APP_PATH) {
+  process.env.FLOWERBASE_APP_PATH = path.resolve(__dirname, 'e2e/app')
+}
+
 const config: Config.InitialOptions = {
   rootDir: path.resolve(__dirname, '../'),
   preset: 'ts-jest',

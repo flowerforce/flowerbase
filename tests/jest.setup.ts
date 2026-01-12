@@ -2,7 +2,7 @@ import { Blob as NodeBlob } from 'buffer'
 import path from 'node:path'
 
 if (!process.env.FLOWERBASE_APP_PATH) {
-  process.env.FLOWERBASE_APP_PATH = path.resolve(__dirname, 'e2e/app')
+  process.env.FLOWERBASE_APP_PATH = path.resolve(__dirname, '../../tests/e2e/app')
 }
 
 const BaseBlob = typeof globalThis.Blob !== 'undefined' ? globalThis.Blob : NodeBlob
@@ -26,3 +26,17 @@ class FilePolyfill extends BaseBlob {
 if (typeof globalThis.File === 'undefined') {
   globalThis.File = FilePolyfill as unknown as typeof File
 }
+
+const createChannel = () => ({
+  publish: jest.fn(),
+  subscribe: jest.fn()
+})
+
+jest.mock('node:diagnostics_channel', () => ({
+  channel: jest.fn(createChannel),
+  tracingChannel: () => ({
+    asyncStart: createChannel(),
+    asyncEnd: createChannel(),
+    error: createChannel()
+  })
+}))
