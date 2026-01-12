@@ -24,7 +24,7 @@ export const activateTriggers = async ({
         (trigger) =>
           trigger.content.type === 'AUTHENTICATION' &&
           trigger.content.event_processors?.FUNCTION?.config?.function_name ===
-            AUTH_CONFIG.on_user_creation_function_name
+          AUTH_CONFIG.on_user_creation_function_name
       )
       if (!alreadyDeclared) {
         triggersToActivate.push({
@@ -34,6 +34,7 @@ export const activateTriggers = async ({
             type: 'AUTHENTICATION',
             disabled: false,
             config: {
+              isAutoTrigger: true,
               collection: AUTH_CONFIG.authCollection ?? 'auth_users',
               database: DB_NAME,
               full_document: true,

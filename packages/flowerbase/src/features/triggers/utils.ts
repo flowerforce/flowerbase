@@ -110,7 +110,7 @@ const handleAuthenticationTrigger = async ({
   services,
   app
 }: HandlerParams) => {
-  const { database } = config
+  const { database, isAutoTrigger } = config
   const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
   const collection = app.mongo.client.db(database || DB_NAME).collection(authCollection)
   const pipeline = [
@@ -191,17 +191,17 @@ const handleAuthenticationTrigger = async ({
 
     const currentUser = { ...document }
     delete (currentUser as { password?: unknown }).password
+
+    const userData = {
+      ...currentUser,
+      id: (currentUser as { _id: { toString: () => string } })._id.toString(),
+      data: {
+        _id: (currentUser as { _id: { toString: () => string } })._id.toString(),
+        email: (currentUser as { email?: string }).email
+      }
+    }
     await GenerateContext({
-      args: [{
-        user: {
-          ...currentUser,
-          id: (currentUser as { _id: { toString: () => string } })._id.toString(),
-          data: {
-            _id: (currentUser as { _id: { toString: () => string } })._id.toString(),
-            email: (currentUser as { email?: string }).email
-          }
-        }
-      }],
+      args: isAutoTrigger ? [userData] : [{ user: userData, ...change }],
       app,
       rules: StateManager.select("rules"),
       user: {},  // TODO from currentUser ??
