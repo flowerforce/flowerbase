@@ -39,14 +39,7 @@ const isRateLimited = (key: string, maxAttempts: number, windowMs: number) => {
  * @param {FastifyInstance} app - The Fastify instance.
  */
 export async function localUserPassController(app: FastifyInstance) {
-  const functionsList = StateManager.select('functions')
-
-  const {
-    authCollection,
-    userCollection,
-    user_id_field,
-    on_user_creation_function_name
-  } = AUTH_CONFIG
+  const { authCollection, userCollection, user_id_field } = AUTH_CONFIG
   const { resetPasswordCollection } = AUTH_CONFIG
   const { refreshTokensCollection } = AUTH_CONFIG
   const db = app.mongo.client.db(DB_NAME)
@@ -211,27 +204,6 @@ export async function localUserPassController(app: FastifyInstance) {
           )
         } catch (error) {
           console.log('>>> 🚀 ~ localUserPassController ~ error:', error)
-        }
-      }
-
-      if (
-        authUser &&
-        authUser.status === 'pending' &&
-        on_user_creation_function_name &&
-        functionsList[on_user_creation_function_name]
-      ) {
-        try {
-          await GenerateContext({
-            args: [userWithCustomData],
-            app,
-            rules: {},
-            user: userWithCustomData,
-            currentFunction: functionsList[on_user_creation_function_name],
-            functionsList,
-            services
-          })
-        } catch (error) {
-          console.log('localUserPassController - /login - GenerateContext - CATCH:', error)
         }
       }
 

@@ -1,12 +1,12 @@
 import path from 'node:path'
-import { FastifyInstance } from 'fastify'
-import { MongoClient, ObjectId, Document, DeleteResult } from 'mongodb'
 import { EJSON } from 'bson'
+import { FastifyInstance } from 'fastify'
+import { DeleteResult, Document, MongoClient, ObjectId } from 'mongodb'
 import { initialize } from '../../packages/flowerbase/src'
-import { StateManager } from '../../packages/flowerbase/src/state'
-import { API_VERSION, AUTH_CONFIG, DEFAULT_CONFIG } from '../../packages/flowerbase/src/constants'
-import { hashPassword, hashToken } from '../../packages/flowerbase/src/utils/crypto'
 import type { User } from '../../packages/flowerbase/src/auth/dtos'
+import { API_VERSION, AUTH_CONFIG, DEFAULT_CONFIG } from '../../packages/flowerbase/src/constants'
+import { StateManager } from '../../packages/flowerbase/src/state'
+import { hashPassword, hashToken } from '../../packages/flowerbase/src/utils/crypto'
 
 jest.setTimeout(120000)
 
@@ -1150,6 +1150,36 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(loginBody.access_token).toBeDefined()
     expect(loginBody.refresh_token).toBeDefined()
     expect(loginBody.user_id).toBe(authUserIds.owner.toString())
+  })
+
+  it('calls on_user_creation_function_name when auth user becomes confirmed', async () => {
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email: 'trigger-user@example.com',
+        password: 'trigger-pass'
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: 'trigger-user@example.com',
+        password: 'trigger-pass'
+      }
+    })
+    expect(login.statusCode).toBe(200)
+
+    const loginBody = login.json() as { user_id?: string }
+    expect(loginBody.user_id).toBeDefined()
+
+    const creationEvent = await waitForTriggerEvent(loginBody.user_id!)
+    expect(creationEvent).toBeDefined()
+    expect(creationEvent?.type).toBe('on_user_creation')
+    expect(creationEvent?.email).toBe('trigger-user@example.com')
   })
 
   it('rejects registration when the email is already used', async () => {

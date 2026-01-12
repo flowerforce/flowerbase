@@ -4,5 +4,5 @@
   "database_name": "flowerbase-e2e",
   "collection_name": "users",
   "user_id_field": "id",
-  "on_user_creation_function_name": "searchTodos"
+  "on_user_creation_function_name": "onCreateUser"
 }

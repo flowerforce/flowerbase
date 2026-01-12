@@ -43,5 +43,10 @@
     "name": "resetPasswordHandler",
     "private": false,
     "run_as_system": true
+  },
+  {
+    "name": "onCreateUser",
+    "private": true,
+    "run_as_system": true
   }
 ]
