@@ -141,6 +141,7 @@ const callServiceOperation = async ({
   method:
   | 'find'
   | 'findOne'
+  | 'findOneAndUpdate'
   | 'deleteOne'
   | 'deleteMany'
   | 'insertOne'
@@ -208,6 +209,8 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
   insertOne: (document: Document) => callServiceOperation({ collection, method: 'insertOne', user, document }),
   updateOne: (query: Document, update: Document) =>
     callServiceOperation({ collection, method: 'updateOne', user, query, update }),
+  findOneAndUpdate: (query: Document, update: Document) =>
+    callServiceOperation({ collection, method: 'findOneAndUpdate', user, query, update }),
   deleteOne: (query: Document) => callServiceOperation({ collection, method: 'deleteOne', user, query }),
   deleteMany: (query: Document = {}) =>
     callServiceOperation({ collection, method: 'deleteMany', user, query }),
@@ -297,6 +300,8 @@ const resetCollections = async () => {
     db.collection(ACTIVITIES_COLLECTION).deleteMany({}),
     db.collection(COUNTERS_COLLECTION).deleteMany({}),
     db.collection(AUTH_USERS_COLLECTION).deleteMany({}),
+    db.collection(AUTH_CONFIG.refreshTokensCollection).deleteMany({}),
+    db.collection(RESET_PASSWORD_COLLECTION).deleteMany({}),
     db.collection(TRIGGER_EVENTS_COLLECTION).deleteMany({})
   ])
 
@@ -744,6 +749,28 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       _id: todoIds.otherUser
     })) as DeleteResult
     expect(deleteResult.deletedCount).toBe(1)
+  })
+
+  it('allows owners to update their own todos with findOneAndUpdate', async () => {
+    const updatedTitle = 'Owner task updated'
+    await getTodosCollection(ownerUser).findOneAndUpdate(
+      { _id: todoIds.ownerFirst },
+      { $set: { title: updatedTitle } }
+    )
+
+    const updated = (await getTodosCollection(ownerUser).findOne({
+      _id: todoIds.ownerFirst
+    })) as TodoDoc | null
+    expect(updated?.title).toBe(updatedTitle)
+  })
+
+  it('prevents guests from updating others todos with findOneAndUpdate', async () => {
+    await expect(
+      getTodosCollection(guestUser).findOneAndUpdate(
+        { _id: todoIds.ownerFirst },
+        { $set: { title: 'Should fail' } }
+      )
+    ).rejects.toThrow('Update not permitted')
   })
 
   it('limits profiles to shared workspaces', async () => {
