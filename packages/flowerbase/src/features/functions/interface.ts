@@ -24,6 +24,9 @@ export type ExecuteQueryParams = {
   currentMethod: ReturnType<GetOperatorsFunction>[keyof ReturnType<GetOperatorsFunction>]
   query: Parameters<GetOperatorsFunction>
   update: Document
+  filter?: Document
+  options?: Document
+  returnNewDocument?: boolean
   document: Document
   documents: Document[]
   pipeline: Document[]

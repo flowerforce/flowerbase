@@ -61,7 +61,18 @@ export const functionsController: FunctionController = async (
         if (!serviceFn) {
           throw new Error(`Service "${req.body.service}" does not exist`)
         }
-      const [{ database, collection, query, update, document, documents, pipeline = [] }] = args
+      const [{
+        database,
+        collection,
+        query,
+        filter,
+        update,
+        options,
+        returnNewDocument,
+        document,
+        documents,
+        pipeline = []
+      }] = args
 
       const currentMethod = serviceFn(app, { rules, user })
         .db(database)
@@ -71,7 +82,10 @@ export const functionsController: FunctionController = async (
       const operatorsByType = await executeQuery({
         currentMethod,
         query,
+        filter,
         update,
+        options,
+        returnNewDocument,
         document,
         documents,
         pipeline,
