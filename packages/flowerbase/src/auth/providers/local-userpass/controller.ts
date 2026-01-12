@@ -1,6 +1,5 @@
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
-import { services } from '../../../services'
 import handleUserRegistration from '../../../shared/handleUserRegistration'
 import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
 import { StateManager } from '../../../state'
@@ -10,6 +9,7 @@ import {
   AUTH_ENDPOINTS,
   AUTH_ERRORS,
   CONFIRM_RESET_SCHEMA,
+  CONFIRM_USER_SCHEMA,
   LOGIN_SCHEMA,
   REGISTRATION_SCHEMA,
   RESET_CALL_SCHEMA,
@@ -17,6 +17,7 @@ import {
 } from '../../utils'
 import {
   ConfirmResetPasswordDto,
+  ConfirmUserDto,
   LoginDto,
   RegistrationDto,
   ResetPasswordCallDto,
@@ -143,6 +144,50 @@ export async function localUserPassController(app: FastifyInstance) {
   )
 
   /**
+   * Endpoint for confirming a user registration.
+   *
+   * @route {POST} /confirm
+   * @param {ConfirmUserDto} req - The request object with confirmation data.
+   * @returns {Promise<Object>} A promise resolving with confirmation status.
+   */
+  app.post<ConfirmUserDto>(
+    AUTH_ENDPOINTS.CONFIRM,
+    {
+      schema: CONFIRM_USER_SCHEMA
+    },
+    async (req, res) => {
+      const key = `confirm:${req.ip}`
+      if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
+        res.status(429).send({ message: 'Too many requests' })
+        return
+      }
+
+      const existing = await db.collection(authCollection!).findOne({
+        confirmationToken: req.body.token,
+        confirmationTokenId: req.body.tokenId
+      }) as { _id: unknown; status?: string } | null
+
+      if (!existing) {
+        res.status(500)
+        throw new Error(AUTH_ERRORS.INVALID_TOKEN)
+      }
+
+      if (existing.status !== 'confirmed') {
+        await db.collection(authCollection!).updateOne(
+          { _id: existing._id },
+          {
+            $set: { status: 'confirmed' },
+            $unset: { confirmationToken: '', confirmationTokenId: '' }
+          }
+        )
+      }
+
+      res.status(200)
+      return { status: 'confirmed' }
+    }
+  )
+
+  /**
    * Endpoint for user login.
    *
    * @route {POST} /login
@@ -192,19 +237,8 @@ export async function localUserPassController(app: FastifyInstance) {
         id: authUser._id.toString()
       }
 
-      if (authUser && authUser.status === 'pending') {
-        try {
-          await db?.collection(authCollection!).updateOne(
-            { _id: authUser._id },
-            {
-              $set: {
-                status: 'confirmed'
-              }
-            }
-          )
-        } catch (error) {
-          console.log('>>> 🚀 ~ localUserPassController ~ error:', error)
-        }
+      if (authUser && authUser.status !== 'confirmed') {
+        throw new Error(AUTH_ERRORS.USER_NOT_CONFIRMED)
       }
 
       const refreshToken = this.createRefreshToken(userWithCustomData)

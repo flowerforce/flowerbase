@@ -64,6 +64,17 @@ export const CONFIRM_RESET_SCHEMA = {
   }
 }
 
+export const CONFIRM_USER_SCHEMA = {
+  body: {
+    type: 'object',
+    properties: {
+      token: { type: 'string' },
+      tokenId: { type: 'string' }
+    },
+    required: ['token', 'tokenId']
+  }
+}
+
 export const RESET_SCHEMA = RESET_SEND_SCHEMA
 
 export const REGISTRATION_SCHEMA = {
@@ -85,6 +96,7 @@ export const REGISTRATION_SCHEMA = {
 export enum AUTH_ENDPOINTS {
   LOGIN = '/login',
   REGISTRATION = '/register',
+  CONFIRM = '/confirm',
   PROFILE = '/profile',
   SESSION = '/session',
   RESET = '/reset/send',
@@ -97,7 +109,8 @@ export enum AUTH_ERRORS {
   INVALID_CREDENTIALS = 'Invalid credentials',
   INVALID_TOKEN = 'Invalid refresh token provided',
   INVALID_RESET_PARAMS = 'Invalid token or tokenId provided',
-  MISSING_RESET_FUNCTION = 'Missing reset function'
+  MISSING_RESET_FUNCTION = 'Missing reset function',
+  USER_NOT_CONFIRMED = 'User not confirmed'
 }
 
 export interface AuthConfig {
@@ -130,6 +143,7 @@ interface CustomFunction {
 
 export interface Config {
   autoConfirm: boolean
+  confirmationFunctionName?: string
   resetFunctionName: string
   resetPasswordUrl: string
   runConfirmationFunction: boolean

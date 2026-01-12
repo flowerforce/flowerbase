@@ -48,5 +48,10 @@
     "name": "onCreateUser",
     "private": true,
     "run_as_system": true
+  },
+  {
+    "name": "confirmUser",
+    "private": true,
+    "run_as_system": true
   }
 ]
