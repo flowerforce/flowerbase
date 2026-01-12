@@ -21,6 +21,7 @@ type Config = {
   database: string
   full_document: boolean
   full_document_before_change: boolean
+  isAutoTrigger?: boolean
   match: Record<string, unknown>
   operation_types: string[]
   project: Record<string, unknown>
