@@ -118,6 +118,7 @@ export interface AuthConfig {
   'api-key': ApiKey
   'local-userpass': LocalUserpass
   'custom-function': CustomFunction
+  'anon-user'?: AnonUser
 }
 
 interface ApiKey {
@@ -139,6 +140,12 @@ interface CustomFunction {
   config: {
     "authFunctionName": string
   }
+}
+
+export interface AnonUser {
+  name: "anon-user"
+  type: "anon-user"
+  disabled: boolean
 }
 
 export interface Config {
