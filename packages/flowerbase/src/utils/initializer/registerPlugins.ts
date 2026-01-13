@@ -5,6 +5,7 @@ import fastifyRawBody from 'fastify-raw-body'
 import { CorsConfig } from '../../'
 import { authController } from '../../auth/controller'
 import jwtAuthPlugin from '../../auth/plugins/jwt'
+import { anonUserController } from '../../auth/providers/anon-user/controller'
 import { customFunctionController } from '../../auth/providers/custom-function/controller'
 import { localUserPassController } from '../../auth/providers/local-userpass/controller'
 import { API_VERSION } from '../../constants'
@@ -132,6 +133,13 @@ const getRegisterConfig = async ({
       plugin: customFunctionController,
       options: {
         prefix: `${API_VERSION}/app/:appId/auth/providers/custom-function`
+      }
+    },
+    {
+      pluginName: 'anonUserController',
+      plugin: anonUserController,
+      options: {
+        prefix: `${API_VERSION}/app/:appId/auth/providers/anon-user`
       }
     }
   ] as RegisterConfig[]

@@ -229,11 +229,12 @@ However, all users will be required to reset their passwords since it is not pos
 
 ### ✅ Supported Auth Method
 
-The only authentication mode currently re-implemented in `@flowerforce/flowerbase` is:
+The authentication modes currently re-implemented in `@flowerforce/flowerbase` are:
 
 - Local Email/Password (local-userpass)
+- Anonymous (anon-user)
 
-> Other methods (OAuth, API key, anonymous, etc.) are not supported yet.
+> Other methods (OAuth, API key, etc.) are not supported yet.
 
 ####  Example user:
 ```js
@@ -270,13 +271,18 @@ Example
         "name": "local-userpass",
         "type": "local-userpass",
         "disabled": false,
-        "auth_collection": "my-users-collection" //custom collection name
+        "auth_collection": "my-users-collection", //custom collection name
         "config": {
             "autoConfirm": true,
             "resetPasswordSubject": "reset",
             "resetPasswordUrl": "https://my.app.url/password-reset",
             "runConfirmationFunction": false
         }
+    },
+    "anon-user": {
+        "name": "anon-user",
+        "type": "anon-user",
+        "disabled": false
     }
 }
 

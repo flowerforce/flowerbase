@@ -22,6 +22,7 @@ export const DEFAULT_CONFIG = {
   AUTH_LOGIN_MAX_ATTEMPTS: Number(process.env.AUTH_LOGIN_MAX_ATTEMPTS) || 10,
   AUTH_RESET_MAX_ATTEMPTS: Number(process.env.AUTH_RESET_MAX_ATTEMPTS) || 5,
   REFRESH_TOKEN_TTL_DAYS: Number(process.env.REFRESH_TOKEN_TTL_DAYS) || 60,
+  ANON_USER_TTL_SECONDS: Number(process.env.ANON_USER_TTL_SECONDS) || 3 * 60 * 60,
   SWAGGER_UI_USER: process.env.SWAGGER_UI_USER || '',
   SWAGGER_UI_PASSWORD: process.env.SWAGGER_UI_PASSWORD || '',
   CORS_OPTIONS: {
@@ -44,7 +45,8 @@ export const AUTH_CONFIG = {
   user_id_field,
   on_user_creation_function_name,
   providers: {
-    "custom-function": configuration['custom-function']?.config
+    "custom-function": configuration['custom-function']?.config,
+    "anon-user": configuration['anon-user']
   }
 }
 

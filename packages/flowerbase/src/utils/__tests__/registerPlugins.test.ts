@@ -3,6 +3,7 @@ import fastifyMongodb from '@fastify/mongodb'
 import { authController } from '../../auth/controller'
 import jwtAuthPlugin from '../../auth/plugins/jwt'
 import fastifyRawBody from 'fastify-raw-body'
+import { anonUserController } from '../../auth/providers/anon-user/controller'
 import { customFunctionController } from '../../auth/providers/custom-function/controller'
 import { localUserPassController } from '../../auth/providers/local-userpass/controller'
 import { Functions } from '../../features/functions/interface'
@@ -36,7 +37,7 @@ describe('registerPlugins', () => {
     })
 
     // Check Plugins Registration
-    expect(registerMock).toHaveBeenCalledTimes(7)
+    expect(registerMock).toHaveBeenCalledTimes(8)
     expect(registerMock).toHaveBeenCalledWith(cors, {
       origin: '*',
       methods: ['POST', 'GET']
@@ -62,6 +63,9 @@ describe('registerPlugins', () => {
     })
     expect(registerMock).toHaveBeenCalledWith(customFunctionController, {
       prefix: `${MOCKED_API_VERSION}/app/:appId/auth/providers/custom-function`
+    })
+    expect(registerMock).toHaveBeenCalledWith(anonUserController, {
+      prefix: `${MOCKED_API_VERSION}/app/:appId/auth/providers/anon-user`
     })
   })
 

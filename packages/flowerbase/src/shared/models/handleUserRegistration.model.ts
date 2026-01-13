@@ -28,5 +28,6 @@ export type HandleUserRegistration = (
 
 export enum PROVIDER {
   LOCAL_USERPASS = "local-userpass",
-  CUSTOM_FUNCTION = "custom-function"
+  CUSTOM_FUNCTION = "custom-function",
+  ANON_USER = "anon-user"
 }
