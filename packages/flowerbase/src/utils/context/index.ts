@@ -214,11 +214,11 @@ export async function GenerateContext({
           const moduleCache = new Map<string, vm.Module>()
 
           const loadModule = async (specifier: string): Promise<vm.Module> => {
-          const importTarget = resolveImportTarget(specifier, customRequire)
-          const cached = moduleCache.get(importTarget)
-          if (cached) return cached
+            const importTarget = resolveImportTarget(specifier, customRequire)
+            const cached = moduleCache.get(importTarget)
+            if (cached) return cached
 
-          const namespace = await dynamicImport(importTarget)
+            const namespace = await dynamicImport(importTarget)
             const exportNames = Object.keys(namespace)
             if ('default' in namespace && !exportNames.includes('default')) {
               exportNames.push('default')
@@ -234,34 +234,34 @@ export async function GenerateContext({
               { context: vmContext, identifier: importTarget }
             )
 
-          moduleCache.set(importTarget, syntheticModule)
-          return syntheticModule
-        }
+            moduleCache.set(importTarget, syntheticModule)
+            return syntheticModule
+          }
 
-        const importModuleDynamically = (async (
-          specifier: string
-        ): Promise<vm.Module> => {
-          const module = await loadModule(specifier)
-          if (module.status === 'unlinked') {
-            await module.link(loadModule)
-          }
-          if (module.status === 'linked') {
-            await module.evaluate()
-          }
-          return module
-        }) as unknown as vm.ScriptOptions['importModuleDynamically']
+          const importModuleDynamically = (async (
+            specifier: string
+          ): Promise<vm.Module> => {
+            const module = await loadModule(specifier)
+            if (module.status === 'unlinked') {
+              await module.link(loadModule)
+            }
+            if (module.status === 'linked') {
+              await module.evaluate()
+            }
+            return module
+          }) as unknown as vm.ScriptOptions['importModuleDynamically']
 
-        const sourceModule = new vmModules.SourceTextModule(
-          wrapEsmModule(functionToRun.code),
-          {
-            context: vmContext,
-            identifier: entryFile,
-            initializeImportMeta: (meta) => {
-              meta.url = pathToFileURL(entryFile).href
-            },
-            importModuleDynamically
-          }
-        )
+          const sourceModule = new vmModules.SourceTextModule(
+            wrapEsmModule(functionToRun.code),
+            {
+              context: vmContext,
+              identifier: entryFile,
+              initializeImportMeta: (meta) => {
+                meta.url = pathToFileURL(entryFile).href
+              },
+              importModuleDynamically
+            }
+          )
 
           await sourceModule.link(loadModule)
           await sourceModule.evaluate()
@@ -281,9 +281,9 @@ export async function GenerateContext({
       }
 
       sandboxModule.exports = resolveExport(vmContext) ?? sandboxModule.exports
-    }
-    catch (e) {
-      console.log(e)
+    } catch (error) {
+      console.error(error)
+      throw error
     }
 
     if (deserializeArgs) {
@@ -294,6 +294,11 @@ export async function GenerateContext({
 
     return await (sandboxModule.exports as ExportedFunction)(...args)
   }
-  const res = await functionsQueue.add(run, enqueue)
-  return res
+  try {
+    const res = await functionsQueue.add(run, enqueue)
+    return res
+  } catch (error) {
+    console.error(error)
+    throw error
+  }
 }
