@@ -67,7 +67,7 @@ export type GetOperatorsFunction = (
   watch: (...params: Parameters<Method<'watch'>>) => ReturnType<Method<'watch'>>
   aggregate: (
     ...params: [...Parameters<Method<'aggregate'>>, isClient: boolean]
-  ) => Promise<ReturnType<Method<'aggregate'>>>
+  ) => ReturnType<Method<'aggregate'>>
   insertMany: (
     ...params: Parameters<Method<'insertMany'>>
   ) => ReturnType<Method<'insertMany'>>
