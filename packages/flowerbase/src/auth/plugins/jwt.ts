@@ -91,13 +91,13 @@ export default fp(async function (fastify, opts: Options) {
 
   fastify.decorate('createAccessToken', function (user: WithId<Document>) {
     const id = user._id.toString()
-    const userDataId = user.user_data._id.toString()
+    // const userDataId = user.user_data._id.toString()
 
     const user_data = {
-      _id: userDataId,
-      id: userDataId,
+      ...user.user_data,
+      _id: id,
+      id: id,
       email: user.email,
-      ...user.user_data
     }
 
     return this.jwt.sign(
@@ -111,7 +111,7 @@ export default fp(async function (fastify, opts: Options) {
       {
         iss: BAAS_ID,
         jti: BAAS_ID,
-        sub: user._id.toJSON(),
+        sub: id,
         expiresIn: '300m'
       }
     )
