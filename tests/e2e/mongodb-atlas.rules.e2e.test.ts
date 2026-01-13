@@ -1103,8 +1103,10 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     })
 
     expect(response.statusCode).toBe(500)
-    const body = response.json() as { message?: string }
-    expect(body.message).toBe('READ FORBIDDEN!')
+    const body = response.json() as { error?: string; error_code?: string }
+    expect(body.error_code).toBe('FunctionExecutionError')
+    const parsedError = body.error ? JSON.parse(body.error) as { message?: string } : {}
+    expect(parsedError.message).toBe('READ FORBIDDEN!')
   })
 
   it('exposes the new API endpoint through the dedicated function', async () => {
