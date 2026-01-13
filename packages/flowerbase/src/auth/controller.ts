@@ -1,9 +1,9 @@
 import { ObjectId } from 'bson'
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../constants'
+import { hashToken } from '../utils/crypto'
 import { SessionCreatedDto } from './dtos'
 import { AUTH_ENDPOINTS, AUTH_ERRORS } from './utils'
-import { hashToken } from '../utils/crypto'
 
 const HANDLER_TYPE = 'preHandler'
 
@@ -101,7 +101,10 @@ export async function authController(app: FastifyInstance) {
       return {
         access_token: this.createAccessToken({
           ...auth_user,
-          user_data: user
+          user_data: {
+            ...user,
+            id: req.user.sub
+          }
         })
       }
     }
