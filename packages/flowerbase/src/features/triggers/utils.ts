@@ -200,8 +200,9 @@ const handleAuthenticationTrigger = async ({
         email: (currentUser as { email?: string }).email
       }
     }
+    // TODO change va ripulito
     await GenerateContext({
-      args: isAutoTrigger ? [userData] : [{ user: userData, ...change }],
+      args: isAutoTrigger ? [userData] : [{ user: userData /*, ...change */ }],
       app,
       rules: StateManager.select("rules"),
       user: {},  // TODO from currentUser ??
