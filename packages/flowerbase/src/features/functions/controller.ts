@@ -34,6 +34,13 @@ const logFunctionCall = (method: string, user: Record<string, any> | undefined, 
   console.log('[functions-debug]', method, user ? { id: user.id, role: user.role, email: user.email } : 'no-user', args)
 }
 
+const formatFunctionExecutionError = (error: unknown) => {
+  const err = error as { message?: string; name?: string }
+  const message = typeof err?.message === 'string' ? err.message : String(error)
+  const name = typeof err?.name === 'string' ? err.name : 'Error'
+  return JSON.stringify({ message, name })
+}
+
 /**
  * > Creates a pre handler for every query
  * @param app -> the fastify instance
@@ -105,17 +112,26 @@ export const functionsController: FunctionController = async (
     }
 
     logFunctionCall(`function:${method}`, user, args)
-    const result = await GenerateContext({
-      args: req.body.arguments,
-      app,
-      rules,
-      user: { ...user, _id: new ObjectId(user.id) },
-      currentFunction,
-      functionsList,
-      services
-    })
-    res.type('application/json')
-    return JSON.stringify(result)
+    try {
+      const result = await GenerateContext({
+        args: req.body.arguments,
+        app,
+        rules,
+        user: { ...user, _id: new ObjectId(user.id) },
+        currentFunction,
+        functionsList,
+        services
+      })
+      res.type('application/json')
+      return JSON.stringify(result)
+    } catch (error) {
+      res.status(500)
+      res.type('application/json')
+      return JSON.stringify({
+        error: formatFunctionExecutionError(error),
+        error_code: 'FunctionExecutionError'
+      })
+    }
   })
   app.get<{
     Querystring: FunctionCallBase64Dto
