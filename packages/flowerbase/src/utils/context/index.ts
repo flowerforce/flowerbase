@@ -238,11 +238,9 @@ export async function GenerateContext({
             return syntheticModule
           }
 
-          const importModuleDynamically: NonNullable<
-            vm.ScriptOptions['importModuleDynamically']
-          > = (specifier, _script, _importAssertions) => {
-            return loadModule(specifier) as unknown as vm.Module
-          }
+          const importModuleDynamically =
+            ((specifier: string) => loadModule(specifier) as unknown as vm.Module) as unknown as
+              vm.SourceTextModuleOptions['importModuleDynamically']
 
           const sourceModule = new vmModules.SourceTextModule(
             wrapEsmModule(functionToRun.code),
