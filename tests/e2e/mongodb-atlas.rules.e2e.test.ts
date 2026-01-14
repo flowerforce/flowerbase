@@ -550,6 +550,7 @@ const ensureReplicaSet = async (client: MongoClient) => {
 
 describe('MongoDB Atlas rule enforcement (e2e)', () => {
   beforeAll(async () => {
+    DEFAULT_CONFIG.AUTH_REGISTER_MAX_ATTEMPTS = 1000
     const mongoUrl = resolveMongoUrl()
     if (MANAGE_REPLICA_SET) {
       const maintenanceClient = new MongoClient(dropReplicaSetHint(mongoUrl), {
