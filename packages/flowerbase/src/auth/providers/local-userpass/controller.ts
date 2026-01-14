@@ -48,6 +48,7 @@ export async function localUserPassController(app: FastifyInstance) {
   const resetPasswordTtlSeconds = DEFAULT_CONFIG.RESET_PASSWORD_TTL_SECONDS
   const rateLimitWindowMs = DEFAULT_CONFIG.AUTH_RATE_LIMIT_WINDOW_MS
   const loginMaxAttempts = DEFAULT_CONFIG.AUTH_LOGIN_MAX_ATTEMPTS
+  const registerMaxAttempts = DEFAULT_CONFIG.AUTH_REGISTER_MAX_ATTEMPTS
   const resetMaxAttempts = DEFAULT_CONFIG.AUTH_RESET_MAX_ATTEMPTS
   const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
 
@@ -131,6 +132,11 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: REGISTRATION_SCHEMA
     },
     async (req, res) => {
+      const key = `register:${req.ip}`
+      if (isRateLimited(key, registerMaxAttempts, rateLimitWindowMs)) {
+        res.status(429).send({ message: 'Too many requests' })
+        return
+      }
 
       const result = await handleUserRegistration(app, { run_as_system: true, provider: PROVIDER.LOCAL_USERPASS })({ email: req.body.email.toLowerCase(), password: req.body.password })
 
