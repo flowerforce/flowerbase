@@ -201,16 +201,20 @@ const handleAuthenticationTrigger = async ({
       }
     }
     // TODO change va ripulito
-    await GenerateContext({
-      args: isAutoTrigger ? [userData] : [{ user: userData /*, ...change */ }],
-      app,
-      rules: StateManager.select("rules"),
-      user: {},  // TODO from currentUser ??
-      currentFunction: triggerHandler,
-      functionsList,
-      services,
-      runAsSystem: true
-    })
+    try {
+      await GenerateContext({
+        args: isAutoTrigger ? [userData] : [{ user: userData /*, ...change */ }],
+        app,
+        rules: StateManager.select("rules"),
+        user: {},  // TODO from currentUser ??
+        currentFunction: triggerHandler,
+        functionsList,
+        services,
+        runAsSystem: true
+      })
+    } catch (error) {
+      console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
+    }
   })
   registerOnClose(
     app,

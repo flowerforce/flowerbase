@@ -35,7 +35,7 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
     const result = await db?.collection(authCollection!).insertOne({
         email,
         password: hashedPassword,
-        status: skipUserCheck || autoConfirm ? 'confirmed' : 'pending',
+        status: (skipUserCheck || autoConfirm) ? 'confirmed' : 'pending',
         createdAt: new Date(),
         custom_data: {
             // TODO: aggiungere dati personalizzati alla registrazione
