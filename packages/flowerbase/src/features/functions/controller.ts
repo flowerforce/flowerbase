@@ -1,6 +1,6 @@
 import { ObjectId } from 'bson'
-import { ChangeStream, Document } from 'mongodb';
 import type { FastifyRequest } from 'fastify'
+import { ChangeStream, Document } from 'mongodb';
 import { services } from '../../services'
 import { StateManager } from '../../state'
 import { GenerateContext } from '../../utils/context'

@@ -10,11 +10,13 @@ export interface MakeRequestParams {
   url: string
   headers: Headers
   body?: Body
+  resolveBody?: boolean
 }
 
 export interface GetParams {
   url: string
   headers: Headers
+  resolveBody?: boolean
 }
 
 export interface PostParams {
@@ -25,6 +27,7 @@ export interface PostParams {
   encodeBodyAsJSON?: boolean
   body: Body
   headers?: Headers
+  resolveBody?: boolean
 }
 
 export type PutParams = PostParams
