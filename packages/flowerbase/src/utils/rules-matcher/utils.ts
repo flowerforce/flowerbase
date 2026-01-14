@@ -154,6 +154,9 @@ const rulesMatcherUtils: RulesMatcherUtils = {
   },
   forceArray: (a) => (Array.isArray(a) ? a : [a]),
   getPath: (path, prefix) => {
+    if (typeof path !== 'string' || path.length === 0) {
+      return ''
+    }
     if (path.indexOf('^') === 0) {
       return _trimStart(path, '^')
     }

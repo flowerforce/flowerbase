@@ -23,12 +23,14 @@ export const getValidRule = <T extends Role | Filter>({
   record = null
 }: GetValidRuleParams<T>) => {
   if (!filters.length) return []
+  const rootRecord = record ?? null
 
   return filters.filter((f) => {
     if (Object.keys(f.apply_when).length === 0) return true
 
     // expandQuery traduce i placeholder (%%user, %%true)
     const conditions = expandQuery(f.apply_when, {
+      '%%root': rootRecord,
       '%%user': user,
       '%%true': true
       /** values */
@@ -40,6 +42,7 @@ export const getValidRule = <T extends Role | Filter>({
       conditions as Parameters<typeof rulesMatcherUtils.checkRule>[0],
       {
         ...(record ?? {}),
+        '%%root': rootRecord,
         '%%user': user,
         '%%true': true
       },
