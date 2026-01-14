@@ -1,3 +1,77 @@
+## 1.3.0 (2026-01-14)
+
+
+### 🚀 Features
+
+- add createdAt on collection auth_user ([87d4e81](https://github.com/flowerforce/flowerbase/commit/87d4e81))
+
+- add log error ([fde3fb1](https://github.com/flowerforce/flowerbase/commit/fde3fb1))
+
+- safe aggregate ([d715444](https://github.com/flowerforce/flowerbase/commit/d715444))
+
+- fix rules and tests ([0bbc9c6](https://github.com/flowerforce/flowerbase/commit/0bbc9c6))
+
+- remove sendgrid module ([f7b3d5f](https://github.com/flowerforce/flowerbase/commit/f7b3d5f))
+
+- security check ([aec94cc](https://github.com/flowerforce/flowerbase/commit/aec94cc))
+
+- add rate limit auth ([346fb12](https://github.com/flowerforce/flowerbase/commit/346fb12))
+
+- add basic auth swagger UI ([ac6b331](https://github.com/flowerforce/flowerbase/commit/ac6b331))
+
+- add rate limit reset password ([c9dcf48](https://github.com/flowerforce/flowerbase/commit/c9dcf48))
+
+- check refresh token ([db8204d](https://github.com/flowerforce/flowerbase/commit/db8204d))
+
+- add findOneAndUpdate ([9ac5b1e](https://github.com/flowerforce/flowerbase/commit/9ac5b1e))
+
+- add confirm user with custom function ([da8990d](https://github.com/flowerforce/flowerbase/commit/da8990d))
+
+- add catch error functions ([ef05b22](https://github.com/flowerforce/flowerbase/commit/ef05b22))
+
+- add anon-user ([2ed0086](https://github.com/flowerforce/flowerbase/commit/2ed0086))
+
+- add rate limit register ([74eb725](https://github.com/flowerforce/flowerbase/commit/74eb725))
+
+- add %%root record in rule ([6a95425](https://github.com/flowerforce/flowerbase/commit/6a95425))
+
+
+### 🩹 Fixes
+
+- cors methods ([c570d3a](https://github.com/flowerforce/flowerbase/commit/c570d3a))
+
+- check missing currentFunction ([7be4845](https://github.com/flowerforce/flowerbase/commit/7be4845))
+
+- reset password endpoint and auth tests ([daef161](https://github.com/flowerforce/flowerbase/commit/daef161))
+
+- reset password ([0dcb9f6](https://github.com/flowerforce/flowerbase/commit/0dcb9f6))
+
+- payload reset password legacy ([1219fd1](https://github.com/flowerforce/flowerbase/commit/1219fd1))
+
+- exports and import modulo in functions ([f5d0b96](https://github.com/flowerforce/flowerbase/commit/f5d0b96))
+
+- revoke token ([8ac3084](https://github.com/flowerforce/flowerbase/commit/8ac3084))
+
+- payload findOneAndUpdate ([5545232](https://github.com/flowerforce/flowerbase/commit/5545232))
+
+- trigger auth ([b376b30](https://github.com/flowerforce/flowerbase/commit/b376b30))
+
+- user auto confirm ([2639e70](https://github.com/flowerforce/flowerbase/commit/2639e70))
+
+- args auth event trigger ([dc78945](https://github.com/flowerforce/flowerbase/commit/dc78945))
+
+- async aggregate ([53ea8e7](https://github.com/flowerforce/flowerbase/commit/53ea8e7))
+
+- trigger crash ([d517f97](https://github.com/flowerforce/flowerbase/commit/d517f97))
+
+- user id jwt ([bfae07c](https://github.com/flowerforce/flowerbase/commit/bfae07c))
+
+- location hostname ([0e831ad](https://github.com/flowerforce/flowerbase/commit/0e831ad))
+
+- add error 401 custom auth ([d8b2eda](https://github.com/flowerforce/flowerbase/commit/d8b2eda))
+
+- **localUserPassController:** userWithCustomData ([3d8e257](https://github.com/flowerforce/flowerbase/commit/3d8e257))
+
 ## 1.2.0 (2025-10-14)
 
 
