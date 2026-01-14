@@ -22,58 +22,65 @@ export const generateContextData = ({
   functionsList,
   GenerateContext,
   request
-}: GenerateContextDataParams) => ({
-  BSON: mongodb.BSON,
-  console: {
-    log: (...args: Arguments) => {
-      console.log(...args)
-    },
-    error: (...args: Arguments) => {
-      console.error(...args)
+}: GenerateContextDataParams) => {
+  const getService = (serviceName: keyof typeof services) => {
+    try {
+      return services[serviceName](app, {
+        rules,
+        user,
+        run_as_system: currentFunction.run_as_system
+      })
+    } catch (error) {
+      console.error(
+        'Something went wrong while generating context function',
+        serviceName,
+        error
+      )
     }
-  },
-  context: {
-    request: {
-      ...request,
-      remoteIPAddress: request?.ip
-    },
-    user,
-    environment: {
-      tag: process.env.NODE_ENV
-    },
-    values: {
-      get: (key: string) => process.env[key]
-    },
-    services: {
-      get: (serviceName: keyof typeof services) => {
-        try {
-          return services[serviceName](app, {
-            rules,
-            user,
-            run_as_system: currentFunction.run_as_system
-          })
-        } catch (error) {
-          console.error(
-            'Something went wrong while generating context function',
-            serviceName,
-            error
-          )
-        }
+  }
+
+  return {
+    BSON: mongodb.BSON,
+    Buffer,
+    console: {
+      log: (...args: Arguments) => {
+        console.log(...args)
+      },
+      error: (...args: Arguments) => {
+        console.error(...args)
       }
     },
-    functions: {
-      execute: (name: keyof typeof functionsList, ...args: Arguments) => {
-        const currentFunction = functionsList[name] as Function
-        return GenerateContext({
-          args,
-          app,
-          rules,
-          user,
-          currentFunction,
-          functionsList,
-          services
-        })
+    context: {
+      request: {
+        ...request,
+        remoteIPAddress: request?.ip
+      },
+      user,
+      environment: {
+        tag: process.env.NODE_ENV
+      },
+      values: {
+        get: (key: string) => process.env[key]
+      },
+      services: {
+        get: getService
+      },
+      http: getService('api'),
+      https: getService('api'),
+      functions: {
+        execute: (name: keyof typeof functionsList, ...args: Arguments) => {
+          const currentFunction = functionsList[name] as Function
+          return GenerateContext({
+            args,
+            app,
+            rules,
+            user,
+            currentFunction,
+            functionsList,
+            services
+          })
+        }
       }
     }
   }
-})
+}
