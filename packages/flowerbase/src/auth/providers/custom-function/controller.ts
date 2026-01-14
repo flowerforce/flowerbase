@@ -1,17 +1,10 @@
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
-import handleUserRegistration from '../../../shared/handleUserRegistration'
-import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
 import { hashToken } from '../../../utils/crypto'
-import {
-  AUTH_ENDPOINTS,
-  generatePassword,
-} from '../../utils'
-import {
-  LoginDto
-} from './dtos'
+import { AUTH_ENDPOINTS } from '../../utils'
+import { LoginDto } from './dtos'
 import { LOGIN_SCHEMA } from './schema'
 
 /**
@@ -24,7 +17,7 @@ export async function customFunctionController(app: FastifyInstance) {
   const functionsList = StateManager.select('functions')
   const services = StateManager.select('services')
   const db = app.mongo.client.db(DB_NAME)
-  const { refreshTokensCollection } = AUTH_CONFIG
+  const { authCollection, refreshTokensCollection } = AUTH_CONFIG
   const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
 
   /**
@@ -39,7 +32,7 @@ export async function customFunctionController(app: FastifyInstance) {
     {
       schema: LOGIN_SCHEMA
     },
-    async function (req) {
+    async function (req, reply) {
       const { providers } = AUTH_CONFIG
       const authFunctionName = providers["custom-function"].authFunctionName
 
@@ -58,7 +51,7 @@ export async function customFunctionController(app: FastifyInstance) {
       } = req
 
       type CustomFunctionAuthResult = { id?: string }
-      const res = await GenerateContext({
+      const authResult = await GenerateContext({
         args: [
           req.body
         ],
@@ -80,36 +73,38 @@ export async function customFunctionController(app: FastifyInstance) {
       }) as CustomFunctionAuthResult
 
 
-      if (res.id) {
-        const user = await handleUserRegistration(app, { run_as_system: true, skipUserCheck: true, provider: PROVIDER.CUSTOM_FUNCTION })({ email: res.id, password: generatePassword() })
-        if (!user?.insertedId) {
-          throw new Error('Failed to register custom user')
-        }
-
-        const currentUserData = {
-          _id: user.insertedId,
-          user_data: {
-            _id: user.insertedId
-          }
-        }
-        const refreshToken = this.createRefreshToken(currentUserData)
-        const refreshTokenHash = hashToken(refreshToken)
-        await db.collection(refreshTokensCollection).insertOne({
-          userId: user.insertedId,
-          tokenHash: refreshTokenHash,
-          createdAt: new Date(),
-          expiresAt: new Date(Date.now() + refreshTokenTtlMs),
-          revokedAt: null
-        })
-        return {
-          access_token: this.createAccessToken(currentUserData),
-          refresh_token: refreshToken,
-          device_id: '',
-          user_id: user.insertedId.toString()
-        }
+      if (!authResult.id) {
+        reply.code(401).send({ message: 'Unauthorized' })
+        return
       }
 
-      throw new Error("Authentication Failed")
+      const authUser = await db.collection(authCollection!).findOne({ email: authResult.id })
+      if (!authUser) {
+        reply.code(401).send({ message: 'Unauthorized' })
+        return
+      }
+
+      const currentUserData = {
+        _id: authUser._id,
+        user_data: {
+          _id: authUser._id
+        }
+      }
+      const refreshToken = this.createRefreshToken(currentUserData)
+      const refreshTokenHash = hashToken(refreshToken)
+      await db.collection(refreshTokensCollection).insertOne({
+        userId: authUser._id,
+        tokenHash: refreshTokenHash,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + refreshTokenTtlMs),
+        revokedAt: null
+      })
+      return {
+        access_token: this.createAccessToken(currentUserData),
+        refresh_token: refreshToken,
+        device_id: '',
+        user_id: authUser._id.toString()
+      }
     }
   )
 

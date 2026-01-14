@@ -10,7 +10,11 @@ export type LoginSuccessDto = {
   user_id: string
 }
 
+export type LoginErrorDto = {
+  message: string
+}
+
 export interface LoginDto {
   Body: LoginUserDto
-  Reply: LoginSuccessDto
+  Reply: LoginSuccessDto | LoginErrorDto
 }
