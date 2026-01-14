@@ -2,9 +2,9 @@ import { FastifyInstance } from 'fastify'
 import {
   Collection,
   Document,
-  Filter as MongoFilter,
   FindCursor,
   FindOneAndUpdateOptions,
+  Filter as MongoFilter,
   UpdateFilter,
   WithId
 } from 'mongodb'
