@@ -64,6 +64,9 @@ export type GetOperatorsFunction = (
     options?: FindOneAndUpdateOptions
   ) => Promise<Document | null>
   find: (...params: Parameters<Method<'find'>>) => FindCursor
+  count: (
+    ...params: Parameters<Method<'countDocuments'>>
+  ) => ReturnType<Method<'countDocuments'>>
   watch: (...params: Parameters<Method<'watch'>>) => ReturnType<Method<'watch'>>
   aggregate: (
     ...params: [...Parameters<Method<'aggregate'>>, isClient: boolean]

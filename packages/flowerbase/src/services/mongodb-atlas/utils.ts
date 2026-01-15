@@ -55,7 +55,7 @@ export const getValidRule = <T extends Role | Filter>({
 
 export const getFormattedQuery = (
   filters: Filter[] = [],
-  query: Parameters<Collection<Document>['findOne']>[0],
+  query?: Parameters<Collection<Document>['findOne']>[0],
   user?: User
 ) => {
   const preFilter = getValidRule({ filters, user })

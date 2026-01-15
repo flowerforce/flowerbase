@@ -473,6 +473,17 @@ const getOperators: GetOperatorsFunction = (
       // System mode: return original unfiltered cursor
       return collection.find(query)
     },
+    count: (query, options) => {
+      if (!run_as_system) {
+        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+        const formattedQuery = getFormattedQuery(filters, query, user)
+        const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
+        logService('count query', { collName, currentQuery })
+        return collection.countDocuments(currentQuery, options)
+      }
+
+      return collection.countDocuments(query, options)
+    },
     /**
      * Watches changes on a MongoDB collection with optional role-based filtering of change events.
      *
