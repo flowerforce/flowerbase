@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'node:path'
+import { Document } from 'mongodb'
 import { EJSON } from 'bson'
 import { GetOperatorsFunction } from '../../services/mongodb-atlas/model'
 import { ExecuteQueryParams, Functions } from './interface'
@@ -65,11 +66,24 @@ export const executeQuery = async ({
       : typeof returnNewDocument === 'boolean'
         ? { returnDocument: returnNewDocument ? 'after' : 'before' }
         : undefined
+  const parsedOptions = resolvedOptions ? EJSON.deserialize(resolvedOptions) : undefined
   return {
     find: async () =>
-      await (currentMethod as ReturnType<GetOperatorsFunction>['find'])(
-        EJSON.deserialize(resolvedQuery)
-      ).toArray(),
+      await (() => {
+        const cursor = (currentMethod as ReturnType<GetOperatorsFunction>['find'])(
+          EJSON.deserialize(resolvedQuery)
+        )
+        if (parsedOptions?.sort) {
+          cursor.sort(parsedOptions.sort as Document)
+        }
+        if (typeof parsedOptions?.skip === 'number') {
+          cursor.skip(parsedOptions.skip)
+        }
+        if (typeof parsedOptions?.limit === 'number') {
+          cursor.limit(parsedOptions.limit)
+        }
+        return cursor.toArray()
+      })(),
     findOne: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['findOne'])(
         EJSON.deserialize(resolvedQuery)
@@ -77,7 +91,7 @@ export const executeQuery = async ({
     count: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['count'])(
         EJSON.deserialize(resolvedQuery),
-        resolvedOptions ? EJSON.deserialize(resolvedOptions) : undefined
+        parsedOptions
       ),
     deleteOne: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['deleteOne'])(
@@ -92,7 +106,7 @@ export const executeQuery = async ({
       (currentMethod as ReturnType<GetOperatorsFunction>['findOneAndUpdate'])(
         EJSON.deserialize(resolvedQuery),
         EJSON.deserialize(resolvedUpdate),
-        resolvedOptions ? EJSON.deserialize(resolvedOptions) : undefined
+        parsedOptions
       ),
     aggregate: async () =>
       (await (currentMethod as ReturnType<GetOperatorsFunction>['aggregate'])(
