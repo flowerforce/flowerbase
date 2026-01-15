@@ -24,7 +24,7 @@ export const comparePassword = async (plaintext: string, storedPassword: string)
   const [storedHash, storedSalt] = storedPassword.split('.')
 
   if (!storedHash || !storedSalt) {
-    throw new Error(`Invalid stored password: ${storedPassword}`);
+    throw new Error('Invalid credentials');
   }
 
   const storedBuffer = Buffer.from(storedHash, 'hex')
