@@ -16,6 +16,7 @@ const TODO_COLLECTION = 'todos'
 const USER_COLLECTION = 'users'
 const ACTIVITIES_COLLECTION = 'activities'
 const COUNTERS_COLLECTION = 'counters'
+const UPLOADS_COLLECTION = 'uploads'
 const AUTH_USERS_COLLECTION = 'auth_users'
 const RESET_PASSWORD_COLLECTION = 'reset_password_requests'
 const MANAGE_REPLICA_SET = process.env.MANAGE_REPLICA_SET === 'true'
@@ -32,6 +33,7 @@ type TestUser = User & {
   role?: string
   email: string
   custom_data?: {
+    key?: string
     workspaces: string[]
     adminIn?: string[]
   }
@@ -72,6 +74,10 @@ const counterIds = {
   visibilityUsers: new ObjectId('000000000000000000000203'),
   adminOnly: new ObjectId('000000000000000000000204')
 }
+const uploadIds = {
+  owner: new ObjectId('000000000000000000000301'),
+  guest: new ObjectId('000000000000000000000302')
+}
 const authUserIds = {
   owner: new ObjectId('000000000000000000000090'),
   guest: new ObjectId('000000000000000000000091'),
@@ -83,6 +89,7 @@ const ownerUser: TestUser = {
   role: 'owner',
   custom_data: {
     role: 'owner',
+    key: 'publisher-owner',
     workspaces: ['workspace-1'],
     adminIn: ['workspace-1']
   }
@@ -93,6 +100,7 @@ const guestUser: TestUser = {
   role: 'guest',
   custom_data: {
     role: 'guest',
+    key: 'publisher-guest',
     workspaces: ['workspace-2'],
     adminIn: []
   }
@@ -103,6 +111,7 @@ const adminUser: TestUser = {
   role: 'admin',
   custom_data: {
     role: 'admin',
+    key: 'publisher-admin',
     workspaces: ['workspace-1', 'workspace-2'],
     adminIn: ['workspace-1', 'workspace-2']
   }
@@ -232,6 +241,7 @@ const getProjectsCollection = (user: TestUser | null) => createCollectionProxy('
 const getActivityLogsCollection = (user: TestUser | null) => createCollectionProxy('activityLogs', user)
 const getActivitiesCollection = (user: TestUser | null) => createCollectionProxy(ACTIVITIES_COLLECTION, user)
 const getCountersCollection = (user: TestUser | null) => createCollectionProxy(COUNTERS_COLLECTION, user)
+const getUploadsCollection = (user: TestUser | null) => createCollectionProxy(UPLOADS_COLLECTION, user)
 
 const registerAccessToken = (user: TestUser, authId: ObjectId) => {
   if (!appInstance) {
@@ -294,6 +304,10 @@ type CounterDoc = Document & {
   }
   value: number
 }
+type UploadDoc = Document & {
+  publisher: string
+  status: string
+}
 
 let client: MongoClient
 let appInstance: FastifyInstance | undefined
@@ -308,6 +322,7 @@ const resetCollections = async () => {
     db.collection('activityLogs').deleteMany({}),
     db.collection(ACTIVITIES_COLLECTION).deleteMany({}),
     db.collection(COUNTERS_COLLECTION).deleteMany({}),
+    db.collection(UPLOADS_COLLECTION).deleteMany({}),
     db.collection(AUTH_USERS_COLLECTION).deleteMany({}),
     db.collection(AUTH_CONFIG.refreshTokensCollection).deleteMany({}),
     db.collection(RESET_PASSWORD_COLLECTION).deleteMany({}),
@@ -454,6 +469,19 @@ const resetCollections = async () => {
       visibility: {
         type: 'private'
       }
+    }
+  ])
+
+  await db.collection(UPLOADS_COLLECTION).insertMany([
+    {
+      _id: uploadIds.owner,
+      publisher: ownerUser.custom_data?.key,
+      status: 'pending'
+    },
+    {
+      _id: uploadIds.guest,
+      publisher: guestUser.custom_data?.key,
+      status: 'pending'
     }
   ])
 
@@ -1006,6 +1034,55 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(guestResults[0].workspace).toBe('workspace-2')
   })
 
+  it('sorts/limits/makes skips work on find and aggregate results with multiple records', async () => {
+    const ownerDescPipeline = [
+      { $match: { workspace: 'workspace-1' } },
+      { $sort: { value: -1 } },
+      { $limit: 3 }
+    ]
+    const ownerDescResults = (await getCountersCollection(ownerUser)
+      .aggregate(ownerDescPipeline)
+      .toArray()) as CounterDoc[]
+    expect(ownerDescResults.length).toBe(3)
+    expect(ownerDescResults.map((counter) => counter.value)).toEqual([400, 200, 100])
+
+    const ownerSkipPipeline = [
+      { $match: { workspace: 'workspace-1' } },
+      { $sort: { value: -1 } },
+      { $skip: 1 },
+      { $limit: 2 }
+    ]
+    const ownerSkipResults = (await getCountersCollection(ownerUser)
+      .aggregate(ownerSkipPipeline)
+      .toArray()) as CounterDoc[]
+    expect(ownerSkipResults.map((counter) => counter.value)).toEqual([200, 100])
+
+    const ownerDescFind = (await getCountersCollection(ownerUser)
+      .find({}, { sort: { value: -1 }, limit: 3 })
+      .toArray()) as CounterDoc[]
+    expect(ownerDescFind.map((counter) => counter.value)).toEqual([400, 200, 100])
+
+    const ownerSkipFind = (await getCountersCollection(ownerUser)
+      .find({}, { sort: { value: -1 }, skip: 1, limit: 2 })
+      .toArray()) as CounterDoc[]
+    expect(ownerSkipFind.map((counter) => counter.value)).toEqual([200, 100])
+
+    const ownerAscPipeline = [
+      { $match: { workspace: 'workspace-1' } },
+      { $sort: { value: 1 } },
+      { $limit: 3 }
+    ]
+    const ownerAscResults = (await getCountersCollection(ownerUser)
+      .aggregate(ownerAscPipeline)
+      .toArray()) as CounterDoc[]
+    expect(ownerAscResults.map((counter) => counter.value)).toEqual([100, 200, 400])
+
+    const ownerAscFind = (await getCountersCollection(ownerUser)
+      .find({}, { sort: { value: 1 }, limit: 3 })
+      .toArray()) as CounterDoc[]
+    expect(ownerAscFind.map((counter) => counter.value)).toEqual([100, 200, 400])
+  })
+
   it('requires admin privileges to modify protected counters', async () => {
     const ownerUpdate = await getCountersCollection(ownerUser).updateOne(
       { _id: counterIds.adminOnly },
@@ -1032,6 +1109,19 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       _id: counterIds.adminOnly
     })) as CounterDoc | null
     expect(adminCounter?.value).toBe(500)
+  })
+
+  it('allows status update when the role grants field-level write', async () => {
+    const updateResult = await getUploadsCollection(ownerUser).updateOne(
+      { _id: uploadIds.owner },
+      { $set: { status: 'canceled' } }
+    )
+    expect(updateResult.matchedCount).toBe(1)
+
+    const updated = (await getUploadsCollection(ownerUser).findOne({
+      _id: uploadIds.owner
+    })) as UploadDoc | null
+    expect(updated?.status).toBe('canceled')
   })
 
   it('triggers activityLogs stream and saves the log', async () => {

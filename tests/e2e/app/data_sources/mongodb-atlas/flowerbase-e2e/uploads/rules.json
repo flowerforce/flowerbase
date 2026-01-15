@@ -1,0 +1,47 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "uploads",
+  "filters": [
+    {
+      "name": "My",
+      "query": {
+        "publisher": "%%user.custom_data.key"
+      },
+      "apply_when": {}
+    }
+  ],
+  "roles": [
+    {
+      "name": "default",
+      "apply_when": {},
+      "insert": true,
+      "delete": true,
+      "search": true,
+      "read": true,
+      "fields": {
+        "error": {
+          "write": true
+        },
+        "nUsers": {
+          "write": true
+        },
+        "publisher": {
+          "read": true
+        },
+        "runAt": {
+          "write": true
+        },
+        "runUser": {
+          "write": true
+        },
+        "status": {
+          "write": true
+        },
+        "usersIds": {
+          "write": true
+        }
+      },
+      "additional_fields": {}
+    }
+  ]
+}
