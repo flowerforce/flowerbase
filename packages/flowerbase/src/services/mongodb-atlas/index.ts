@@ -1,3 +1,4 @@
+import get from 'lodash/get'
 import isEqual from 'lodash/isEqual'
 import {
   Collection,
@@ -40,6 +41,34 @@ const getUserId = (user?: unknown) => {
 const logService = (message: string, payload?: unknown) => {
   if (!debugServices) return
   console.log('[service-debug]', message, payload ?? '')
+}
+
+const getUpdatedPaths = (update: Document) => {
+  const entries = Object.entries(update ?? {})
+  const hasOperators = entries.some(([key]) => key.startsWith('$'))
+
+  if (!hasOperators) {
+    return Object.keys(update ?? {})
+  }
+
+  const paths = new Set<string>()
+  for (const [key, value] of entries) {
+    if (!key.startsWith('$')) continue
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      Object.keys(value as Document).forEach((path) => paths.add(path))
+    }
+  }
+  return [...paths]
+}
+
+const areUpdatedFieldsAllowed = (
+  filtered: Document | null | undefined,
+  updated: Document,
+  updatedPaths: string[]
+) => {
+  if (!filtered) return false
+  if (!updatedPaths.length) return isEqual(filtered, updated)
+  return updatedPaths.every((path) => isEqual(get(filtered, path), get(updated, path)))
 }
 
 const getOperators: GetOperatorsFunction = (
@@ -273,6 +302,7 @@ const getOperators: GetOperatorsFunction = (
 
         // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
         const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
+        const updatedPaths = getUpdatedPaths(data as Document)
 
         // Flatten the update object to extract the actual fields being modified
         // const docToCheck = hasOperators
@@ -304,7 +334,7 @@ const getOperators: GetOperatorsFunction = (
           )
           : fallbackAccess(docToCheck)
         // Ensure no unauthorized changes are made
-        const areDocumentsEqual = isEqual(document, docToCheck)
+        const areDocumentsEqual = areUpdatedFieldsAllowed(document, docToCheck, updatedPaths)
 
         if (!status || !areDocumentsEqual) {
           throw new Error('Update not permitted')
@@ -343,6 +373,7 @@ const getOperators: GetOperatorsFunction = (
 
         const winningRole = getWinningRole(result, user, roles)
         const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
+        const updatedPaths = Array.isArray(data) ? [] : getUpdatedPaths(data as Document)
         const pipeline = [
           {
             $match: { $and: safeQuery }
@@ -369,7 +400,7 @@ const getOperators: GetOperatorsFunction = (
           )
           : fallbackAccess(docToCheck)
 
-        const areDocumentsEqual = isEqual(document, docToCheck)
+        const areDocumentsEqual = areUpdatedFieldsAllowed(document, docToCheck, updatedPaths)
         if (!status || !areDocumentsEqual) {
           throw new Error('Update not permitted')
         }
@@ -704,6 +735,7 @@ const getOperators: GetOperatorsFunction = (
 
         // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
         const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
+        const updatedPaths = getUpdatedPaths(data as Document)
 
         // Flatten the update object to extract the actual fields being modified
         // const docToCheck = hasOperators
@@ -743,7 +775,9 @@ const getOperators: GetOperatorsFunction = (
         )
 
         // Ensure no unauthorized changes are made
-        const areDocumentsEqual = isEqual(docsToCheck, filteredItems)
+        const areDocumentsEqual = docsToCheck.every((doc, index) =>
+          areUpdatedFieldsAllowed(filteredItems[index], doc, updatedPaths)
+        )
 
         if (!areDocumentsEqual) {
           console.log('check1 In updateMany --> (!areDocumentsEqual)')
