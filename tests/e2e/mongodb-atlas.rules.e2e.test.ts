@@ -1006,6 +1006,55 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(guestResults[0].workspace).toBe('workspace-2')
   })
 
+  it('sorts/limits/makes skips work on find and aggregate results with multiple records', async () => {
+    const ownerDescPipeline = [
+      { $match: { workspace: 'workspace-1' } },
+      { $sort: { value: -1 } },
+      { $limit: 3 }
+    ]
+    const ownerDescResults = (await getCountersCollection(ownerUser)
+      .aggregate(ownerDescPipeline)
+      .toArray()) as CounterDoc[]
+    expect(ownerDescResults.length).toBe(3)
+    expect(ownerDescResults.map((counter) => counter.value)).toEqual([400, 200, 100])
+
+    const ownerSkipPipeline = [
+      { $match: { workspace: 'workspace-1' } },
+      { $sort: { value: -1 } },
+      { $skip: 1 },
+      { $limit: 2 }
+    ]
+    const ownerSkipResults = (await getCountersCollection(ownerUser)
+      .aggregate(ownerSkipPipeline)
+      .toArray()) as CounterDoc[]
+    expect(ownerSkipResults.map((counter) => counter.value)).toEqual([200, 100])
+
+    const ownerDescFind = (await getCountersCollection(ownerUser)
+      .find({}, { sort: { value: -1 }, limit: 3 })
+      .toArray()) as CounterDoc[]
+    expect(ownerDescFind.map((counter) => counter.value)).toEqual([400, 200, 100])
+
+    const ownerSkipFind = (await getCountersCollection(ownerUser)
+      .find({}, { sort: { value: -1 }, skip: 1, limit: 2 })
+      .toArray()) as CounterDoc[]
+    expect(ownerSkipFind.map((counter) => counter.value)).toEqual([200, 100])
+
+    const ownerAscPipeline = [
+      { $match: { workspace: 'workspace-1' } },
+      { $sort: { value: 1 } },
+      { $limit: 3 }
+    ]
+    const ownerAscResults = (await getCountersCollection(ownerUser)
+      .aggregate(ownerAscPipeline)
+      .toArray()) as CounterDoc[]
+    expect(ownerAscResults.map((counter) => counter.value)).toEqual([100, 200, 400])
+
+    const ownerAscFind = (await getCountersCollection(ownerUser)
+      .find({}, { sort: { value: 1 }, limit: 3 })
+      .toArray()) as CounterDoc[]
+    expect(ownerAscFind.map((counter) => counter.value)).toEqual([100, 200, 400])
+  })
+
   it('requires admin privileges to modify protected counters', async () => {
     const ownerUpdate = await getCountersCollection(ownerUser).updateOne(
       { _id: counterIds.adminOnly },
