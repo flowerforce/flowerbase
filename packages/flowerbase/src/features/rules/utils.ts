@@ -17,9 +17,24 @@ export const loadRules = async (rootDir = process.cwd()): Promise<Rules> => {
   const files = recursivelyCollectFiles(rulesRoot)
   const rulesFiles = files.filter((x) => (x as string).endsWith('rules.json'))
 
+  const removeEmptyFieldRules = (rulesConfig: RulesConfig): RulesConfig => {
+    const roles = (rulesConfig.roles ?? []).map((role) => {
+      const fields = (role as { fields?: Record<string, Record<string, unknown>> }).fields
+      if (!fields) return role
+      const cleanedFields = Object.fromEntries(
+        Object.entries(fields).filter(([, value]) =>
+          value && typeof value === 'object' && Object.keys(value).length > 0
+        )
+      )
+      return { ...role, fields: cleanedFields }
+    })
+
+    return { ...rulesConfig, roles }
+  }
+
   const rulesByCollection = rulesFiles.reduce((acc, rulesFile) => {
     const filePath = rulesFile
-    const collectionRules = readJsonContent(filePath) as RulesConfig
+    const collectionRules = removeEmptyFieldRules(readJsonContent(filePath) as RulesConfig)
     acc[collectionRules.collection] = collectionRules
 
     return acc
