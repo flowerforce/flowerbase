@@ -206,8 +206,8 @@ const callServiceOperation = async ({
 }
 
 const createCollectionProxy = (collection: string, user: TestUser | null) => ({
-  find: (query: Document = {}) => ({
-    toArray: async () => callServiceOperation({ collection, method: 'find', user, query })
+  find: (query: Document = {}, options?: Document) => ({
+    toArray: async () => callServiceOperation({ collection, method: 'find', user, query, options })
   }),
   aggregate: (pipeline: Document[] = []) => ({
     toArray: async () => callServiceOperation({ collection, method: 'aggregate', user, pipeline })
@@ -970,6 +970,42 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(adminCount).toBe(4)
   })
 
+  it('supports client aggregate pipelines with $sort/$skip/$limit', async () => {
+    const ownerPipeline = [
+      { $match: { workspace: 'workspace-1' } },
+      { $sort: { value: -1 } },
+      { $skip: 1 },
+      { $limit: 1 }
+    ]
+    const ownerResults = (await getCountersCollection(ownerUser).aggregate(ownerPipeline).toArray()) as CounterDoc[]
+    expect(ownerResults).toHaveLength(1)
+    expect(ownerResults[0].value).toBe(200)
+
+    const guestPipeline = [
+      { $match: { workspace: 'workspace-2' } },
+      { $sort: { value: 1 } },
+      { $skip: 0 },
+      { $limit: 1 }
+    ]
+    const guestResults = (await getCountersCollection(guestUser).aggregate(guestPipeline).toArray()) as CounterDoc[]
+    expect(guestResults).toHaveLength(1)
+    expect(guestResults[0].workspace).toBe('workspace-2')
+  })
+
+  it('supports client find queries with $sort/$skip/$limit options', async () => {
+    const ownerResults = (await getCountersCollection(ownerUser)
+      .find({}, { sort: { value: -1 }, skip: 1, limit: 1 })
+      .toArray()) as CounterDoc[]
+    expect(ownerResults).toHaveLength(1)
+    expect(ownerResults[0].value).toBe(200)
+
+    const guestResults = (await getCountersCollection(guestUser)
+      .find({}, { sort: { value: 1 }, limit: 1 })
+      .toArray()) as CounterDoc[]
+    expect(guestResults).toHaveLength(1)
+    expect(guestResults[0].workspace).toBe('workspace-2')
+  })
+
   it('requires admin privileges to modify protected counters', async () => {
     const ownerUpdate = await getCountersCollection(ownerUser).updateOne(
       { _id: counterIds.adminOnly },
@@ -1665,7 +1701,6 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('handles password reset via reset/send and confirm reset', async () => {
-    const requestedPassword = 'request-pass-1'
     const newPassword = 'new-pass-1'
     const resetCall = await appInstance!.inject({
       method: 'POST',
