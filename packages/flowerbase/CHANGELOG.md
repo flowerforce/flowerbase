@@ -1,3 +1,23 @@
+## 1.4.0 (2026-01-15)
+
+
+### 🚀 Features
+
+- add method count mongodb ([6348568](https://github.com/flowerforce/flowerbase/commit/6348568))
+
+- add $sort ([f468213](https://github.com/flowerforce/flowerbase/commit/f468213))
+
+
+### 🩹 Fixes
+
+- load triggers ([fe9062e](https://github.com/flowerforce/flowerbase/commit/fe9062e))
+
+- http in functions ([1c8cc6d](https://github.com/flowerforce/flowerbase/commit/1c8cc6d))
+
+- update fields roles ([289466a](https://github.com/flowerforce/flowerbase/commit/289466a))
+
+- clean empty fields ([7decc8b](https://github.com/flowerforce/flowerbase/commit/7decc8b))
+
 ## 1.3.0 (2026-01-14)
 
 
