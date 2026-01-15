@@ -74,6 +74,11 @@ export const executeQuery = async ({
       (currentMethod as ReturnType<GetOperatorsFunction>['findOne'])(
         EJSON.deserialize(resolvedQuery)
       ),
+    count: () =>
+      (currentMethod as ReturnType<GetOperatorsFunction>['count'])(
+        EJSON.deserialize(resolvedQuery),
+        resolvedOptions ? EJSON.deserialize(resolvedOptions) : undefined
+      ),
     deleteOne: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['deleteOne'])(
         EJSON.deserialize(resolvedQuery)

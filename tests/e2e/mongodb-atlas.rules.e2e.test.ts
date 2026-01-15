@@ -133,14 +133,17 @@ const callServiceOperation = async ({
   method,
   user,
   query,
+  filter,
   update,
   document,
-  pipeline
+  pipeline,
+  options
 }: {
   collection: string
   method:
   | 'find'
   | 'findOne'
+  | 'count'
   | 'findOneAndUpdate'
   | 'deleteOne'
   | 'deleteMany'
@@ -149,8 +152,10 @@ const callServiceOperation = async ({
   | 'aggregate'
   user: TestUser | null
   query?: Document
+  filter?: Document
   update?: Document
   document?: Document
+  options?: Document
   pipeline?: Document[]
 }) => {
   const fastify = appInstance
@@ -165,9 +170,11 @@ const callServiceOperation = async ({
         database: DB_NAME,
         collection,
         query: serializeValue(query),
+        filter: serializeValue(filter),
         update: serializeValue(update),
         document: serializeValue(document),
-        pipeline: pipeline?.map((stage) => serializeValue(stage))
+        pipeline: pipeline?.map((stage) => serializeValue(stage)),
+        options: serializeValue(options)
       }
     ],
     service: 'mongodb-atlas'
@@ -206,6 +213,8 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
     toArray: async () => callServiceOperation({ collection, method: 'aggregate', user, pipeline })
   }),
   findOne: (query: Document = {}) => callServiceOperation({ collection, method: 'findOne', user, query }),
+  count: (query: Document = {}, options?: Document) =>
+    callServiceOperation({ collection, method: 'count', user, query, options }),
   insertOne: (document: Document) => callServiceOperation({ collection, method: 'insertOne', user, document }),
   updateOne: (query: Document, update: Document) =>
     callServiceOperation({ collection, method: 'updateOne', user, query, update }),
@@ -942,6 +951,23 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
     const adminCounters = (await getCountersCollection(adminUser).find({}).toArray()) as CounterDoc[]
     expect(adminCounters).toHaveLength(4)
+  })
+
+  it('counts accessible counters using RBAC filters', async () => {
+    const ownerCount = await getCountersCollection(ownerUser).count({})
+    expect(ownerCount).toBe(3)
+
+    const ownerWorkspaceTwoCount = await getCountersCollection(ownerUser).count({ workspace: 'workspace-2' })
+    expect(ownerWorkspaceTwoCount).toBe(0)
+
+    const guestCount = await getCountersCollection(guestUser).count({})
+    expect(guestCount).toBe(1)
+
+    const guestWorkspaceTwoCount = await getCountersCollection(guestUser).count({ workspace: 'workspace-2' })
+    expect(guestWorkspaceTwoCount).toBe(1)
+
+    const adminCount = await getCountersCollection(adminUser).count({})
+    expect(adminCount).toBe(4)
   })
 
   it('requires admin privileges to modify protected counters', async () => {
