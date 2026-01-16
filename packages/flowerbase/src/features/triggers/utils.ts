@@ -109,6 +109,12 @@ const mapOp = {
   replace: 'REPLACE'
 }
 
+const mapOpInverse = {
+  CREATE: ['insert', 'update'],
+  // LOGIN
+  // DELETE
+}
+
 const handleAuthenticationTrigger = async ({
   config,
   triggerHandler,
@@ -116,13 +122,17 @@ const handleAuthenticationTrigger = async ({
   services,
   app
 }: HandlerParams) => {
-  const { database, isAutoTrigger } = config
+  const { database, isAutoTrigger, operation_types, operation_type } = config
   const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
   const collection = app.mongo.client.db(database || DB_NAME).collection(authCollection)
   const pipeline = [
     {
       $match: {
-        operationType: { $in: ['insert', 'update', 'replace'] }
+        operationType: {
+          $in: operation_type
+            ? mapOpInverse[operation_type]
+            : operation_types
+        }
       }
     }
   ]
