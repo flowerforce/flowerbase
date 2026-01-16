@@ -103,12 +103,6 @@ const handleCronTrigger = async ({
   registerOnClose(app, () => task.stop(), 'Scheduled trigger')
 }
 
-const mapOp = {
-  insert: 'CREATE',
-  update: 'UPDATE',
-  replace: 'REPLACE'
-}
-
 const mapOpInverse = {
   CREATE: ['insert', 'update'],
   // LOGIN
@@ -123,6 +117,7 @@ const handleAuthenticationTrigger = async ({
   app
 }: HandlerParams) => {
   const { database, isAutoTrigger, operation_types, operation_type } = config
+  const autoConfirm = AUTH_CONFIG.localUserpassConfig?.autoConfirm === true
   const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
   const collection = app.mongo.client.db(database || DB_NAME).collection(authCollection)
   const pipeline = [
@@ -224,7 +219,7 @@ const handleAuthenticationTrigger = async ({
     }
 
     const op = {
-      operationType: mapOp[operationType],
+      operationType: (autoConfirm || confirmedCandidate) ? 'CREATE' : 'UPDATE',
       fullDocument,
       fullDocumentBeforeChange,
       documentKey,
