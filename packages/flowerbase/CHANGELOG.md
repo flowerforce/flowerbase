@@ -1,3 +1,20 @@
+## 1.4.1 (2026-01-16)
+
+
+### 🩹 Fixes
+
+- add change on trigger auth ([9ab5a47](https://github.com/flowerforce/flowerbase/commit/9ab5a47))
+
+- trigger auth ([f5b0835](https://github.com/flowerforce/flowerbase/commit/f5b0835))
+
+- operationType auth trigger ([a349c1c](https://github.com/flowerforce/flowerbase/commit/a349c1c))
+
+- trigger auth ([a018f24](https://github.com/flowerforce/flowerbase/commit/a018f24))
+
+- location host in production ([f9fe84c](https://github.com/flowerforce/flowerbase/commit/f9fe84c))
+
+- autoconfirm auth trigger ([88a6aea](https://github.com/flowerforce/flowerbase/commit/88a6aea))
+
 ## 1.4.0 (2026-01-15)
 
 
