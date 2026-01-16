@@ -18,7 +18,7 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
       const headerHost = req.headers.host ?? 'localhost:3000'
       const hostname = headerHost.split(':')[0]
       const port = DEFAULT_CONFIG?.PORT ?? 3000
-      const host = port === 8080 ? hostname : `${hostname}:${port}`
+      const host = process.env.NODE_ENV === "production" ? hostname : `${hostname}:${port}`
       const wsSchema = 'wss'
 
       return {
