@@ -24,7 +24,7 @@ type Config = {
   isAutoTrigger?: boolean
   match: Record<string, unknown>
   operation_types: string[]
-  operation_type?: 'CREATE'
+  operation_type?: 'CREATE' | 'DELETE'
   project: Record<string, unknown>
   service_name: string
   skip_catchup_events: boolean
