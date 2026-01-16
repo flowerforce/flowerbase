@@ -116,7 +116,6 @@ const handleAuthenticationTrigger = async ({
   app
 }: HandlerParams) => {
   const { database, isAutoTrigger, operation_types, operation_type } = config
-  const autoConfirm = AUTH_CONFIG.localUserpassConfig?.autoConfirm === true
   const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
   const collection = app.mongo.client.db(database || DB_NAME).collection(authCollection)
   const pipeline = [
@@ -159,7 +158,6 @@ const handleAuthenticationTrigger = async ({
       return
     }
 
-    const autoConfirm = AUTH_CONFIG.localUserpassConfig?.autoConfirm === true
     const updateDescription = change[
       'updateDescription' as keyof typeof change
     ] as { updatedFields?: Record<string, unknown> } | undefined
@@ -276,10 +274,6 @@ const handleAuthenticationTrigger = async ({
       }
     } else {
       confirmedCandidate = (confirmedDocument as { status?: string } | null)?.status === 'confirmed'
-    }
-
-    if (autoConfirm && isInsert) {
-      confirmedCandidate = true
     }
 
     if (!confirmedCandidate) {
