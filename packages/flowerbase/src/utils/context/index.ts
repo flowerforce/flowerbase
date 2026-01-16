@@ -186,96 +186,92 @@ export async function GenerateContext({
 
     const sandboxModule: SandboxModule = { exports: {} }
 
-    try {
-      const entryFile = require.main?.filename ?? process.cwd()
-      const customRequire = createRequire(entryFile)
+    const entryFile = require.main?.filename ?? process.cwd()
+    const customRequire = createRequire(entryFile)
 
-      const vmContext: SandboxContext = vm.createContext({
-        ...contextData,
-        require: customRequire,
-        exports: sandboxModule.exports,
-        module: sandboxModule,
-        __filename,
-        __dirname,
-        __fb_require: customRequire,
-        __fb_filename: __filename,
-        __fb_dirname: __dirname
-      }) as SandboxContext
+    const vmContext: SandboxContext = vm.createContext({
+      ...contextData,
+      require: customRequire,
+      exports: sandboxModule.exports,
+      module: sandboxModule,
+      __filename,
+      __dirname,
+      __fb_require: customRequire,
+      __fb_filename: __filename,
+      __fb_dirname: __dirname
+    }) as SandboxContext
 
-      const vmModules = vm as typeof vm & {
-        SourceTextModule?: typeof vm.SourceTextModule
-        SyntheticModule?: typeof vm.SyntheticModule
-      }
-      const hasStaticImport = /\bimport\s+/.test(functionToRun.code)
-      let usedVmModules = false
+    const vmModules = vm as typeof vm & {
+      SourceTextModule?: typeof vm.SourceTextModule
+      SyntheticModule?: typeof vm.SyntheticModule
+    }
+    const hasStaticImport = /\bimport\s+/.test(functionToRun.code)
+    let usedVmModules = false
 
-      if (hasStaticImport && vmModules.SourceTextModule && vmModules.SyntheticModule) {
-        try {
-          const moduleCache = new Map<string, vm.Module>()
+    if (hasStaticImport && vmModules.SourceTextModule && vmModules.SyntheticModule) {
+      try {
+        const moduleCache = new Map<string, vm.Module>()
 
-          const loadModule = async (specifier: string): Promise<vm.Module> => {
-            const importTarget = resolveImportTarget(specifier, customRequire)
-            const cached = moduleCache.get(importTarget)
-            if (cached) return cached
+        const loadModule = async (specifier: string): Promise<vm.Module> => {
+          const importTarget = resolveImportTarget(specifier, customRequire)
+          const cached = moduleCache.get(importTarget)
+          if (cached) return cached
 
-            const namespace = await dynamicImport(importTarget)
-            const exportNames = Object.keys(namespace)
-            if ('default' in namespace && !exportNames.includes('default')) {
-              exportNames.push('default')
-            }
-
-            const syntheticModule = new vmModules.SyntheticModule(
-              exportNames,
-              function () {
-                for (const name of exportNames) {
-                  this.setExport(name, namespace[name])
-                }
-              },
-              { context: vmContext, identifier: importTarget }
-            )
-
-            moduleCache.set(importTarget, syntheticModule)
-            return syntheticModule
+          const namespace = await dynamicImport(importTarget)
+          const exportNames = Object.keys(namespace)
+          if ('default' in namespace && !exportNames.includes('default')) {
+            exportNames.push('default')
           }
 
-          const importModuleDynamically =
-            ((specifier: string) => loadModule(specifier) as unknown as vm.Module) as unknown as
-              vm.SourceTextModuleOptions['importModuleDynamically']
-
-          const sourceModule = new vmModules.SourceTextModule(
-            wrapEsmModule(functionToRun.code),
-            {
-              context: vmContext,
-              identifier: entryFile,
-              initializeImportMeta: (meta) => {
-                meta.url = pathToFileURL(entryFile).href
-              },
-              importModuleDynamically
-            }
+          const syntheticModule = new vmModules.SyntheticModule(
+            exportNames,
+            function () {
+              for (const name of exportNames) {
+                this.setExport(name, namespace[name])
+              }
+            },
+            { context: vmContext, identifier: importTarget }
           )
 
-          await sourceModule.link(loadModule)
-          await sourceModule.evaluate()
-          usedVmModules = true
-        } catch (error) {
-          if (!shouldFallbackFromVmModules(error)) {
-            throw error
+          moduleCache.set(importTarget, syntheticModule)
+          return syntheticModule
+        }
+
+        const importModuleDynamically =
+          ((specifier: string) => loadModule(specifier) as unknown as vm.Module) as unknown as
+          vm.SourceTextModuleOptions['importModuleDynamically']
+
+        const sourceModule = new vmModules.SourceTextModule(
+          wrapEsmModule(functionToRun.code),
+          {
+            context: vmContext,
+            identifier: entryFile,
+            initializeImportMeta: (meta) => {
+              meta.url = pathToFileURL(entryFile).href
+            },
+            importModuleDynamically
           }
+        )
+
+        await sourceModule.link(loadModule)
+        await sourceModule.evaluate()
+        usedVmModules = true
+      } catch (error) {
+        if (!shouldFallbackFromVmModules(error)) {
+          throw error
         }
       }
-
-      if (!usedVmModules) {
-        const codeToRun = functionToRun.code.includes('import ')
-          ? transformImportsToRequire(functionToRun.code)
-          : functionToRun.code
-        vm.runInContext(codeToRun, vmContext)
-      }
-
-      sandboxModule.exports = resolveExport(vmContext) ?? sandboxModule.exports
-    } catch (error) {
-      console.error(error)
-      throw error
     }
+
+    if (!usedVmModules) {
+      const codeToRun = functionToRun.code.includes('import ')
+        ? transformImportsToRequire(functionToRun.code)
+        : functionToRun.code
+      vm.runInContext(codeToRun, vmContext)
+    }
+
+    sandboxModule.exports = resolveExport(vmContext) ?? sandboxModule.exports
+
 
     if (deserializeArgs) {
       return await (sandboxModule.exports as ExportedFunction)(
@@ -285,11 +281,8 @@ export async function GenerateContext({
 
     return await (sandboxModule.exports as ExportedFunction)(...args)
   }
-  try {
-    const res = await functionsQueue.add(run, enqueue)
-    return res
-  } catch (error) {
-    console.error(error)
-    throw error
-  }
+
+  const res = await functionsQueue.add(run, enqueue)
+  return res
+
 }

@@ -1225,6 +1225,29 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(body.message).toBe('Function "privateEcho" is private')
   })
 
+  it('returns error payload when a function returns an Error object', async () => {
+    const token = getTokenFor(ownerUser)
+    expect(token).toBeDefined()
+
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      payload: {
+        name: 'returnError',
+        arguments: []
+      }
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({
+      message: 'Max subscribers created',
+      name: 'Error'
+    })
+  })
+
   it('allows run_as_system function to read all users', async () => {
     const token = getTokenFor(adminUser)
     expect(token).toBeDefined()

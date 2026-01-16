@@ -41,6 +41,13 @@ const formatFunctionExecutionError = (error: unknown) => {
   return JSON.stringify({ message, name })
 }
 
+const isReturnedError = (value: unknown): value is { message: string; name: string } => {
+  if (value instanceof Error) return true
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as { message?: unknown; name?: unknown }
+  return typeof candidate.message === 'string' && typeof candidate.name === 'string'
+}
+
 /**
  * > Creates a pre handler for every query
  * @param app -> the fastify instance
@@ -122,6 +129,10 @@ export const functionsController: FunctionController = async (
         functionsList,
         services
       })
+      if (isReturnedError(result)) {
+        res.type('application/json')
+        return JSON.stringify({ message: result.message, name: result.name })
+      }
       res.type('application/json')
       return JSON.stringify(result)
     } catch (error) {
