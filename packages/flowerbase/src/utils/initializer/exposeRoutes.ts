@@ -56,6 +56,7 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
       const result = await db.collection(authCollection!).insertOne({
         email: email,
         password: hashedPassword,
+        status: 'confirmed',
         custom_data: {}
       })
 

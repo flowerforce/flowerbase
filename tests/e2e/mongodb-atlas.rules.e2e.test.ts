@@ -542,6 +542,18 @@ const waitForTriggerEvent = async (documentId: string) => {
   return null
 }
 
+const waitForTriggerEventType = async (documentId: string, type: string) => {
+  const collection = client.db(DB_NAME).collection(TRIGGER_EVENTS_COLLECTION)
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const record = await collection.findOne({ documentId, type })
+    if (record) {
+      return record
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  return null
+}
+
 const isReplicaSetNotInitializedError = (error: unknown) => {
   if (!(error instanceof Error)) {
     return false
@@ -1386,6 +1398,54 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     }
   })
 
+  it('does not fire on_user_creation for non-confirming updates', async () => {
+    const originalConfig = AUTH_CONFIG.localUserpassConfig
+    AUTH_CONFIG.localUserpassConfig = {
+      ...originalConfig,
+      autoConfirm: false,
+      runConfirmationFunction: true,
+      confirmationFunctionName: 'confirmUser'
+    }
+
+    try {
+      const email = 'pending-update-no-trigger@example.com'
+      const registration = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/register`,
+        payload: {
+          email,
+          password: 'auto-pass'
+        }
+      })
+      expect(registration.statusCode).toBe(201)
+      const registrationBody = registration.json() as { userId?: string }
+      expect(registrationBody.userId).toBeDefined()
+
+      const initialEvent = await waitForTriggerEventType(
+        registrationBody.userId!,
+        'on_user_creation'
+      )
+      expect(initialEvent).toBeNull()
+
+      const updateResult = await client
+        .db(DB_NAME)
+        .collection(AUTH_USERS_COLLECTION)
+        .updateOne(
+          { _id: new ObjectId(registrationBody.userId) },
+          { $set: { status: 'failed' } }
+        )
+      expect(updateResult.matchedCount).toBe(1)
+
+      const afterEvent = await waitForTriggerEventType(
+        registrationBody.userId!,
+        'on_user_creation'
+      )
+      expect(afterEvent).toBeNull()
+    } finally {
+      AUTH_CONFIG.localUserpassConfig = originalConfig
+    }
+  })
+
   it('confirms users via token and tokenId from the client', async () => {
     const originalConfig = AUTH_CONFIG.localUserpassConfig
     AUTH_CONFIG.localUserpassConfig = {
@@ -1459,6 +1519,52 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(authUser?.status).toBe('confirmed')
   })
 
+  it('fires on_user_creation when a pending user becomes confirmed', async () => {
+    const originalConfig = AUTH_CONFIG.localUserpassConfig
+    AUTH_CONFIG.localUserpassConfig = {
+      ...originalConfig,
+      autoConfirm: false,
+      runConfirmationFunction: true,
+      confirmationFunctionName: 'confirmUser'
+    }
+
+    try {
+      const email = 'pending-trigger-update@example.com'
+      const registration = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/register`,
+        payload: {
+          email,
+          password: 'auto-pass'
+        }
+      })
+      expect(registration.statusCode).toBe(201)
+
+      const authUser = await client
+        .db(DB_NAME)
+        .collection(AUTH_USERS_COLLECTION)
+        .findOne({ email })
+      expect(authUser?.status).toBe('pending')
+
+      await client
+        .db(DB_NAME)
+        .collection(AUTH_USERS_COLLECTION)
+        .updateOne(
+          { _id: authUser!._id },
+          { $set: { status: 'confirmed' } }
+        )
+
+      const creationEvent = await waitForTriggerEventType(
+        authUser!._id.toString(),
+        'on_user_creation'
+      )
+      expect(creationEvent).toBeDefined()
+      expect(creationEvent?.email).toBe(email)
+    } finally {
+      AUTH_CONFIG.localUserpassConfig = originalConfig
+    }
+  })
+
   it('fires on_user_creation_function_name on auto-confirmed registrations', async () => {
     const registration = await appInstance!.inject({
       method: 'POST',
@@ -1506,6 +1612,76 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(creationEvent).toBeDefined()
     expect(creationEvent?.type).toBe('on_user_creation')
     expect(creationEvent?.email).toBe('trigger-user@example.com')
+  })
+
+  it('ignores auth updates that do not confirm the user', async () => {
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email: 'no-trigger-update@example.com',
+        password: 'auto-pass'
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+    const registrationBody = registration.json() as { userId?: string }
+    expect(registrationBody.userId).toBeDefined()
+
+    await waitForTriggerEventType(registrationBody.userId!, 'on_user_creation')
+    const beforeCount = await client
+      .db(DB_NAME)
+      .collection(TRIGGER_EVENTS_COLLECTION)
+      .countDocuments({
+        documentId: registrationBody.userId,
+        type: 'on_user_creation'
+      })
+
+    await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .updateOne(
+        { _id: new ObjectId(registrationBody.userId) },
+        { $set: { lastLogoutAt: new Date() } }
+      )
+
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    const afterCount = await client
+      .db(DB_NAME)
+      .collection(TRIGGER_EVENTS_COLLECTION)
+      .countDocuments({
+        documentId: registrationBody.userId,
+        type: 'on_user_creation'
+      })
+
+    expect(afterCount).toBe(beforeCount)
+  })
+
+  it('fires delete trigger when auth user is removed', async () => {
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email: 'delete-trigger@example.com',
+        password: 'auto-pass'
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+    const registrationBody = registration.json() as { userId?: string }
+    expect(registrationBody.userId).toBeDefined()
+
+    await waitForTriggerEventType(registrationBody.userId!, 'on_user_creation')
+    const deleteResult = await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .deleteOne({ _id: new ObjectId(registrationBody.userId) })
+    expect(deleteResult.deletedCount).toBe(1)
+
+    const deleteEvent = await waitForTriggerEventType(
+      registrationBody.userId!,
+      'on_user_delete'
+    )
+    expect(deleteEvent).toBeDefined()
+    expect(deleteEvent?.type).toBe('on_user_delete')
   })
 
   it('rejects registration when the email is already used', async () => {

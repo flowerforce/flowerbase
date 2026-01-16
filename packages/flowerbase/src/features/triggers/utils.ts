@@ -104,9 +104,8 @@ const handleCronTrigger = async ({
 }
 
 const mapOpInverse = {
-  CREATE: ['insert', 'update'],
-  // LOGIN
-  // DELETE
+  CREATE: ['insert', 'update', 'replace'],
+  DELETE: ['delete'],
 }
 
 const handleAuthenticationTrigger = async ({
@@ -142,7 +141,11 @@ const handleAuthenticationTrigger = async ({
     console.error('Authentication trigger change stream error', error)
   })
   changeStream.on('change', async function (change) {
-    const operationType = change['operationType' as keyof typeof change] as 'insert' | 'update' | 'replace'
+    const operationType = change['operationType' as keyof typeof change] as
+      | 'insert'
+      | 'update'
+      | 'replace'
+      | 'delete'
     const documentKey = change['documentKey' as keyof typeof change] as
       | { _id?: unknown }
       | undefined
@@ -156,26 +159,127 @@ const handleAuthenticationTrigger = async ({
       return
     }
 
+    const autoConfirm = AUTH_CONFIG.localUserpassConfig?.autoConfirm === true
     const updateDescription = change[
       'updateDescription' as keyof typeof change
     ] as { updatedFields?: Record<string, unknown> } | undefined
     const updatedStatus = updateDescription?.updatedFields?.status
+    const isInsert = operationType === 'insert'
+    const isUpdate = operationType === 'update'
+    const isReplace = operationType === 'replace'
+    const isDelete = operationType === 'delete'
+
     let confirmedCandidate = false
     let confirmedDocument =
       fullDocument as Record<string, unknown> | null
 
-    if (operationType === 'update') {
-      if (updatedStatus === 'confirmed') {
-        confirmedCandidate = true
-      } else if (updatedStatus === undefined) {
+    const buildUserData = (document: Record<string, unknown> | null) => {
+      if (!document) {
+        const id = documentKey?._id
+        if (!id) return null
+        const idString = typeof id === 'string'
+          ? id
+          : (id as { toString?: () => string }).toString?.() ?? String(id)
+        return {
+          id: idString,
+          data: {
+            _id: idString
+          }
+        }
+      }
+
+      const currentUser = { ...document }
+      delete (currentUser as { password?: unknown }).password
+
+      return {
+        ...currentUser,
+        id: (currentUser as { _id: { toString: () => string } })._id.toString(),
+        data: {
+          _id: (currentUser as { _id: { toString: () => string } })._id.toString(),
+          email: (currentUser as { email?: string }).email
+        }
+      }
+    }
+
+    if (isDelete) {
+      if (isAutoTrigger || operation_type !== 'DELETE') {
+        return
+      }
+      const userData = buildUserData(fullDocumentBeforeChange ?? confirmedDocument)
+      if (!userData) {
+        return
+      }
+      const op = {
+        operationType: 'DELETE',
+        fullDocument,
+        fullDocumentBeforeChange,
+        documentKey,
+        updateDescription
+      }
+      try {
+        await GenerateContext({
+          args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
+          app,
+          rules: StateManager.select("rules"),
+          user: {},  // TODO from currentUser ??
+          currentFunction: triggerHandler,
+          functionsList,
+          services,
+          runAsSystem: true
+        })
+      } catch (error) {
+        console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
+      }
+      return
+    }
+
+    if (isReplace) {
+      const userData = buildUserData(confirmedDocument)
+      if (!userData) {
+        return
+      }
+      const op = {
+        operationType: 'UPDATE',
+        fullDocument,
+        fullDocumentBeforeChange,
+        documentKey,
+        updateDescription
+      }
+      try {
+        await GenerateContext({
+          args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
+          app,
+          rules: StateManager.select("rules"),
+          user: {},  // TODO from currentUser ??
+          currentFunction: triggerHandler,
+          functionsList,
+          services,
+          runAsSystem: true
+        })
+      } catch (error) {
+        console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
+      }
+      return
+    }
+
+    if (!isInsert && !isUpdate) {
+      return
+    }
+
+    if (isUpdate) {
+      confirmedCandidate = updatedStatus === 'confirmed'
+      if (confirmedCandidate && !confirmedDocument) {
         const fetched = await collection.findOne({
           _id: documentKey._id
         }) as Record<string, unknown> | null
         confirmedDocument = fetched ?? confirmedDocument
-        confirmedCandidate = (confirmedDocument as { status?: string } | null)?.status === 'confirmed'
       }
     } else {
       confirmedCandidate = (confirmedDocument as { status?: string } | null)?.status === 'confirmed'
+    }
+
+    if (autoConfirm && isInsert) {
+      confirmedCandidate = true
     }
 
     if (!confirmedCandidate) {
@@ -206,20 +310,13 @@ const handleAuthenticationTrigger = async ({
 
     delete (document as { password?: unknown }).password
 
-    const currentUser = { ...document }
-    delete (currentUser as { password?: unknown }).password
-
-    const userData = {
-      ...currentUser,
-      id: (currentUser as { _id: { toString: () => string } })._id.toString(),
-      data: {
-        _id: (currentUser as { _id: { toString: () => string } })._id.toString(),
-        email: (currentUser as { email?: string }).email
-      }
+    const userData = buildUserData(document)
+    if (!userData) {
+      return
     }
 
     const op = {
-      operationType: (autoConfirm || confirmedCandidate) ? 'CREATE' : 'UPDATE',
+      operationType: 'CREATE',
       fullDocument,
       fullDocumentBeforeChange,
       documentKey,
