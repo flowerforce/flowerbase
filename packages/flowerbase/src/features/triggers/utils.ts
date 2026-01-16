@@ -103,6 +103,12 @@ const handleCronTrigger = async ({
   registerOnClose(app, () => task.stop(), 'Scheduled trigger')
 }
 
+const mapOp = {
+  insert: 'CREATE',
+  update: 'UPDATE',
+  replace: 'REPLACE'
+}
+
 const handleAuthenticationTrigger = async ({
   config,
   triggerHandler,
@@ -121,18 +127,24 @@ const handleAuthenticationTrigger = async ({
     }
   ]
   const changeStream = collection.watch(pipeline, {
-    fullDocument: 'whenAvailable'
+    fullDocument: 'whenAvailable',
+    fullDocumentBeforeChange: config.full_document_before_change
+      ? 'whenAvailable'
+      : undefined
   })
   changeStream.on('error', (error) => {
     if (shouldIgnoreStreamError(error)) return
     console.error('Authentication trigger change stream error', error)
   })
   changeStream.on('change', async function (change) {
-    const operationType = change['operationType' as keyof typeof change] as string | undefined
+    const operationType = change['operationType' as keyof typeof change] as 'insert' | 'update' | 'replace'
     const documentKey = change['documentKey' as keyof typeof change] as
       | { _id?: unknown }
       | undefined
     const fullDocument = change['fullDocument' as keyof typeof change] as
+      | Record<string, unknown>
+      | null
+    const fullDocumentBeforeChange = change['fullDocumentBeforeChange' as keyof typeof change] as
       | Record<string, unknown>
       | null
     if (!documentKey?._id) {
@@ -200,10 +212,18 @@ const handleAuthenticationTrigger = async ({
         email: (currentUser as { email?: string }).email
       }
     }
-    // TODO change va ripulito
+
+    const op = {
+      operationType: mapOp[operationType],
+      fullDocument,
+      fullDocumentBeforeChange,
+      documentKey,
+      updateDescription
+    }
+
     try {
       await GenerateContext({
-        args: isAutoTrigger ? [userData] : [{ user: userData /*, ...change */ }],
+        args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
         app,
         rules: StateManager.select("rules"),
         user: {},  // TODO from currentUser ??
