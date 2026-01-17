@@ -1,0 +1,26 @@
+{
+  "name": "scheduledTrigger",
+  "type": "SCHEDULED",
+  "disabled": false,
+  "config": {
+    "schedule": "*/1 * * * * *",
+    "database": "",
+    "collection": "",
+    "operation_types": [],
+    "match": {},
+    "project": {},
+    "service_name": "mongodb-atlas",
+    "skip_catchup_events": false,
+    "tolerate_resume_errors": false,
+    "unordered": false,
+    "full_document": false,
+    "full_document_before_change": false
+  },
+  "event_processors": {
+    "FUNCTION": {
+      "config": {
+        "function_name": "onScheduledEvent"
+      }
+    }
+  }
+}

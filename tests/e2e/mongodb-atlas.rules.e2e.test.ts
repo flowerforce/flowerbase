@@ -17,6 +17,9 @@ const USER_COLLECTION = 'users'
 const ACTIVITIES_COLLECTION = 'activities'
 const COUNTERS_COLLECTION = 'counters'
 const UPLOADS_COLLECTION = 'uploads'
+const TRIGGER_ITEMS_INSERT_COLLECTION = 'trigger_items_insert'
+const TRIGGER_ITEMS_UPDATE_COLLECTION = 'trigger_items_update'
+const TRIGGER_ITEMS_DELETE_COLLECTION = 'trigger_items_delete'
 const AUTH_USERS_COLLECTION = 'auth_users'
 const RESET_PASSWORD_COLLECTION = 'reset_password_requests'
 const MANAGE_REPLICA_SET = process.env.MANAGE_REPLICA_SET === 'true'
@@ -326,6 +329,9 @@ const resetCollections = async () => {
     db.collection(AUTH_USERS_COLLECTION).deleteMany({}),
     db.collection(AUTH_CONFIG.refreshTokensCollection).deleteMany({}),
     db.collection(RESET_PASSWORD_COLLECTION).deleteMany({}),
+    db.collection(TRIGGER_ITEMS_INSERT_COLLECTION).deleteMany({}),
+    db.collection(TRIGGER_ITEMS_UPDATE_COLLECTION).deleteMany({}),
+    db.collection(TRIGGER_ITEMS_DELETE_COLLECTION).deleteMany({}),
     db.collection(TRIGGER_EVENTS_COLLECTION).deleteMany({})
   ])
 
@@ -1152,6 +1158,57 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(recorded).not.toBeNull()
     expect(recorded?.operationType).toBe('insert')
     expect(recorded?.documentId).toBe(newActivityId.toString())
+  })
+
+  it('fires database trigger on insert', async () => {
+    const documentId = new ObjectId()
+    await client
+      .db(DB_NAME)
+      .collection(TRIGGER_ITEMS_INSERT_COLLECTION)
+      .insertOne({ _id: documentId, label: 'insert' })
+
+    const event = await waitForTriggerEventType(documentId.toString(), 'insert')
+    expect(event).toBeDefined()
+    expect(event?.collection).toBe(TRIGGER_ITEMS_INSERT_COLLECTION)
+  })
+
+  it('fires database trigger on update', async () => {
+    const documentId = new ObjectId()
+    await client
+      .db(DB_NAME)
+      .collection(TRIGGER_ITEMS_UPDATE_COLLECTION)
+      .insertOne({ _id: documentId, label: 'before' })
+
+    await client
+      .db(DB_NAME)
+      .collection(TRIGGER_ITEMS_UPDATE_COLLECTION)
+      .updateOne({ _id: documentId }, { $set: { label: 'after' } })
+
+    const event = await waitForTriggerEventType(documentId.toString(), 'update')
+    expect(event).toBeDefined()
+    expect(event?.collection).toBe(TRIGGER_ITEMS_UPDATE_COLLECTION)
+  })
+
+  it('fires database trigger on delete', async () => {
+    const documentId = new ObjectId()
+    await client
+      .db(DB_NAME)
+      .collection(TRIGGER_ITEMS_DELETE_COLLECTION)
+      .insertOne({ _id: documentId, label: 'delete' })
+
+    await client
+      .db(DB_NAME)
+      .collection(TRIGGER_ITEMS_DELETE_COLLECTION)
+      .deleteOne({ _id: documentId })
+
+    const event = await waitForTriggerEventType(documentId.toString(), 'delete')
+    expect(event).toBeDefined()
+    expect(event?.collection).toBe(TRIGGER_ITEMS_DELETE_COLLECTION)
+  })
+
+  it('fires scheduled trigger', async () => {
+    const event = await waitForTriggerEventType('scheduled-trigger', 'scheduled')
+    expect(event).toBeDefined()
   })
 
   it('executes logTriggerEvent function directly', async () => {

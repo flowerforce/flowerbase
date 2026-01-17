@@ -206,7 +206,13 @@ const handleAuthenticationTrigger = async ({
       if (!isLogoutUpdate) {
         return
       }
-      const userData = buildUserData(fullDocument ?? confirmedDocument)
+      let logoutDocument = fullDocument ?? confirmedDocument
+      if (!logoutDocument && documentKey?._id) {
+        logoutDocument = await collection.findOne({
+          _id: documentKey._id
+        }) as Record<string, unknown> | null
+      }
+      const userData = buildUserData(logoutDocument)
       if (!userData) {
         return
       }
