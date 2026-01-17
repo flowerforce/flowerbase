@@ -60,6 +60,11 @@
     "run_as_system": true
   },
   {
+    "name": "onLogoutUser",
+    "private": true,
+    "run_as_system": true
+  },
+  {
     "name": "confirmUser",
     "private": true,
     "run_as_system": true

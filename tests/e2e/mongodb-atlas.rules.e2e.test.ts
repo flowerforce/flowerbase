@@ -1707,6 +1707,49 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(deleteEvent?.type).toBe('on_user_delete')
   })
 
+  it('fires logout trigger when auth user logs out', async () => {
+    const email = 'logout-trigger@example.com'
+    const password = 'logout-pass'
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email,
+        password
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: email,
+        password
+      }
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as { refresh_token?: string; user_id?: string }
+    expect(loginBody.refresh_token).toBeDefined()
+    expect(loginBody.user_id).toBeDefined()
+
+    const logout = await appInstance!.inject({
+      method: 'DELETE',
+      url: `${API_VERSION}/auth/session`,
+      headers: {
+        authorization: `Bearer ${loginBody.refresh_token}`
+      }
+    })
+    expect(logout.statusCode).toBe(200)
+
+    const logoutEvent = await waitForTriggerEventType(
+      loginBody.user_id!,
+      'on_user_logout'
+    )
+    expect(logoutEvent).toBeDefined()
+    expect(logoutEvent?.email).toBe(email)
+  })
+
   it('rejects registration when the email is already used', async () => {
     const payload = {
       email: 'duplicate@example.com',

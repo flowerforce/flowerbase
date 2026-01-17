@@ -1,5 +1,5 @@
 {
-  "name": "authDeleteTrigger",
+  "name": "authLogoutTrigger",
   "type": "AUTHENTICATION",
   "disabled": false,
   "config": {
@@ -8,7 +8,7 @@
     "full_document": true,
     "full_document_before_change": false,
     "match": {},
-    "operation_type": "DELETE",
+    "operation_type": "LOGOUT",
     "project": {},
     "service_name": "mongodb-atlas",
     "skip_catchup_events": false,
@@ -19,7 +19,7 @@
   "event_processors": {
     "FUNCTION": {
       "config": {
-        "function_name": "onDeleteUser"
+        "function_name": "onLogoutUser"
       }
     }
   }
