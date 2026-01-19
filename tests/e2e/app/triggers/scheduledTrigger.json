@@ -1,25 +1,25 @@
 {
-  "name": "authDeleteTrigger",
-  "type": "AUTHENTICATION",
+  "name": "scheduledTrigger",
+  "type": "SCHEDULED",
   "disabled": false,
   "config": {
-    "collection": "auth_users",
-    "database": "flowerbase-e2e",
-    "full_document": true,
-    "full_document_before_change": false,
+    "schedule": "*/1 * * * * *",
+    "database": "",
+    "collection": "",
+    "operation_types": [],
     "match": {},
-    "operation_type": "DELETE",
     "project": {},
     "service_name": "mongodb-atlas",
     "skip_catchup_events": false,
     "tolerate_resume_errors": false,
     "unordered": false,
-    "schedule": ""
+    "full_document": false,
+    "full_document_before_change": false
   },
   "event_processors": {
     "FUNCTION": {
       "config": {
-        "function_name": "onDeleteUser"
+        "function_name": "onScheduledEvent"
       }
     }
   }

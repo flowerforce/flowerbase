@@ -1,0 +1,18 @@
+{
+  "name": "databaseDeleteTrigger",
+  "type": "DATABASE",
+  "disabled": false,
+  "config": {
+    "database": "flowerbase-e2e",
+    "collection": "trigger_items_delete",
+    "operation_types": ["delete"],
+    "match": {}
+  },
+  "event_processors": {
+    "FUNCTION": {
+      "config": {
+        "function_name": "onDatabaseEvent"
+      }
+    }
+  }
+}

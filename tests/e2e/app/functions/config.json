@@ -60,6 +60,21 @@
     "run_as_system": true
   },
   {
+    "name": "onLogoutUser",
+    "private": true,
+    "run_as_system": true
+  },
+  {
+    "name": "onDatabaseEvent",
+    "private": true,
+    "run_as_system": true
+  },
+  {
+    "name": "onScheduledEvent",
+    "private": true,
+    "run_as_system": true
+  },
+  {
     "name": "confirmUser",
     "private": true,
     "run_as_system": true

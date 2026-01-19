@@ -17,6 +17,9 @@ const USER_COLLECTION = 'users'
 const ACTIVITIES_COLLECTION = 'activities'
 const COUNTERS_COLLECTION = 'counters'
 const UPLOADS_COLLECTION = 'uploads'
+const TRIGGER_ITEMS_INSERT_COLLECTION = 'trigger_items_insert'
+const TRIGGER_ITEMS_UPDATE_COLLECTION = 'trigger_items_update'
+const TRIGGER_ITEMS_DELETE_COLLECTION = 'trigger_items_delete'
 const AUTH_USERS_COLLECTION = 'auth_users'
 const RESET_PASSWORD_COLLECTION = 'reset_password_requests'
 const MANAGE_REPLICA_SET = process.env.MANAGE_REPLICA_SET === 'true'
@@ -326,6 +329,9 @@ const resetCollections = async () => {
     db.collection(AUTH_USERS_COLLECTION).deleteMany({}),
     db.collection(AUTH_CONFIG.refreshTokensCollection).deleteMany({}),
     db.collection(RESET_PASSWORD_COLLECTION).deleteMany({}),
+    db.collection(TRIGGER_ITEMS_INSERT_COLLECTION).deleteMany({}),
+    db.collection(TRIGGER_ITEMS_UPDATE_COLLECTION).deleteMany({}),
+    db.collection(TRIGGER_ITEMS_DELETE_COLLECTION).deleteMany({}),
     db.collection(TRIGGER_EVENTS_COLLECTION).deleteMany({})
   ])
 
@@ -1154,6 +1160,57 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(recorded?.documentId).toBe(newActivityId.toString())
   })
 
+  it('fires database trigger on insert', async () => {
+    const documentId = new ObjectId()
+    await client
+      .db(DB_NAME)
+      .collection(TRIGGER_ITEMS_INSERT_COLLECTION)
+      .insertOne({ _id: documentId, label: 'insert' })
+
+    const event = await waitForTriggerEventType(documentId.toString(), 'insert')
+    expect(event).toBeDefined()
+    expect(event?.collection).toBe(TRIGGER_ITEMS_INSERT_COLLECTION)
+  })
+
+  it('fires database trigger on update', async () => {
+    const documentId = new ObjectId()
+    await client
+      .db(DB_NAME)
+      .collection(TRIGGER_ITEMS_UPDATE_COLLECTION)
+      .insertOne({ _id: documentId, label: 'before' })
+
+    await client
+      .db(DB_NAME)
+      .collection(TRIGGER_ITEMS_UPDATE_COLLECTION)
+      .updateOne({ _id: documentId }, { $set: { label: 'after' } })
+
+    const event = await waitForTriggerEventType(documentId.toString(), 'update')
+    expect(event).toBeDefined()
+    expect(event?.collection).toBe(TRIGGER_ITEMS_UPDATE_COLLECTION)
+  })
+
+  it('fires database trigger on delete', async () => {
+    const documentId = new ObjectId()
+    await client
+      .db(DB_NAME)
+      .collection(TRIGGER_ITEMS_DELETE_COLLECTION)
+      .insertOne({ _id: documentId, label: 'delete' })
+
+    await client
+      .db(DB_NAME)
+      .collection(TRIGGER_ITEMS_DELETE_COLLECTION)
+      .deleteOne({ _id: documentId })
+
+    const event = await waitForTriggerEventType(documentId.toString(), 'delete')
+    expect(event).toBeDefined()
+    expect(event?.collection).toBe(TRIGGER_ITEMS_DELETE_COLLECTION)
+  })
+
+  it('fires scheduled trigger', async () => {
+    const event = await waitForTriggerEventType('scheduled-trigger', 'scheduled')
+    expect(event).toBeDefined()
+  })
+
   it('executes logTriggerEvent function directly', async () => {
     const changeEventId = new ObjectId()
     const token = getTokenFor(adminUser)
@@ -1705,6 +1762,49 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     )
     expect(deleteEvent).toBeDefined()
     expect(deleteEvent?.type).toBe('on_user_delete')
+  })
+
+  it('fires logout trigger when auth user logs out', async () => {
+    const email = 'logout-trigger@example.com'
+    const password = 'logout-pass'
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email,
+        password
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: email,
+        password
+      }
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as { refresh_token?: string; user_id?: string }
+    expect(loginBody.refresh_token).toBeDefined()
+    expect(loginBody.user_id).toBeDefined()
+
+    const logout = await appInstance!.inject({
+      method: 'DELETE',
+      url: `${API_VERSION}/auth/session`,
+      headers: {
+        authorization: `Bearer ${loginBody.refresh_token}`
+      }
+    })
+    expect(logout.statusCode).toBe(200)
+
+    const logoutEvent = await waitForTriggerEventType(
+      loginBody.user_id!,
+      'on_user_logout'
+    )
+    expect(logoutEvent).toBeDefined()
+    expect(logoutEvent?.email).toBe(email)
   })
 
   it('rejects registration when the email is already used', async () => {

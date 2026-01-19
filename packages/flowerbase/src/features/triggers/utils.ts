@@ -106,6 +106,7 @@ const handleCronTrigger = async ({
 const mapOpInverse = {
   CREATE: ['insert', 'update', 'replace'],
   DELETE: ['delete'],
+  LOGOUT: ['update'],
 }
 
 const handleAuthenticationTrigger = async ({
@@ -161,11 +162,13 @@ const handleAuthenticationTrigger = async ({
     const updateDescription = change[
       'updateDescription' as keyof typeof change
     ] as { updatedFields?: Record<string, unknown> } | undefined
-    const updatedStatus = updateDescription?.updatedFields?.status
+    const updatedFields = updateDescription?.updatedFields
+    const updatedStatus = updatedFields?.status
     const isInsert = operationType === 'insert'
     const isUpdate = operationType === 'update'
     const isReplace = operationType === 'replace'
     const isDelete = operationType === 'delete'
+    const isLogoutUpdate = isUpdate && !!updatedFields && 'lastLogoutAt' in updatedFields
 
     let confirmedCandidate = false
     let confirmedDocument =
@@ -197,6 +200,44 @@ const handleAuthenticationTrigger = async ({
           email: (currentUser as { email?: string }).email
         }
       }
+    }
+
+    if (operation_type === 'LOGOUT') {
+      if (!isLogoutUpdate) {
+        return
+      }
+      let logoutDocument = fullDocument ?? confirmedDocument
+      if (!logoutDocument && documentKey?._id) {
+        logoutDocument = await collection.findOne({
+          _id: documentKey._id
+        }) as Record<string, unknown> | null
+      }
+      const userData = buildUserData(logoutDocument)
+      if (!userData) {
+        return
+      }
+      const op = {
+        operationType: 'LOGOUT',
+        fullDocument,
+        fullDocumentBeforeChange,
+        documentKey,
+        updateDescription
+      }
+      try {
+        await GenerateContext({
+          args: [{ user: userData, ...op }],
+          app,
+          rules: StateManager.select("rules"),
+          user: {},  // TODO from currentUser ??
+          currentFunction: triggerHandler,
+          functionsList,
+          services,
+          runAsSystem: true
+        })
+      } catch (error) {
+        console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
+      }
+      return
     }
 
     if (isDelete) {
