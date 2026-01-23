@@ -1825,9 +1825,10 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       url: `${AUTH_BASE_URL}/register`,
       payload
     })
-    expect(second.statusCode).toBe(500)
-    const body = second.json() as { message?: string }
-    expect(body.message).toBe('This email address is already used')
+    expect(second.statusCode).toBe(409)
+    const body = second.json() as { error?: string; error_code?: string }
+    expect(body.error).toBe('name already in use')
+    expect(body.error_code).toBe('AccountNameInUse')
   })
 
   it('revokes refresh tokens on logout', async () => {
