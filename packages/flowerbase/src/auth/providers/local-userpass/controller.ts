@@ -138,7 +138,22 @@ export async function localUserPassController(app: FastifyInstance) {
         return
       }
 
-      const result = await handleUserRegistration(app, { run_as_system: true, provider: PROVIDER.LOCAL_USERPASS })({ email: req.body.email.toLowerCase(), password: req.body.password })
+      let result
+      try {
+        result = await handleUserRegistration(app, { run_as_system: true, provider: PROVIDER.LOCAL_USERPASS })({
+          email: req.body.email.toLowerCase(),
+          password: req.body.password
+        })
+      } catch (error) {
+        if (error instanceof Error && error.message === 'This email address is already used') {
+          res.status(409).send({
+            error: 'name already in use',
+            error_code: 'AccountNameInUse'
+          })
+          return
+        }
+        throw error
+      }
 
       if (!result?.insertedId) {
         res?.status(500)
