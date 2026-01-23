@@ -1950,6 +1950,96 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(parsedError.message).toBe('This email address is already used')
   })
 
+  it('deletes auth users via deleteUser function', async () => {
+    const email = 'service-delete@example.com'
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email,
+        password: 'service-delete-pass'
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+    const registrationBody = registration.json() as { userId?: string }
+    expect(registrationBody.userId).toBeDefined()
+
+    const token = getTokenFor(adminUser)
+    expect(token).toBeDefined()
+
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      payload: {
+        name: 'deleteUser',
+        arguments: [
+          {
+            id: registrationBody.userId
+          }
+        ]
+      }
+    })
+    expect(response.statusCode).toBe(200)
+    const body = response.json() as { deletedCount?: number }
+    expect(body.deletedCount).toBe(1)
+
+    const existing = await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .findOne({ _id: new ObjectId(registrationBody.userId) })
+
+    expect(existing).toBeNull()
+  })
+
+  it('rejects deleteUser when function is not run_as_system', async () => {
+    const email = 'public-delete@example.com'
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email,
+        password: 'public-delete-pass'
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+    const registrationBody = registration.json() as { userId?: string }
+    expect(registrationBody.userId).toBeDefined()
+
+    const token = getTokenFor(adminUser)
+    expect(token).toBeDefined()
+
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      payload: {
+        name: 'publicDeleteUser',
+        arguments: [
+          {
+            id: registrationBody.userId
+          }
+        ]
+      }
+    })
+
+    expect(response.statusCode).toBe(400)
+    const body = response.json() as { error?: string; error_code?: string }
+    expect(body.error_code).toBe('FunctionExecutionError')
+    const parsedError = body.error ? (JSON.parse(body.error) as { message?: string }) : {}
+    expect(parsedError.message).toBe('only run_as_system')
+
+    const existing = await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .findOne({ _id: new ObjectId(registrationBody.userId) })
+    expect(existing).toBeDefined()
+  })
+
   it('revokes refresh tokens on logout', async () => {
     const ip = '203.0.113.50'
     const login = await appInstance!.inject({
