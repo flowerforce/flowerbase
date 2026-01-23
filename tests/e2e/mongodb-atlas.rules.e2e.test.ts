@@ -123,6 +123,7 @@ const TRIGGER_EVENTS_COLLECTION = 'triggerEvents'
 const PROJECT_ID = 'flowerbase-e2e'
 const FUNCTION_CALL_URL = `${API_VERSION}/app/${PROJECT_ID}/functions/call`
 const AUTH_BASE_URL = `${API_VERSION}/app/${PROJECT_ID}/auth/providers/local-userpass`
+const ANON_AUTH_BASE_URL = `${API_VERSION}/app/${PROJECT_ID}/auth/providers/anon-user`
 const TOKEN_MAP: Record<string, string> = {}
 
 const serializeValue = (value: unknown) => {
@@ -1829,6 +1830,78 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const body = second.json() as { error?: string; error_code?: string }
     expect(body.error).toBe('name already in use')
     expect(body.error_code).toBe('AccountNameInUse')
+  })
+
+  it('creates a unique email index for auth users', async () => {
+    const indexes = await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .indexes()
+    const emailIndex = indexes.find((index) => {
+      const key = index.key as Record<string, number>
+      return key?.email === 1
+    })
+
+    expect(emailIndex).toBeDefined()
+    expect(emailIndex?.unique).toBe(true)
+  })
+
+  it('assigns a fake email to anonymous users', async () => {
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: `${ANON_AUTH_BASE_URL}/login`
+    })
+    expect(response.statusCode).toBe(200)
+    const body = response.json() as { user_id?: string }
+    expect(body.user_id).toBeDefined()
+
+    const authUser = await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .findOne({ _id: new ObjectId(body.user_id!) })
+
+    expect(authUser?.email).toBe(`anon-${body.user_id}@users.invalid`)
+  })
+
+  it('rejects registerUser when the email is already used', async () => {
+    const token = getTokenFor(adminUser)
+    expect(token).toBeDefined()
+
+    const payload = {
+      name: 'registerUser',
+      arguments: [
+        {
+          email: 'service-dup@example.com',
+          password: 'service-pass'
+        }
+      ]
+    }
+
+    const first = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      payload
+    })
+    expect(first.statusCode).toBe(200)
+    const firstBody = first.json() as { insertedId?: string | null }
+    expect(firstBody.insertedId).toBeDefined()
+
+    const second = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      payload
+    })
+    expect(second.statusCode).toBe(500)
+    const secondBody = second.json() as { error?: string; error_code?: string }
+    expect(secondBody.error_code).toBe('FunctionExecutionError')
+    const parsedError = secondBody.error ? (JSON.parse(secondBody.error) as { message?: string }) : {}
+    expect(parsedError.message).toBe('This email address is already used')
   })
 
   it('revokes refresh tokens on logout', async () => {
