@@ -46,6 +46,7 @@ export const executeQuery = async ({
   query,
   update,
   filter,
+  projection,
   options,
   returnNewDocument,
   document,
@@ -67,11 +68,23 @@ export const executeQuery = async ({
         ? { returnDocument: returnNewDocument ? 'after' : 'before' }
         : undefined
   const parsedOptions = resolvedOptions ? EJSON.deserialize(resolvedOptions) : undefined
+  const parsedProjection =
+    typeof projection !== 'undefined' ? EJSON.deserialize(projection) : undefined
+  const resolvedProjection =
+    typeof projection !== 'undefined'
+      ? parsedProjection
+      : parsedOptions &&
+          typeof parsedOptions === 'object' &&
+          'projection' in parsedOptions
+        ? (parsedOptions as Document).projection
+        : undefined
   return {
     find: async () =>
       await (() => {
         const cursor = (currentMethod as ReturnType<GetOperatorsFunction>['find'])(
-          EJSON.deserialize(resolvedQuery)
+          EJSON.deserialize(resolvedQuery),
+          resolvedProjection,
+          parsedOptions
         )
         if (parsedOptions?.sort) {
           cursor.sort(parsedOptions.sort as Document)
@@ -86,7 +99,9 @@ export const executeQuery = async ({
       })(),
     findOne: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['findOne'])(
-        EJSON.deserialize(resolvedQuery)
+        EJSON.deserialize(resolvedQuery),
+        resolvedProjection,
+        parsedOptions
       ),
     count: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['count'])(
@@ -95,7 +110,8 @@ export const executeQuery = async ({
       ),
     deleteOne: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['deleteOne'])(
-        EJSON.deserialize(resolvedQuery)
+        EJSON.deserialize(resolvedQuery),
+        parsedOptions
       ),
     insertOne: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['insertOne'])(
@@ -125,7 +141,8 @@ export const executeQuery = async ({
       ),
     deleteMany: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['deleteMany'])(
-        EJSON.deserialize(resolvedQuery)
+        EJSON.deserialize(resolvedQuery),
+        parsedOptions
       )
   }
 }

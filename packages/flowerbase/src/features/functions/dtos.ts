@@ -26,6 +26,7 @@ type ArgumentsData = Arguments<{
   filter?: Document
   query: Parameters<GetOperatorsFunction>
   update: Document
+  projection?: Document
   options?: Document
   returnNewDocument?: boolean
   document: Document

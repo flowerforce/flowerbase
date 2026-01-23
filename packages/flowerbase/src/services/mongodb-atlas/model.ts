@@ -4,6 +4,8 @@ import {
   Document,
   FindCursor,
   FindOneAndUpdateOptions,
+  FindOneOptions,
+  FindOptions,
   Filter as MongoFilter,
   UpdateFilter,
   WithId
@@ -50,8 +52,12 @@ export type GetOperatorsFunction = (
     collName: string
   }
 ) => {
-  findOne: (...params: Parameters<Method<'findOne'>>) => ReturnType<Method<'findOne'>>
-  deleteOne: (...params: Parameters<Method<'findOne'>>) => ReturnType<Method<'findOne'>>
+  findOne: (
+    filter?: MongoFilter<Document>,
+    projection?: Document,
+    options?: FindOneOptions
+  ) => ReturnType<Method<'findOne'>>
+  deleteOne: (...params: Parameters<Method<'deleteOne'>>) => ReturnType<Method<'deleteOne'>>
   insertOne: (
     ...params: Parameters<Method<'insertOne'>>
   ) => ReturnType<Method<'insertOne'>>
@@ -63,7 +69,11 @@ export type GetOperatorsFunction = (
     update: UpdateFilter<Document> | Document[],
     options?: FindOneAndUpdateOptions
   ) => Promise<Document | null>
-  find: (...params: Parameters<Method<'find'>>) => FindCursor
+  find: (
+    filter?: MongoFilter<Document>,
+    projection?: Document,
+    options?: FindOptions
+  ) => FindCursor
   count: (
     ...params: Parameters<Method<'countDocuments'>>
   ) => ReturnType<Method<'countDocuments'>>

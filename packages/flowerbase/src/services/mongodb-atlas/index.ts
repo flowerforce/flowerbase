@@ -89,6 +89,8 @@ const getOperators: GetOperatorsFunction = (
    * Finds a single document in a MongoDB collection with optional role-based filtering and validation.
    *
    * @param {Filter<Document>} query - The MongoDB query used to match the document.
+   * @param {Document} [projection] - Optional projection to select returned fields.
+   * @param {FindOneOptions} [options] - Optional settings for the findOne operation.
    * @returns {Promise<Document | {} | null>} A promise resolving to the document if found and permitted, an empty object if access is denied, or `null` if not found.
    *
    * @description
@@ -100,11 +102,19 @@ const getOperators: GetOperatorsFunction = (
    *  - Validates the result using `checkValidation` to ensure read permission.
    *  - If validation fails, returns an empty object; otherwise returns the validated document.
    */
-    findOne: async (query) => {
+    findOne: async (query = {}, projection, options) => {
+      const resolvedOptions =
+        projection || options
+          ? {
+            ...(options ?? {}),
+            ...(projection ? { projection } : {})
+          }
+          : undefined
+      const resolvedQuery = query ?? {}
       if (!run_as_system) {
         checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
         // Apply access control filters to the query
-        const formattedQuery = getFormattedQuery(filters, query, user)
+        const formattedQuery = getFormattedQuery(filters, resolvedQuery, user)
         logDebug('update formattedQuery', {
           collection: collName,
           query,
@@ -120,7 +130,7 @@ const getOperators: GetOperatorsFunction = (
         logService('findOne query', { collName, formattedQuery })
         const safeQuery = normalizeQuery(formattedQuery)
         logService('findOne normalizedQuery', { collName, safeQuery })
-        const result = await collection.findOne({ $and: safeQuery })
+        const result = await collection.findOne({ $and: safeQuery }, resolvedOptions)
         logDebug('findOne result', {
           collection: collName,
           result
@@ -151,12 +161,13 @@ const getOperators: GetOperatorsFunction = (
         return Promise.resolve(status ? document : {})
       }
       // System mode: no validation applied
-      return collection.findOne(query)
+      return collection.findOne(resolvedQuery, resolvedOptions)
     },
     /**
      * Deletes a single document from a MongoDB collection with optional role-based validation.
      *
      * @param {Filter<Document>} [query={}] - The MongoDB query used to match the document to delete.
+     * @param {DeleteOptions} [options] - Optional settings for the delete operation.
      * @returns {Promise<DeleteResult>} A promise resolving to the result of the delete operation.
      *
      * @throws {Error} If the user is not authorized to delete the document.
@@ -170,7 +181,7 @@ const getOperators: GetOperatorsFunction = (
      *  - If validation fails, throws an error.
      *  - If validation passes, deletes the document using the filtered query.
      */
-    deleteOne: async (query = {}) => {
+    deleteOne: async (query = {}, options) => {
       if (!run_as_system) {
         checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
         // Apply access control filters
@@ -202,10 +213,10 @@ const getOperators: GetOperatorsFunction = (
           throw new Error('Delete not permitted')
         }
 
-        return collection.deleteOne({ $and: formattedQuery })
+        return collection.deleteOne({ $and: formattedQuery }, options)
       }
       // System mode: bypass access control
-      return collection.deleteOne(query)
+      return collection.deleteOne(query, options)
     },
     /**
      * Inserts a single document into a MongoDB collection with optional role-based validation.
@@ -438,6 +449,9 @@ const getOperators: GetOperatorsFunction = (
      * Finds documents in a MongoDB collection with optional role-based access control and post-query validation.
      *
      * @param {Filter<Document>} query - The MongoDB query to filter documents.
+     * @param {Document} [projection] - Optional projection to select returned fields.
+     * @param {FindOptions} [options] - Optional settings for the find operation.
+     * @param {FindOptions} [options] - Optional settings for the find operation.
      * @returns {FindCursor} A customized `FindCursor` that includes additional access control logic in its `toArray()` method.
      *
      * @description
@@ -451,14 +465,21 @@ const getOperators: GetOperatorsFunction = (
      *
      * This ensures that both pre-query filtering and post-query validation are applied consistently.
      */
-    find: (query) => {
+    find: (query = {}, projection, options) => {
+      const resolvedOptions =
+        projection || options
+          ? {
+            ...(options ?? {}),
+            ...(projection ? { projection } : {})
+          }
+          : undefined
       if (!run_as_system) {
         checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
         // Pre-query filtering based on access control rules
         const formattedQuery = getFormattedQuery(filters, query, user)
         const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
         // aggiunto filter per evitare questo errore: $and argument's entries must be objects
-        const cursor = collection.find(currentQuery)
+        const cursor = collection.find(currentQuery, resolvedOptions)
         const originalToArray = cursor.toArray.bind(cursor)
 
         /**
@@ -502,7 +523,7 @@ const getOperators: GetOperatorsFunction = (
         return cursor
       }
       // System mode: return original unfiltered cursor
-      return collection.find(query)
+      return collection.find(query, resolvedOptions)
     },
     count: (query, options) => {
       if (!run_as_system) {
@@ -793,6 +814,7 @@ const getOperators: GetOperatorsFunction = (
      * Deletes multiple documents from a MongoDB collection with role-based access control and validation.
      *
      * @param query - The initial MongoDB query to filter documents to be deleted.
+     * @param {DeleteOptions} [options] - Optional settings for the delete operation.
      * @returns {Promise<{ acknowledged: boolean, deletedCount: number }>} A promise resolving to the deletion result.
      *
      * @description
@@ -803,7 +825,7 @@ const getOperators: GetOperatorsFunction = (
      *  - Validates each document against user roles.
      *  - Deletes only the documents that the current user has permission to delete.
      */
-    deleteMany: async (query = {}) => {
+    deleteMany: async (query = {}, options) => {
       if (!run_as_system) {
         checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
         // Apply access control filters
@@ -849,10 +871,10 @@ const getOperators: GetOperatorsFunction = (
         const deleteQuery = {
           $and: [...formattedQuery, { _id: { $in: elementsToDelete } }]
         }
-        return collection.deleteMany(deleteQuery)
+        return collection.deleteMany(deleteQuery, options)
       }
       // If running as system, bypass access control and delete directly
-      return collection.deleteMany(query)
+      return collection.deleteMany(query, options)
     }
   }
 }

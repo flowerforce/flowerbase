@@ -148,6 +148,7 @@ const callServiceOperation = async ({
   query,
   filter,
   update,
+  projection,
   document,
   pipeline,
   options
@@ -167,6 +168,7 @@ const callServiceOperation = async ({
   query?: Document
   filter?: Document
   update?: Document
+  projection?: Document
   document?: Document
   options?: Document
   pipeline?: Document[]
@@ -185,6 +187,7 @@ const callServiceOperation = async ({
         query: serializeValue(query),
         filter: serializeValue(filter),
         update: serializeValue(update),
+        projection: serializeValue(projection),
         document: serializeValue(document),
         pipeline: pipeline?.map((stage) => serializeValue(stage)),
         options: serializeValue(options)
@@ -219,13 +222,15 @@ const callServiceOperation = async ({
 }
 
 const createCollectionProxy = (collection: string, user: TestUser | null) => ({
-  find: (query: Document = {}, options?: Document) => ({
-    toArray: async () => callServiceOperation({ collection, method: 'find', user, query, options })
+  find: (query: Document = {}, projection?: Document, options?: Document) => ({
+    toArray: async () =>
+      callServiceOperation({ collection, method: 'find', user, query, projection, options })
   }),
   aggregate: (pipeline: Document[] = []) => ({
     toArray: async () => callServiceOperation({ collection, method: 'aggregate', user, pipeline })
   }),
-  findOne: (query: Document = {}) => callServiceOperation({ collection, method: 'findOne', user, query }),
+  findOne: (query: Document = {}, projection?: Document, options?: Document) =>
+    callServiceOperation({ collection, method: 'findOne', user, query, projection, options }),
   count: (query: Document = {}, options?: Document) =>
     callServiceOperation({ collection, method: 'count', user, query, options }),
   insertOne: (document: Document) => callServiceOperation({ collection, method: 'insertOne', user, document }),
@@ -233,9 +238,10 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
     callServiceOperation({ collection, method: 'updateOne', user, query, update }),
   findOneAndUpdate: (query: Document, update: Document) =>
     callServiceOperation({ collection, method: 'findOneAndUpdate', user, query, update }),
-  deleteOne: (query: Document) => callServiceOperation({ collection, method: 'deleteOne', user, query }),
-  deleteMany: (query: Document = {}) =>
-    callServiceOperation({ collection, method: 'deleteMany', user, query }),
+  deleteOne: (query: Document, options?: Document) =>
+    callServiceOperation({ collection, method: 'deleteOne', user, query, options }),
+  deleteMany: (query: Document = {}, options?: Document) =>
+    callServiceOperation({ collection, method: 'deleteMany', user, query, options }),
 })
 
 const getTodosCollection = (user: TestUser | null) => createCollectionProxy(TODO_COLLECTION, user)
@@ -666,6 +672,20 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(todos.every((todo) => todo.userId === ownerUser.id)).toBe(true)
   })
 
+  it('respects projection options in findOne', async () => {
+    const todo = (await getTodosCollection(ownerUser).findOne(
+      { _id: todoIds.ownerFirst },
+      { title: 1, userId: 1 }
+    )) as TodoDoc | null
+
+    expect(todo).toBeDefined()
+    expect(todo).toMatchObject({
+      title: 'Owner task 1',
+      userId: ownerUser.id
+    })
+    expect(todo).not.toHaveProperty('sensitive')
+  })
+
   it('denies inserting a todo for another user', async () => {
     await expect(
       getTodosCollection(ownerUser).insertOne({
@@ -780,6 +800,20 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(deleteResult.deletedCount).toBe(1)
   })
 
+  it('passes options through deleteOne', async () => {
+    await expect(
+      getTodosCollection(ownerUser).deleteOne(
+        { _id: todoIds.ownerSecond },
+        { hint: { missingField: 1 } }
+      )
+    ).rejects.toThrow()
+
+    const remaining = (await getTodosCollection(ownerUser).findOne({
+      _id: todoIds.ownerSecond
+    })) as TodoDoc | null
+    expect(remaining).toBeDefined()
+  })
+
   it('allows users to delete only their own todos with deleteMany', async () => {
     const deleteResult = (await getTodosCollection(ownerUser).deleteMany({})) as DeleteResult
     expect(deleteResult.deletedCount).toBe(2)
@@ -806,6 +840,18 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       _id: todoIds.otherUser
     })) as DeleteResult
     expect(deleteResult.deletedCount).toBe(1)
+  })
+
+  it('passes options through deleteMany', async () => {
+    await expect(
+      getTodosCollection(ownerUser).deleteMany(
+        { userId: ownerUser.id },
+        { hint: { missingField: 1 } }
+      )
+    ).rejects.toThrow()
+
+    const remainingOwner = (await getTodosCollection(ownerUser).find({}).toArray()) as TodoDoc[]
+    expect(remainingOwner).toHaveLength(2)
   })
 
   it('allows owners to update their own todos with findOneAndUpdate', async () => {
@@ -1041,13 +1087,13 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
   it('supports client find queries with $sort/$skip/$limit options', async () => {
     const ownerResults = (await getCountersCollection(ownerUser)
-      .find({}, { sort: { value: -1 }, skip: 1, limit: 1 })
+      .find({}, undefined, { sort: { value: -1 }, skip: 1, limit: 1 })
       .toArray()) as CounterDoc[]
     expect(ownerResults).toHaveLength(1)
     expect(ownerResults[0].value).toBe(200)
 
     const guestResults = (await getCountersCollection(guestUser)
-      .find({}, { sort: { value: 1 }, limit: 1 })
+      .find({}, undefined, { sort: { value: 1 }, limit: 1 })
       .toArray()) as CounterDoc[]
     expect(guestResults).toHaveLength(1)
     expect(guestResults[0].workspace).toBe('workspace-2')
@@ -1077,12 +1123,12 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(ownerSkipResults.map((counter) => counter.value)).toEqual([200, 100])
 
     const ownerDescFind = (await getCountersCollection(ownerUser)
-      .find({}, { sort: { value: -1 }, limit: 3 })
+      .find({}, undefined, { sort: { value: -1 }, limit: 3 })
       .toArray()) as CounterDoc[]
     expect(ownerDescFind.map((counter) => counter.value)).toEqual([400, 200, 100])
 
     const ownerSkipFind = (await getCountersCollection(ownerUser)
-      .find({}, { sort: { value: -1 }, skip: 1, limit: 2 })
+      .find({}, undefined, { sort: { value: -1 }, skip: 1, limit: 2 })
       .toArray()) as CounterDoc[]
     expect(ownerSkipFind.map((counter) => counter.value)).toEqual([200, 100])
 
@@ -1097,7 +1143,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(ownerAscResults.map((counter) => counter.value)).toEqual([100, 200, 400])
 
     const ownerAscFind = (await getCountersCollection(ownerUser)
-      .find({}, { sort: { value: 1 }, limit: 3 })
+      .find({}, undefined, { sort: { value: 1 }, limit: 3 })
       .toArray()) as CounterDoc[]
     expect(ownerAscFind.map((counter) => counter.value)).toEqual([100, 200, 400])
   })
