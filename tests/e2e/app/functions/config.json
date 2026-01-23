@@ -80,6 +80,16 @@
     "run_as_system": true
   },
   {
+    "name": "deleteUser",
+    "private": false,
+    "run_as_system": true
+  },
+  {
+    "name": "publicDeleteUser",
+    "private": false,
+    "run_as_system": false
+  },
+  {
     "name": "registerUser",
     "private": false,
     "run_as_system": true
