@@ -78,5 +78,10 @@
     "name": "confirmUser",
     "private": true,
     "run_as_system": true
+  },
+  {
+    "name": "registerUser",
+    "private": false,
+    "run_as_system": true
   }
 ]

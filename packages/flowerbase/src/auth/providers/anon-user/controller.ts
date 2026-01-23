@@ -1,7 +1,8 @@
+import { ObjectId } from 'bson'
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
-import { hashToken } from '../../../utils/crypto'
 import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
+import { hashToken } from '../../../utils/crypto'
 import { AUTH_ENDPOINTS } from '../../utils'
 import { LoginDto } from './dtos'
 
@@ -37,34 +38,23 @@ export async function anonUserController(app: FastifyInstance) {
       }
 
       const now = new Date()
-      const insertResult = await db.collection(authCollection!).insertOne({
+      const userId = new ObjectId()
+      const anonEmail = `anon-${userId.toString()}@users.invalid`
+      await db.collection(authCollection!).insertOne({
+        _id: userId,
+        email: anonEmail,
         status: 'confirmed',
         createdAt: now,
         custom_data: {},
         identities: [
           {
+            id: userId.toString(),
+            provider_id: userId.toString(),
             provider_type: PROVIDER.ANON_USER,
             provider_data: {}
           }
         ]
       })
-
-      const userId = insertResult.insertedId
-      await db.collection(authCollection!).updateOne(
-        { _id: userId },
-        {
-          $set: {
-            identities: [
-              {
-                id: userId.toString(),
-                provider_id: userId.toString(),
-                provider_type: PROVIDER.ANON_USER,
-                provider_data: {}
-              }
-            ]
-          }
-        }
-      )
 
       const currentUserData = {
         _id: userId,

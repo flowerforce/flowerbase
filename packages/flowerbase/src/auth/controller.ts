@@ -27,6 +27,17 @@ export async function authController(app: FastifyInstance) {
     console.error('Failed to ensure refresh token TTL index', error)
   }
 
+  try {
+    await db.collection(authCollection).createIndex(
+      { email: 1 },
+      {
+        unique: true
+      }
+    )
+  } catch (error) {
+    console.error('Failed to ensure auth email unique index', error)
+  }
+
   app.addHook(HANDLER_TYPE, app.jwtAuthentication)
 
   /**
