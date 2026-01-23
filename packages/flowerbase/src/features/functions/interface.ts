@@ -25,6 +25,7 @@ export type ExecuteQueryParams = {
   query: Parameters<GetOperatorsFunction>
   update: Document
   filter?: Document
+  projection?: Document
   options?: Document
   returnNewDocument?: boolean
   document: Document
