@@ -138,7 +138,7 @@ export const functionsController: FunctionController = async (
       res.type('application/json')
       return JSON.stringify(result)
     } catch (error) {
-      res.status(500)
+      res.status(400)
       res.type('application/json')
       return JSON.stringify({
         error: formatFunctionExecutionError(error),

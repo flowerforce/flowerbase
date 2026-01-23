@@ -1394,7 +1394,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       }
     })
 
-    expect(response.statusCode).toBe(500)
+    expect(response.statusCode).toBe(400)
     const body = response.json() as { error?: string; error_code?: string }
     expect(body.error_code).toBe('FunctionExecutionError')
     const parsedError = body.error ? JSON.parse(body.error) as { message?: string } : {}
@@ -1943,7 +1943,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       },
       payload
     })
-    expect(second.statusCode).toBe(500)
+    expect(second.statusCode).toBe(400)
     const secondBody = second.json() as { error?: string; error_code?: string }
     expect(secondBody.error_code).toBe('FunctionExecutionError')
     const parsedError = secondBody.error ? (JSON.parse(secondBody.error) as { message?: string }) : {}
