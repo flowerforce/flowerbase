@@ -1,0 +1,22 @@
+{
+  "name": "databaseFilteredUpdateTrigger",
+  "type": "DATABASE",
+  "disabled": false,
+  "config": {
+    "database": "flowerbase-e2e",
+    "collection": "trigger_items_filtered",
+    "operation_types": ["update"],
+    "match": {
+      "updateDescription.updatedFields.category": "approved"
+    },
+    "full_document": true,
+    "full_document_before_change": true
+  },
+  "event_processors": {
+    "FUNCTION": {
+      "config": {
+        "function_name": "logFilteredUpdateEvent"
+      }
+    }
+  }
+}

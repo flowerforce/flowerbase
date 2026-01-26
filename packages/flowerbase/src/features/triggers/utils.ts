@@ -415,11 +415,13 @@ const handleDataBaseTrigger = async ({
     project = {}
   } = config
 
+  const operationsNormalized = operation_types.map((op: string) => op.toLowerCase())
+
   const collection = app.mongo.client.db(database).collection(collectionName)
   const pipeline = [
     {
       $match: {
-        operationType: { $in: operation_types.map((op: string) => op.toLowerCase()) },
+        operationType: { $in: operationsNormalized },
         ...match
       }
     },
@@ -430,7 +432,11 @@ const handleDataBaseTrigger = async ({
       : undefined
   ].filter(Boolean) as Parameters<typeof collection.watch>[0]
   const changeStream = collection.watch(pipeline, {
-    fullDocument: config.full_document ? 'whenAvailable' : undefined,
+    fullDocument: (() => {
+      if (!config.full_document) return undefined
+      const requiresLookup = operationsNormalized.some((op) => op === 'update' || op === 'replace')
+      return requiresLookup ? 'updateLookup' : 'whenAvailable'
+    })(),
     fullDocumentBeforeChange: config.full_document_before_change
       ? 'whenAvailable'
       : undefined
