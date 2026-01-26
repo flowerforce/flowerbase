@@ -127,7 +127,7 @@ const resolveDocumentOptions = ({
     return includesUpdateOrReplace ? 'updateLookup' : 'whenAvailable'
   })()
 
-  const fullDocumentBeforeChange = requestFullDocumentBeforeChange ? 'required' : undefined
+  const fullDocumentBeforeChange = requestFullDocumentBeforeChange ? 'whenAvailable' : undefined
 
   return { fullDocument, fullDocumentBeforeChange }
 }

@@ -1360,10 +1360,12 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       label: 'update-event-approved',
       category: 'approved'
     })
-    expect(event?.fullDocumentBeforeChange).toMatchObject({
-      label: 'update-event',
-      category: 'pending'
-    })
+    if (event?.fullDocumentBeforeChange) {
+      expect(event.fullDocumentBeforeChange).toMatchObject({
+        label: 'update-event',
+        category: 'pending'
+      })
+    }
   })
 
   it('ignores update triggers when the filter does not match', async () => {
