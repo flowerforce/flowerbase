@@ -67,5 +67,8 @@
   },
   "exports": {
     ".": "./dist/index.js"
+  },
+  "bin": {
+    "flowerbase-function": "dist/cli/call-function.js"
   }
 }
