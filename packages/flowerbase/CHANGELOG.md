@@ -1,3 +1,27 @@
+## 1.5.0 (2026-01-26)
+
+
+### 🚀 Features
+
+- add trigger auth LOGOUT ([970f2c7](https://github.com/flowerforce/flowerbase/commit/970f2c7))
+
+
+### 🩹 Fixes
+
+- response error in functions ([557941e](https://github.com/flowerforce/flowerbase/commit/557941e))
+
+- add error AccountNameInUse ([e0162c1](https://github.com/flowerforce/flowerbase/commit/e0162c1))
+
+- update aws lib ([6fa5144](https://github.com/flowerforce/flowerbase/commit/6fa5144))
+
+- add unique email auth and schema email password ([d650d0b](https://github.com/flowerforce/flowerbase/commit/d650d0b))
+
+- add options mongod methods ([1f4bbcd](https://github.com/flowerforce/flowerbase/commit/1f4bbcd))
+
+- change status code FunctionExecutionError ([6ae17c8](https://github.com/flowerforce/flowerbase/commit/6ae17c8))
+
+- add delete auth user method ([353c030](https://github.com/flowerforce/flowerbase/commit/353c030))
+
 ## 1.4.1 (2026-01-16)
 
 
