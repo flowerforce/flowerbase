@@ -109,6 +109,29 @@ const mapOpInverse = {
   LOGOUT: ['update'],
 }
 
+const normalizeOperationTypes = (operationTypes: string[] = []) =>
+  operationTypes.map((op) => op.toLowerCase())
+
+const resolveDocumentOptions = ({
+  requestFullDocument,
+  requestFullDocumentBeforeChange,
+  normalizedOperations
+}: {
+  requestFullDocument?: boolean
+  requestFullDocumentBeforeChange?: boolean
+  normalizedOperations: string[]
+}) => {
+  const includesUpdateOrReplace = normalizedOperations.some((op) => op === 'update' || op === 'replace')
+  const fullDocument = (() => {
+    if (!requestFullDocument) return undefined
+    return includesUpdateOrReplace ? 'updateLookup' : 'whenAvailable'
+  })()
+
+  const fullDocumentBeforeChange = requestFullDocumentBeforeChange ? 'required' : undefined
+
+  return { fullDocument, fullDocumentBeforeChange }
+}
+
 const handleAuthenticationTrigger = async ({
   config,
   triggerHandler,
@@ -116,25 +139,28 @@ const handleAuthenticationTrigger = async ({
   services,
   app
 }: HandlerParams) => {
-  const { database, isAutoTrigger, operation_types, operation_type } = config
+  const { database, isAutoTrigger, operation_types = [], operation_type } = config
   const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
   const collection = app.mongo.client.db(database || DB_NAME).collection(authCollection)
+  const operationCandidates = operation_type ? mapOpInverse[operation_type] : operation_types
+  const normalizedOps = normalizeOperationTypes(operationCandidates)
+  const { fullDocument, fullDocumentBeforeChange } = resolveDocumentOptions({
+    requestFullDocument: config.full_document,
+    requestFullDocumentBeforeChange: config.full_document_before_change,
+    normalizedOperations: normalizedOps
+  })
   const pipeline = [
     {
       $match: {
         operationType: {
-          $in: operation_type
-            ? mapOpInverse[operation_type]
-            : operation_types
+          $in: normalizedOps
         }
       }
     }
   ]
   const changeStream = collection.watch(pipeline, {
-    fullDocument: 'whenAvailable',
-    fullDocumentBeforeChange: config.full_document_before_change
-      ? 'whenAvailable'
-      : undefined
+    fullDocument,
+    fullDocumentBeforeChange
   })
   changeStream.on('error', (error) => {
     if (shouldIgnoreStreamError(error)) return
@@ -415,15 +441,15 @@ const handleDataBaseTrigger = async ({
     project = {}
   } = config
 
-  const operationsNormalized = operation_types.map((op: string) => op.toLowerCase())
+  const normalizedOperations = normalizeOperationTypes(operation_types)
 
   const collection = app.mongo.client.db(database).collection(collectionName)
   const pipeline = [
     {
-      $match: {
-        operationType: { $in: operationsNormalized },
-        ...match
-      }
+    $match: {
+      operationType: { $in: normalizedOperations },
+      ...match
+    }
     },
     Object.keys(project).length
       ? {
@@ -431,15 +457,15 @@ const handleDataBaseTrigger = async ({
       }
       : undefined
   ].filter(Boolean) as Parameters<typeof collection.watch>[0]
+  const { fullDocument, fullDocumentBeforeChange } = resolveDocumentOptions({
+    requestFullDocument: config.full_document,
+    requestFullDocumentBeforeChange: config.full_document_before_change,
+    normalizedOperations
+  })
+
   const changeStream = collection.watch(pipeline, {
-    fullDocument: (() => {
-      if (!config.full_document) return undefined
-      const requiresLookup = operationsNormalized.some((op) => op === 'update' || op === 'replace')
-      return requiresLookup ? 'updateLookup' : 'whenAvailable'
-    })(),
-    fullDocumentBeforeChange: config.full_document_before_change
-      ? 'whenAvailable'
-      : undefined
+    fullDocument,
+    fullDocumentBeforeChange
   })
   changeStream.on('error', (error) => {
     if (shouldIgnoreStreamError(error)) return
