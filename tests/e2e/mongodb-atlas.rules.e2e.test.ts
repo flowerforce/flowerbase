@@ -552,8 +552,8 @@ const ensureFilteredTriggerCollections = async () => {
   }
 
   await recreateCollection(FILTERED_TRIGGER_EVENTS_COLLECTION)
-  await recreateCollection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
-  await recreateCollection(FILTERED_TRIGGER_ITEMS_COLLECTION, {
+    await recreateCollection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
+    await recreateCollection(FILTERED_TRIGGER_ITEMS_COLLECTION, {
     changeStreamPreAndPostImages: { enabled: true }
   })
 }
