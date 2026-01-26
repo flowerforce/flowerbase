@@ -20,8 +20,11 @@ const UPLOADS_COLLECTION = 'uploads'
 const TRIGGER_ITEMS_INSERT_COLLECTION = 'trigger_items_insert'
 const TRIGGER_ITEMS_UPDATE_COLLECTION = 'trigger_items_update'
 const TRIGGER_ITEMS_DELETE_COLLECTION = 'trigger_items_delete'
+const FILTERED_TRIGGER_ITEMS_COLLECTION = 'trigger_items_filtered'
 const AUTH_USERS_COLLECTION = 'auth_users'
 const RESET_PASSWORD_COLLECTION = 'reset_password_requests'
+const FILTERED_TRIGGER_EVENTS_COLLECTION = 'filteredTriggerEvents'
+const FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION = 'filteredUpdateTriggerEvents'
 const MANAGE_REPLICA_SET = process.env.MANAGE_REPLICA_SET === 'true'
 const REPLICA_SET_NAME = process.env.REPLICA_SET_NAME ?? 'rs0'
 const REPLICA_SET_HOST = process.env.REPLICA_SET_HOST ?? 'mongo:27017'
@@ -339,7 +342,10 @@ const resetCollections = async () => {
     db.collection(TRIGGER_ITEMS_INSERT_COLLECTION).deleteMany({}),
     db.collection(TRIGGER_ITEMS_UPDATE_COLLECTION).deleteMany({}),
     db.collection(TRIGGER_ITEMS_DELETE_COLLECTION).deleteMany({}),
-    db.collection(TRIGGER_EVENTS_COLLECTION).deleteMany({})
+    db.collection(FILTERED_TRIGGER_ITEMS_COLLECTION).deleteMany({}),
+    db.collection(TRIGGER_EVENTS_COLLECTION).deleteMany({}),
+    db.collection(FILTERED_TRIGGER_EVENTS_COLLECTION).deleteMany({}),
+    db.collection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION).deleteMany({})
   ])
 
   await db.collection(TODO_COLLECTION).insertMany([
@@ -532,6 +538,26 @@ const resetCollections = async () => {
   ])
 }
 
+const ensureFilteredTriggerCollections = async () => {
+  const db = client.db(DB_NAME)
+
+  const recreateCollection = async (name: string, options?: Parameters<typeof db.createCollection>[1]) => {
+    try {
+      await db.collection(name).drop()
+    } catch {
+      // ignore if collection does not exist
+    }
+
+    await db.createCollection(name, options)
+  }
+
+  await recreateCollection(FILTERED_TRIGGER_EVENTS_COLLECTION)
+  await recreateCollection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
+  await recreateCollection(FILTERED_TRIGGER_ITEMS_COLLECTION, {
+    changeStreamPreAndPostImages: { enabled: true }
+  })
+}
+
 const dropReplicaSetHint = (mongoUrl: string) => {
   try {
     const url = new URL(mongoUrl)
@@ -559,6 +585,30 @@ const waitForTriggerEventType = async (documentId: string, type: string) => {
   const collection = client.db(DB_NAME).collection(TRIGGER_EVENTS_COLLECTION)
   for (let attempt = 0; attempt < 10; attempt++) {
     const record = await collection.findOne({ documentId, type })
+    if (record) {
+      return record
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  return null
+}
+
+const waitForFilteredTriggerEvent = async (documentId: string) => {
+  const collection = client.db(DB_NAME).collection(FILTERED_TRIGGER_EVENTS_COLLECTION)
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const record = await collection.findOne({ documentId })
+    if (record) {
+      return record
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  return null
+}
+
+const waitForFilteredUpdateTriggerEvent = async (documentId: string) => {
+  const collection = client.db(DB_NAME).collection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const record = await collection.findOne({ documentId })
     if (record) {
       return record
     }
@@ -629,6 +679,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
     client = new MongoClient(mongoUrl, { serverSelectionTimeoutMS: 60000 })
     await client.connect()
+    await ensureFilteredTriggerCollections()
     originalMainPath = require.main?.path
     if (require.main) {
       require.main.path = APP_ROOT
@@ -1251,6 +1302,88 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const event = await waitForTriggerEventType(documentId.toString(), 'delete')
     expect(event).toBeDefined()
     expect(event?.collection).toBe(TRIGGER_ITEMS_DELETE_COLLECTION)
+  })
+
+  it('passes fullDocument to filtered database triggers when the match applies', async () => {
+    const documentId = new ObjectId()
+    const payload = {
+      _id: documentId,
+      label: 'filtered-event',
+      category: 'approved',
+      ownerId: adminUser.id
+    }
+    await client.db(DB_NAME).collection(FILTERED_TRIGGER_ITEMS_COLLECTION).insertOne(payload)
+
+    const event = await waitForFilteredTriggerEvent(documentId.toString())
+    expect(event).toBeDefined()
+    expect(event?.type).toBe('insert')
+    expect(event?.collection).toBe(FILTERED_TRIGGER_ITEMS_COLLECTION)
+    expect(event?.fullDocument).toMatchObject({
+      label: 'filtered-event',
+      category: 'approved'
+    })
+  })
+
+  it('does not record filtered events when the match filter does not apply', async () => {
+    const documentId = new ObjectId()
+    await client.db(DB_NAME).collection(FILTERED_TRIGGER_ITEMS_COLLECTION).insertOne({
+      _id: documentId,
+      label: 'filtered-event',
+      category: 'rejected'
+    })
+
+    const event = await waitForFilteredTriggerEvent(documentId.toString())
+    expect(event).toBeNull()
+  })
+
+  it('records update triggers that include fullDocument and fullDocumentBeforeChange when the filter matches', async () => {
+    const documentId = new ObjectId()
+    await client
+      .db(DB_NAME)
+      .collection(FILTERED_TRIGGER_ITEMS_COLLECTION)
+      .insertOne({
+        _id: documentId,
+        label: 'update-event',
+        category: 'pending'
+      })
+
+    await client
+      .db(DB_NAME)
+      .collection(FILTERED_TRIGGER_ITEMS_COLLECTION)
+      .updateOne({ _id: documentId }, { $set: { label: 'update-event-approved', category: 'approved' } })
+
+    const event = await waitForFilteredUpdateTriggerEvent(documentId.toString())
+    expect(event).toBeDefined()
+    expect(event?.type).toBe('update')
+    expect(event?.collection).toBe(FILTERED_TRIGGER_ITEMS_COLLECTION)
+    expect(event?.fullDocument).toMatchObject({
+      label: 'update-event-approved',
+      category: 'approved'
+    })
+    expect(event?.fullDocumentBeforeChange).toMatchObject({
+      label: 'update-event',
+      category: 'pending'
+    })
+  })
+
+  it('ignores update triggers when the filter does not match', async () => {
+    const documentId = new ObjectId()
+    await client
+      .db(DB_NAME)
+      .collection(FILTERED_TRIGGER_ITEMS_COLLECTION)
+      .insertOne({
+        _id: documentId,
+        label: 'update-event',
+        category: 'pending'
+      })
+
+    await client
+      .db(DB_NAME)
+      .collection(FILTERED_TRIGGER_ITEMS_COLLECTION)
+      .updateOne({ _id: documentId }, { $set: { label: 'update-event-rejected', category: 'rejected' } })
+
+    const event = await waitForFilteredUpdateTriggerEvent(documentId.toString())
+    expect(event).toBeNull()
   })
 
   it('fires scheduled trigger', async () => {

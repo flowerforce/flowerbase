@@ -1,0 +1,21 @@
+{
+  "name": "databaseFilteredTrigger",
+  "type": "DATABASE",
+  "disabled": false,
+  "config": {
+    "database": "flowerbase-e2e",
+    "collection": "trigger_items_filtered",
+    "operation_types": ["insert"],
+    "match": {
+      "fullDocument.category": "approved"
+    },
+    "full_document": true
+  },
+  "event_processors": {
+    "FUNCTION": {
+      "config": {
+        "function_name": "logFilteredTriggerEvent"
+      }
+    }
+  }
+}
