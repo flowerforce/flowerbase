@@ -87,6 +87,35 @@ exports = function(user) {
 };
 
 ```
+
+---
+
+### 🧰 CLI: Invoke Functions Locally
+
+Flowerbase ships a CLI to execute functions locally without HTTP calls. It uses the same `initialize(...)` pipeline as the server, so it loads rules/functions/services from your app folder.
+
+>Example – run a function (system mode by default)
+```sh
+flowerbase-function \
+  --name sendWelcomeEmail \
+  --mongodb-url "mongodb://localhost:27017" \
+  --jwt-secret "dev-secret" \
+  --args '{"email":"demo@example.com","name":"Demo"}'
+```
+
+>Example – run a function as a user (no login)
+```sh
+flowerbase-function \
+  --name getUserProfile \
+  --mongodb-url "mongodb://localhost:27017" \
+  --jwt-secret "dev-secret" \
+  --user '{"id":"000000000000000000000001","email":"demo@example.com","role":"admin"}'
+```
+
+Notes:
+* You can pass arguments via `--args`, `--args-file`, or stdin.
+* `MONGODB_URL` and `JWT_SECRET` are read from env if set; flags override them.
+* `--app-id` is optional; when omitted, the folder name of `--base-path` is used.
 ---
 
 ### 🔔 Triggers

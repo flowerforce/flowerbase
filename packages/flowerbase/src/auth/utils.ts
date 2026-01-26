@@ -176,6 +176,42 @@ const resolveAppPath = () =>
  */
 export const loadAuthConfig = (): AuthConfig => {
   const authPath = path.join(resolveAppPath(), 'auth/providers.json')
+  if (!fs.existsSync(authPath)) {
+    return {
+      auth_collection: 'auth_users',
+      'api-key': {
+        name: 'api-key',
+        type: 'api-key',
+        disabled: true
+      },
+      'local-userpass': {
+        name: 'local-userpass',
+        type: 'local-userpass',
+        disabled: true,
+        config: {
+          autoConfirm: true,
+          confirmationFunctionName: '',
+          resetFunctionName: '',
+          resetPasswordUrl: '',
+          runConfirmationFunction: false,
+          runResetFunction: false
+        }
+      },
+      'custom-function': {
+        name: 'custom-function',
+        type: 'custom-function',
+        disabled: true,
+        config: {
+          authFunctionName: ''
+        }
+      },
+      'anon-user': {
+        name: 'anon-user',
+        type: 'anon-user',
+        disabled: false
+      }
+    }
+  }
   return JSON.parse(fs.readFileSync(authPath, 'utf-8'))
 }
 
@@ -185,6 +221,16 @@ export const loadAuthConfig = (): AuthConfig => {
  */
 export const loadCustomUserData = (): CustomUserDataConfig => {
   const userDataPath = path.join(resolveAppPath(), 'auth/custom_user_data.json')
+  if (!fs.existsSync(userDataPath)) {
+    return {
+      enabled: false,
+      mongo_service_name: 'mongodb-atlas',
+      database_name: process.env.DB_NAME ?? '',
+      collection_name: 'users',
+      user_id_field: 'id',
+      on_user_creation_function_name: ''
+    }
+  }
   return JSON.parse(fs.readFileSync(userDataPath, 'utf-8'))
 }
 
