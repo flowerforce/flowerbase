@@ -53,7 +53,7 @@ export const registerPlugins = async ({
     registersConfig.forEach(({ plugin, options, pluginName }) => {
       try {
         register(plugin, options)
-        console.log('registration COMPLETED --->', pluginName)
+        // console.log('registration COMPLETED --->', pluginName)
       } catch (e) {
         console.log('Registration FAILED --->', pluginName)
         console.log('Error --->', e)
