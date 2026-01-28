@@ -1,3 +1,21 @@
+## 1.6.0 (2026-01-28)
+
+
+### 🚀 Features
+
+- added cli run function ([fb2e418](https://github.com/flowerforce/flowerbase/commit/fb2e418))
+
+
+### 🩹 Fixes
+
+- trigger db update ([8eed422](https://github.com/flowerforce/flowerbase/commit/8eed422))
+
+- trigger test e2e full_document_before_change ([117e89c](https://github.com/flowerforce/flowerbase/commit/117e89c))
+
+- trigger fullDocumentBeforeChange ([a659a8d](https://github.com/flowerforce/flowerbase/commit/a659a8d))
+
+- revert trigger fullDocumentBeforeChange ([f1736b5](https://github.com/flowerforce/flowerbase/commit/f1736b5))
+
 ## 1.5.0 (2026-01-26)
 
 
