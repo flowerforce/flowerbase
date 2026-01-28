@@ -23,6 +23,22 @@ export const generateContextData = ({
   GenerateContext,
   request
 }: GenerateContextDataParams) => {
+  const BSON = mongodb.BSON
+  const Binary = BSON?.Binary as
+    | (typeof mongodb.BSON.Binary & {
+        fromBase64?: (base64: string, subType?: number) => mongodb.BSON.Binary
+      })
+    | undefined
+
+  if (Binary && typeof Binary.fromBase64 !== 'function') {
+    Binary.fromBase64 = (base64: string, subType?: number) => {
+      if (typeof Binary.createFromBase64 === 'function') {
+        return Binary.createFromBase64(base64, subType)
+      }
+      return new Binary(Buffer.from(base64, 'base64'), subType)
+    }
+  }
+
   const getService = (serviceName: keyof typeof services) => {
     try {
       return services[serviceName](app, {
@@ -40,7 +56,7 @@ export const generateContextData = ({
   }
 
   return {
-    BSON: mongodb.BSON,
+    BSON,
     Buffer,
     console: {
       log: (...args: Arguments) => {
