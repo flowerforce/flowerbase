@@ -26,7 +26,9 @@ export const generateContextData = ({
   const BSON = mongodb.BSON
   const Binary = BSON?.Binary as
     | (typeof mongodb.BSON.Binary & {
-        fromBase64?: (base64: string, subType?: number) => mongodb.BSON.Binary
+        fromBase64?: (base64: string, subType?: number) => mongodb.BSON.Binary | Uint8Array
+        fromBase64Binary?: (base64: string, subType?: number) => mongodb.BSON.Binary
+        __fb_fromBase64Wrapped?: boolean
       })
     | undefined
 
@@ -36,6 +38,15 @@ export const generateContextData = ({
         return Binary.createFromBase64(base64, subType)
       }
       return new Binary(Buffer.from(base64, 'base64'), subType)
+    }
+  }
+
+  if (Binary && Binary.fromBase64 && !Binary.__fb_fromBase64Wrapped) {
+    Binary.__fb_fromBase64Wrapped = true
+    Binary.fromBase64Binary = Binary.fromBase64 as (base64: string, subType?: number) => mongodb.BSON.Binary
+    Binary.fromBase64 = (base64: string, subType?: number) => {
+      const result = Binary.fromBase64Binary?.(base64, subType)
+      return result && typeof result.value === 'function' ? result.value() : result
     }
   }
 

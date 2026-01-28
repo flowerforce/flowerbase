@@ -80,10 +80,13 @@ describe('generateContextData', () => {
 
     const base64 = Buffer.from('test').toString('base64')
     const Binary = BSON.Binary as typeof BSON.Binary & {
-      fromBase64: (base64: string, subType?: number) => InstanceType<typeof BSON.Binary>
+      fromBase64: (base64: string, subType?: number) => Uint8Array
+      fromBase64Binary: (base64: string, subType?: number) => InstanceType<typeof BSON.Binary>
     }
     const binaryValue = Binary.fromBase64(base64, 0)
-    expect(binaryValue).toBeInstanceOf(BSON.Binary)
-    expect(binaryValue.toString('utf8')).toBe('test')
+    expect(binaryValue).toBeInstanceOf(Uint8Array)
+    expect(Buffer.from(binaryValue).toString('utf8')).toBe('test')
+    const binaryObject = Binary.fromBase64Binary(base64, 0)
+    expect(binaryObject).toBeInstanceOf(BSON.Binary)
   })
 })
