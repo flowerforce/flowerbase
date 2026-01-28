@@ -45,7 +45,7 @@ describe('generateContextData', () => {
 
   it('should return an object with context configuration', async () => {
     const mockApp = Fastify()
-    const { context, console: contextConsole } = generateContextData({
+    const { context, console: contextConsole, BSON } = generateContextData({
       services,
       app: mockApp,
       functionsList: mockFunctions,
@@ -77,5 +77,13 @@ describe('generateContextData', () => {
 
     context.functions.execute('test')
     expect(GenerateContextMock).toHaveBeenCalled()
+
+    const base64 = Buffer.from('test').toString('base64')
+    const Binary = BSON.Binary as typeof BSON.Binary & {
+      fromBase64: (base64: string, subType?: number) => InstanceType<typeof BSON.Binary>
+    }
+    const binaryValue = Binary.fromBase64(base64, 0)
+    expect(binaryValue).toBeInstanceOf(BSON.Binary)
+    expect(binaryValue.toString('utf8')).toBe('test')
   })
 })
