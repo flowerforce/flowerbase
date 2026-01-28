@@ -7,7 +7,16 @@ import {
   InvokeCommandOutput,
   Lambda
 } from '@aws-sdk/client-lambda'
-import { S3 } from '@aws-sdk/client-s3'
+import {
+  GetObjectCommand,
+  GetObjectCommandInput,
+  GetObjectCommandOutput,
+  PutObjectCommand,
+  PutObjectCommandInput,
+  PutObjectCommandOutput,
+  S3Client
+} from '@aws-sdk/client-s3'
+import { getSignedUrl as presignGetSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { S3_CONFIG } from '../../constants'
 
 type LambdaInvokeResponse = Omit<InvokeCommandOutput, 'Payload'> & {
@@ -32,6 +41,14 @@ const Aws = () => {
         secretAccessKey: S3_CONFIG.SECRET_ACCESS_KEY
       }
       : undefined
+
+  type PresignOperation = 'getObject' | 'putObject'
+  type PresignParams = (GetObjectCommandInput | PutObjectCommandInput) & { Expires?: number }
+  type PresignURLParams = (GetObjectCommandInput | PutObjectCommandInput) & {
+    Method?: string
+    ExpirationMS?: number
+    Expires?: number
+  }
 
   return {
     lambda: (region: string) => {
@@ -64,12 +81,66 @@ const Aws = () => {
 
       return lambda
     },
-    s3: (region: string) =>
-      new S3({
+    s3: (region: string) => {
+      const client = new S3Client({
         region,
         credentials,
         forcePathStyle: true
-      })
+      }) as S3Client & {
+        PutObject: (params: PutObjectCommandInput) => Promise<PutObjectCommandOutput>
+        GetObject: (params: GetObjectCommandInput) => Promise<GetObjectCommandOutput>
+        getSignedUrl: (
+          operation: PresignOperation,
+          params: PresignParams,
+          options?: { expiresIn?: number }
+        ) => Promise<string>
+        PresignURL: (params: PresignURLParams) => Promise<string>
+      }
+
+      client.PutObject = async (params: PutObjectCommandInput): Promise<PutObjectCommandOutput> => {
+        return client.send(new PutObjectCommand(params))
+      }
+
+      client.GetObject = async (params: GetObjectCommandInput): Promise<GetObjectCommandOutput> => {
+        return client.send(new GetObjectCommand(params))
+      }
+
+      client.getSignedUrl = async (
+        operation: PresignOperation,
+        params: PresignParams,
+        options?: { expiresIn?: number }
+      ): Promise<string> => {
+        const { Expires, ...rest } = params
+        const expiresIn = options?.expiresIn ?? Expires
+
+        if (operation === 'putObject') {
+          return presignGetSignedUrl(
+            client,
+            new PutObjectCommand(rest as PutObjectCommandInput),
+            expiresIn ? { expiresIn } : undefined
+          )
+        }
+
+        return presignGetSignedUrl(
+          client,
+          new GetObjectCommand(rest as GetObjectCommandInput),
+          expiresIn ? { expiresIn } : undefined
+        )
+      }
+
+      client.PresignURL = async (params: PresignURLParams): Promise<string> => {
+        const { Method, ExpirationMS, Expires, ...rest } = params
+        const normalizedMethod = Method?.toUpperCase()
+        const operation: PresignOperation = normalizedMethod === 'PUT' ? 'putObject' : 'getObject'
+        const expiresIn =
+          Expires ?? (typeof ExpirationMS === 'number' ? Math.ceil(ExpirationMS / 1000) : undefined)
+        const options = typeof expiresIn === 'number' ? { expiresIn } : undefined
+
+        return client.getSignedUrl(operation, rest as PresignParams, options)
+      }
+
+      return client
+    }
   }
 }
 
