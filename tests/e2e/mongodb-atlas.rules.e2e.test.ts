@@ -1549,6 +1549,68 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     })
   })
 
+  it('supports httpMethod in endpoint configs', async () => {
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: `/app/${PROJECT_ID}/endpoint/api/checkWorkspacePost?workspace=workspace-2`
+    })
+    expect(response.statusCode).toBe(202)
+    expect(response.json()).toEqual({
+      success: true,
+      workspace: 'workspace-2',
+      source: 'api_checkWorkspace'
+    })
+
+    const getResponse = await appInstance!.inject({
+      method: 'GET',
+      url: `/app/${PROJECT_ID}/endpoint/api/checkWorkspacePost?workspace=workspace-2`
+    })
+    expect([404, 405]).toContain(getResponse.statusCode)
+  })
+
+  it('registers all methods when http_method is wildcard', async () => {
+    const getResponse = await appInstance!.inject({
+      method: 'GET',
+      url: `/app/${PROJECT_ID}/endpoint/api/checkWorkspaceAll?workspace=workspace-3`
+    })
+    expect(getResponse.statusCode).toBe(202)
+    expect(getResponse.json()).toEqual({
+      success: true,
+      workspace: 'workspace-3',
+      source: 'api_checkWorkspace'
+    })
+
+    const postResponse = await appInstance!.inject({
+      method: 'POST',
+      url: `/app/${PROJECT_ID}/endpoint/api/checkWorkspaceAll?workspace=workspace-3`
+    })
+    expect(postResponse.statusCode).toBe(202)
+    expect(postResponse.json()).toEqual({
+      success: true,
+      workspace: 'workspace-3',
+      source: 'api_checkWorkspace'
+    })
+  })
+
+  it('defaults to POST when http_method is missing', async () => {
+    const postResponse = await appInstance!.inject({
+      method: 'POST',
+      url: `/app/${PROJECT_ID}/endpoint/api/checkWorkspaceFallback?workspace=workspace-4`
+    })
+    expect(postResponse.statusCode).toBe(202)
+    expect(postResponse.json()).toEqual({
+      success: true,
+      workspace: 'workspace-4',
+      source: 'api_checkWorkspace'
+    })
+
+    const getResponse = await appInstance!.inject({
+      method: 'GET',
+      url: `/app/${PROJECT_ID}/endpoint/api/checkWorkspaceFallback?workspace=workspace-4`
+    })
+    expect([404, 405]).toContain(getResponse.statusCode)
+  })
+
   it('allows registration and login via local-userpass', async () => {
     const registration = await appInstance!.inject({
       method: 'POST',
