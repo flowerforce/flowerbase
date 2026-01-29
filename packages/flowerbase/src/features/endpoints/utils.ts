@@ -20,10 +20,22 @@ export const loadEndpoints = async (rootDir = process.cwd()): Promise<Endpoints>
 
     if (fs.existsSync(endPointsFile)) {
       const config: Endpoints<'*'> = JSON.parse(fs.readFileSync(endPointsFile, 'utf-8'))
-      const configRemap: Endpoints = config.map(({ http_method, ...endpoint }) => ({
-        http_method: http_method === '*' ? 'ALL' : http_method,
-        ...endpoint
-      }))
+      const configRemap: Endpoints = config.map((endpoint) => {
+        const { http_method, httpMethod, ...rest } = endpoint as typeof endpoint & {
+          httpMethod?: string
+        }
+        const normalizedMethod = (http_method ?? httpMethod) as string | undefined
+
+        return {
+          http_method:
+            normalizedMethod === '*' || normalizedMethod === 'ALL' || normalizedMethod === 'ANY'
+              ? 'ALL'
+              : !normalizedMethod
+                ? 'POST'
+                : (normalizedMethod as Endpoints[number]['http_method']),
+          ...rest
+        }
+      })
 
       endpoints.push(...configRemap)
     }
