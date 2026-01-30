@@ -91,49 +91,51 @@ export async function initialize({
     StateManager.setData(key as Parameters<typeof StateManager.setData>[0], value)
   )
 
-  await fastify.register(import('@fastify/swagger'))
+  if (DEFAULT_CONFIG.SWAGGER_ENABLED) {
+    await fastify.register(import('@fastify/swagger'))
 
-  await fastify.register(import('@fastify/swagger-ui'), {
-    routePrefix: '/documentation',
-    uiConfig: {
-      docExpansion: 'full',
-      deepLinking: false
-    },
-    uiHooks: {
-      onRequest: function (request, reply, next) {
-        const swaggerUser = DEFAULT_CONFIG.SWAGGER_UI_USER
-        const swaggerPassword = DEFAULT_CONFIG.SWAGGER_UI_PASSWORD
-        if (!swaggerUser && !swaggerPassword) {
-          next()
-          return
-        }
-        const authHeader = request.headers.authorization
-        if (!authHeader || !authHeader.startsWith('Basic ')) {
-          reply
-            .code(401)
-            .header('WWW-Authenticate', 'Basic realm="Swagger UI"')
-            .send({ message: 'Unauthorized' })
-          return
-        }
-        const encoded = authHeader.slice('Basic '.length)
-        const decoded = Buffer.from(encoded, 'base64').toString('utf8')
-        const [user, pass] = decoded.split(':')
-        if (user !== swaggerUser || pass !== swaggerPassword) {
-          reply
-            .code(401)
-            .header('WWW-Authenticate', 'Basic realm="Swagger UI"')
-            .send({ message: 'Unauthorized' })
-          return
-        }
-        next()
+    await fastify.register(import('@fastify/swagger-ui'), {
+      routePrefix: '/documentation',
+      uiConfig: {
+        docExpansion: 'full',
+        deepLinking: false
       },
-      preHandler: function (request, reply, next) { next() }
-    },
-    staticCSP: true,
-    transformStaticCSP: (header) => header,
-    transformSpecification: (swaggerObject,) => { return swaggerObject },
-    transformSpecificationClone: true
-  })
+      uiHooks: {
+        onRequest: function (request, reply, next) {
+          const swaggerUser = DEFAULT_CONFIG.SWAGGER_UI_USER
+          const swaggerPassword = DEFAULT_CONFIG.SWAGGER_UI_PASSWORD
+          if (!swaggerUser && !swaggerPassword) {
+            next()
+            return
+          }
+          const authHeader = request.headers.authorization
+          if (!authHeader || !authHeader.startsWith('Basic ')) {
+            reply
+              .code(401)
+              .header('WWW-Authenticate', 'Basic realm="Swagger UI"')
+              .send({ message: 'Unauthorized' })
+            return
+          }
+          const encoded = authHeader.slice('Basic '.length)
+          const decoded = Buffer.from(encoded, 'base64').toString('utf8')
+          const [user, pass] = decoded.split(':')
+          if (user !== swaggerUser || pass !== swaggerPassword) {
+            reply
+              .code(401)
+              .header('WWW-Authenticate', 'Basic realm="Swagger UI"')
+              .send({ message: 'Unauthorized' })
+            return
+          }
+          next()
+        },
+        preHandler: function (request, reply, next) { next() }
+      },
+      staticCSP: true,
+      transformStaticCSP: (header) => header,
+      transformSpecification: (swaggerObject,) => { return swaggerObject },
+      transformSpecificationClone: true
+    })
+  }
 
   await registerPlugins({
     register: fastify.register,

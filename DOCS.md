@@ -354,10 +354,10 @@ Le end-to-end risiedono in `tests/e2e` e vengono ora eseguite insieme agli unit 
 - le suite `packages/flowerbase/src/**` (unit)
 - i test `tests/e2e/**/*.test.ts` (E2E)
 
-Per gli E2E viene caricato automaticamente `.env.e2e` (se presente) tramite `dotenv`, quindi il file può contenere `DB_CONNECTION_STRING` e altre variabili custom. Se preferisci non salvare le credenziali nel repo, basta esportare `DB_CONNECTION_STRING` prima di `npm test`:
+Per gli E2E viene caricato automaticamente `.env.e2e` (se presente) tramite `dotenv`, quindi il file può contenere `MONGODB_URL` e altre variabili custom. Se preferisci non salvare le credenziali nel repo, basta esportare `MONGODB_URL` prima di `npm test`:
 
 ```bash
-export DB_CONNECTION_STRING="mongodb+srv://user:pass@cluster.mongodb.net/dbname"
+export MONGODB_URL="mongodb+srv://user:pass@cluster.mongodb.net/dbname"
 npm test
 ```
 

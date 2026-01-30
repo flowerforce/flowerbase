@@ -92,8 +92,8 @@ Ensure the following environment variables are set in your .env file or deployme
 | ---------------------- | --------------------------------------------------------------------------- | -------------------------------------------------- |
 | `PROJECT_ID`           | A unique ID to identify your project. This value can be freely invented — it's preserved mainly for compatibility with the old Realm-style project structure.                     | `my-flowerbase-app`                                |
 | `PORT`                 | The port on which the server will run.                                      | `3000`                                             |
-| `DB_CONNECTION_STRING` | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
-| `APP_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
+| `MONGODB_URL`          | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
+| `JWT_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
 | `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
 | `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
 | `RESET_PASSWORD_TTL_SECONDS` | Time-to-live for password reset tokens (in seconds).                  | `3600`                                             |
@@ -101,6 +101,7 @@ Ensure the following environment variables are set in your .env file or deployme
 | `AUTH_LOGIN_MAX_ATTEMPTS`    | Max login attempts per window.                                         | `10`                                               |
 | `AUTH_RESET_MAX_ATTEMPTS`    | Max reset requests per window.                                         | `5`                                                |
 | `REFRESH_TOKEN_TTL_DAYS`     | Refresh token time-to-live (in days).                                  | `60`                                               |
+| `SWAGGER_ENABLED`      | Enable Swagger UI and spec routes (disabled by default).                    | `true`                                             |
 | `SWAGGER_UI_USER`      | Basic Auth username for Swagger UI (optional).                            | `admin`                                            |
 | `SWAGGER_UI_PASSWORD`  | Basic Auth password for Swagger UI (optional).                            | `change-me`                                        |
 
@@ -109,8 +110,8 @@ Example:
 ```env
 PROJECT_ID=your-project-id
 PORT=3000
-DB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/dbname
-APP_SECRET=your-jwt-secret
+MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/dbname
+JWT_SECRET=your-jwt-secret
 HOST=0.0.0.0
 HTTPS_SCHEMA=http
 RESET_PASSWORD_TTL_SECONDS=3600
@@ -118,6 +119,7 @@ AUTH_RATE_LIMIT_WINDOW_MS=900000
 AUTH_LOGIN_MAX_ATTEMPTS=10
 AUTH_RESET_MAX_ATTEMPTS=5
 REFRESH_TOKEN_TTL_DAYS=60
+SWAGGER_ENABLED=true
 SWAGGER_UI_USER=admin
 SWAGGER_UI_PASSWORD=change-me
 ```
@@ -134,8 +136,8 @@ import { initialize } from '@flowerforce/flowerbase';
 
 const projectId = process.env.PROJECT_ID ?? "my-project-id"
 const port = process.env.PORT ? Number(process.env.PORT) : undefined
-const mongodbUrl = process.env.DB_CONNECTION_STRING
-const jwtSecret = process.env.APP_SECRET
+const mongodbUrl = process.env.MONGODB_URL
+const jwtSecret = process.env.JWT_SECRET
 const host = process.env.HOST
 
 initialize({
@@ -401,8 +403,8 @@ import { initialize } from '@flowerforce/flowerbase';
 
 const projectId = process.env.PROJECT_ID ?? "my-project-id"
 const port = process.env.PORT ? Number(process.env.PORT) : undefined
-const mongodbUrl = process.env.DB_CONNECTION_STRING
-const jwtSecret = process.env.APP_SECRET
+const mongodbUrl = process.env.MONGODB_URL
+const jwtSecret = process.env.JWT_SECRET
 const host = process.env.HOST
 
 initialize({
@@ -422,8 +424,8 @@ Ensure the following environment variables are set in your .env file or deployme
 | ---------------------- | --------------------------------------------------------------------------- | -------------------------------------------------- |
 | `PROJECT_ID`           | A unique ID to identify your project. This value can be freely invented — it's preserved mainly for compatibility with the old Realm-style project structure.                     | `my-flowerbase-app`                                |
 | `PORT`                 | The port on which the server will run.                                      | `3000`                                             |
-| `DB_CONNECTION_STRING` | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
-| `APP_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
+| `MONGODB_URL`          | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
+| `JWT_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
 | `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
 | `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
 | `RESET_PASSWORD_TTL_SECONDS` | Time-to-live for password reset tokens (in seconds).                  | `3600`                                             |
@@ -431,6 +433,7 @@ Ensure the following environment variables are set in your .env file or deployme
 | `AUTH_LOGIN_MAX_ATTEMPTS`    | Max login attempts per window.                                         | `10`                                               |
 | `AUTH_RESET_MAX_ATTEMPTS`    | Max reset requests per window.                                         | `5`                                                |
 | `REFRESH_TOKEN_TTL_DAYS`     | Refresh token time-to-live (in days).                                  | `60`                                               |
+| `SWAGGER_ENABLED`      | Enable Swagger UI and spec routes (disabled by default).                    | `true`                                             |
 | `SWAGGER_UI_USER`      | Basic Auth username for Swagger UI (optional).                            | `admin`                                            |
 | `SWAGGER_UI_PASSWORD`  | Basic Auth password for Swagger UI (optional).                            | `change-me`                                        |
 
@@ -439,8 +442,8 @@ Example:
 ```env
 PROJECT_ID=your-project-id
 PORT=3000
-DB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/dbname
-APP_SECRET=your-jwt-secret
+MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/dbname
+JWT_SECRET=your-jwt-secret
 HOST=0.0.0.0
 HTTPS_SCHEMA=http
 RESET_PASSWORD_TTL_SECONDS=3600
@@ -448,6 +451,7 @@ AUTH_RATE_LIMIT_WINDOW_MS=900000
 AUTH_LOGIN_MAX_ATTEMPTS=10
 AUTH_RESET_MAX_ATTEMPTS=5
 REFRESH_TOKEN_TTL_DAYS=60
+SWAGGER_ENABLED=true
 SWAGGER_UI_USER=admin
 SWAGGER_UI_PASSWORD=change-me
 ```
