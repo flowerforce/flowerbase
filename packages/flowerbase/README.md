@@ -258,12 +258,13 @@ The authentication modes currently re-implemented in `@flowerforce/flowerbase` a
 }
 ```
 
-You can specify the MongoDB collection used to store authentication users by configuring the `auth_collection` field inside the `auth/providers.json` file.
+You can specify the MongoDB collection used to store authentication users by setting `auth_collection` at the root of `auth/providers.json`.
 
 #### 📁 auth/providers.json
 Example
 ```json
 {
+    "auth_collection": "my-users-collection",
     "api-key": {
         "name": "api-key",
         "type": "api-key",
@@ -273,12 +274,13 @@ Example
         "name": "local-userpass",
         "type": "local-userpass",
         "disabled": false,
-        "auth_collection": "my-users-collection", //custom collection name
         "config": {
             "autoConfirm": true,
-            "resetPasswordSubject": "reset",
+            "confirmationFunctionName": "",
+            "resetFunctionName": "",
             "resetPasswordUrl": "https://my.app.url/password-reset",
-            "runConfirmationFunction": false
+            "runConfirmationFunction": false,
+            "runResetFunction": false
         }
     },
     "anon-user": {
