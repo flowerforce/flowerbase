@@ -25,6 +25,7 @@ type Config = {
   match: Record<string, unknown>
   operation_types: string[]
   operation_type?: 'CREATE' | 'DELETE' | 'LOGOUT'
+  providers?: string[]
   project: Record<string, unknown>
   service_name: string
   skip_catchup_events: boolean

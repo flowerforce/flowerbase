@@ -112,6 +112,41 @@ const mapOpInverse = {
 const normalizeOperationTypes = (operationTypes: string[] = []) =>
   operationTypes.map((op) => op.toLowerCase())
 
+const normalizeProviders = (providers: string[] = []) =>
+  providers
+    .map((provider) => (typeof provider === 'string' ? provider.trim().toLowerCase() : ''))
+    .filter((provider) => provider.length)
+
+const extractProvidersFromDocument = (document?: Record<string, unknown> | null) => {
+  if (!document) return []
+  const providers: string[] = []
+  const identities = (document as { identities?: unknown }).identities
+  if (Array.isArray(identities)) {
+    for (const identity of identities) {
+      if (!identity || typeof identity !== 'object') continue
+      const providerType = (identity as { provider_type?: unknown }).provider_type
+      if (typeof providerType === 'string') {
+        providers.push(providerType.toLowerCase())
+      }
+    }
+  }
+  const rootProviderType = (document as { provider_type?: unknown }).provider_type
+  if (typeof rootProviderType === 'string') {
+    providers.push(rootProviderType.toLowerCase())
+  }
+  return providers
+}
+
+const matchesProviderFilter = (
+  document: Record<string, unknown> | null | undefined,
+  providerFilter: string[]
+) => {
+  if (!providerFilter.length) return true
+  const documentProviders = extractProvidersFromDocument(document)
+  if (!documentProviders.length) return false
+  return documentProviders.some((provider) => providerFilter.includes(provider))
+}
+
 const resolveDocumentOptions = ({
   requestFullDocument,
   requestFullDocumentBeforeChange,
@@ -140,6 +175,7 @@ const handleAuthenticationTrigger = async ({
   app
 }: HandlerParams) => {
   const { database, isAutoTrigger, operation_types = [], operation_type } = config
+  const providerFilter = normalizeProviders(config.providers ?? [])
   const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
   const collection = app.mongo.client.db(database || DB_NAME).collection(authCollection)
   const operationCandidates = operation_type ? mapOpInverse[operation_type] : operation_types
@@ -238,6 +274,9 @@ const handleAuthenticationTrigger = async ({
           _id: documentKey._id
         }) as Record<string, unknown> | null
       }
+      if (!matchesProviderFilter(logoutDocument, providerFilter)) {
+        return
+      }
       const userData = buildUserData(logoutDocument)
       if (!userData) {
         return
@@ -270,7 +309,11 @@ const handleAuthenticationTrigger = async ({
       if (isAutoTrigger || operation_type !== 'DELETE') {
         return
       }
-      const userData = buildUserData(fullDocumentBeforeChange ?? confirmedDocument)
+      const deleteDocument = fullDocumentBeforeChange ?? confirmedDocument
+      if (!matchesProviderFilter(deleteDocument, providerFilter)) {
+        return
+      }
+      const userData = buildUserData(deleteDocument)
       if (!userData) {
         return
       }
@@ -299,7 +342,16 @@ const handleAuthenticationTrigger = async ({
     }
 
     if (isReplace) {
-      const userData = buildUserData(confirmedDocument)
+      let replaceDocument = confirmedDocument
+      if (!replaceDocument && providerFilter.length && documentKey?._id) {
+        replaceDocument = await collection.findOne({
+          _id: documentKey._id
+        }) as Record<string, unknown> | null
+      }
+      if (!matchesProviderFilter(replaceDocument, providerFilter)) {
+        return
+      }
+      const userData = buildUserData(replaceDocument)
       if (!userData) {
         return
       }
@@ -347,6 +399,17 @@ const handleAuthenticationTrigger = async ({
       return
     }
 
+    let candidateDocument = confirmedDocument
+    if (!candidateDocument && providerFilter.length && documentKey?._id) {
+      candidateDocument = await collection.findOne({
+        _id: documentKey._id
+      }) as Record<string, unknown> | null
+      confirmedDocument = candidateDocument ?? confirmedDocument
+    }
+    if (!matchesProviderFilter(candidateDocument, providerFilter)) {
+      return
+    }
+
     const updateResult = await collection.findOneAndUpdate(
       {
         _id: documentKey._id,
@@ -371,6 +434,9 @@ const handleAuthenticationTrigger = async ({
 
     delete (document as { password?: unknown }).password
 
+    if (!matchesProviderFilter(document, providerFilter)) {
+      return
+    }
     const userData = buildUserData(document)
     if (!userData) {
       return
