@@ -64,7 +64,7 @@ Add `tsconfig.json` file
 npx tsc --init
 ```
 
-In your `packages.json`, inside the script section add this: 
+In your `package.json`, inside the script section add this: 
 
 ```json
 {
@@ -85,46 +85,7 @@ touch src/index.ts
 ```
 
 ## 🌿 3. Environment Variables
-Ensure the following environment variables are set in your .env file or deployment environment:
-
-
-| Variable               | Description                                                                 | Example                                            |
-| ---------------------- | --------------------------------------------------------------------------- | -------------------------------------------------- |
-| `PROJECT_ID`           | A unique ID to identify your project. This value can be freely invented — it's preserved mainly for compatibility with the old Realm-style project structure.                     | `my-flowerbase-app`                                |
-| `PORT`                 | The port on which the server will run.                                      | `3000`                                             |
-| `MONGODB_URL`          | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
-| `JWT_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
-| `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
-| `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
-| `RESET_PASSWORD_TTL_SECONDS` | Time-to-live for password reset tokens (in seconds).                  | `3600`                                             |
-| `AUTH_RATE_LIMIT_WINDOW_MS`  | Rate limit window for auth endpoints (in ms).                          | `900000`                                           |
-| `AUTH_LOGIN_MAX_ATTEMPTS`    | Max login attempts per window.                                         | `10`                                               |
-| `AUTH_RESET_MAX_ATTEMPTS`    | Max reset requests per window.                                         | `5`                                                |
-| `REFRESH_TOKEN_TTL_DAYS`     | Refresh token time-to-live (in days).                                  | `60`                                               |
-| `SWAGGER_ENABLED`      | Enable Swagger UI and spec routes (disabled by default).                    | `true`                                             |
-| `SWAGGER_UI_USER`      | Basic Auth username for Swagger UI (optional).                            | `admin`                                            |
-| `SWAGGER_UI_PASSWORD`  | Basic Auth password for Swagger UI (optional).                            | `change-me`                                        |
-
-
-Example:
-```env
-PROJECT_ID=your-project-id
-PORT=3000
-MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/dbname
-JWT_SECRET=your-jwt-secret
-HOST=0.0.0.0
-HTTPS_SCHEMA=http
-RESET_PASSWORD_TTL_SECONDS=3600
-AUTH_RATE_LIMIT_WINDOW_MS=900000
-AUTH_LOGIN_MAX_ATTEMPTS=10
-AUTH_RESET_MAX_ATTEMPTS=5
-REFRESH_TOKEN_TTL_DAYS=60
-SWAGGER_ENABLED=true
-SWAGGER_UI_USER=admin
-SWAGGER_UI_PASSWORD=change-me
-```
-
-🛡️ Note: Never commit .env files to source control. Use a .gitignore file to exclude it.
+Ensure the same environment variables described in the "Environment Variables" section above are set in your .env file or deployment environment.
 
 
 ## 🧩 4. Initialize Flowerbase
@@ -356,49 +317,9 @@ This will download a `.zip` file containing your Realm app's full structure and 
 
 ✅ You are now ready to migrate or inspect your Realm app locally!
 
-1) In your existing project folder, initialize a new Node.js project, Run:
+1) Reuse the same project setup steps from "Creating a New Project from Scratch" (init, install, tsconfig, scripts).
 
-```bash
-npm init -y
-```
-2) Install Flowerbase
-
-```bash
-npm install @flowerforce/flowerbase
-```
-
-3) Add Typescript
-
-```bash
-npm install --save-dev typescript @types/node ts-node
-```
-
-
-4) Add `tsconfig.json` file
-
-```bash
-npx tsc --init
-```
-
-5) Create an index.ts file
-
-Inside your project, create index.ts:
-
-```bash
-touch index.ts
-```
-
-6) In your `packages.json`, inside the script section add this: 
-
-```json
-{
-  "start": "ts-node index.ts"
-}
-```
-
-Initialize the Flowerbase App
-
-In index.ts, add:
+Initialize the Flowerbase App in `index.ts`:
 
 ```ts
 import { initialize } from '@flowerforce/flowerbase';
@@ -429,12 +350,16 @@ Ensure the following environment variables are set in your .env file or deployme
 | `MONGODB_URL`          | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
 | `JWT_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
 | `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
+| `API_VERSION`          | API version used in client base path.                                       | `v2.0`                                             |
 | `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
+| `ENABLE_LOGGER`        | Enable Fastify logger (any truthy value).                                   | `true`                                             |
 | `RESET_PASSWORD_TTL_SECONDS` | Time-to-live for password reset tokens (in seconds).                  | `3600`                                             |
 | `AUTH_RATE_LIMIT_WINDOW_MS`  | Rate limit window for auth endpoints (in ms).                          | `900000`                                           |
 | `AUTH_LOGIN_MAX_ATTEMPTS`    | Max login attempts per window.                                         | `10`                                               |
+| `AUTH_REGISTER_MAX_ATTEMPTS` | Max register attempts per window.                                      | `5`                                                |
 | `AUTH_RESET_MAX_ATTEMPTS`    | Max reset requests per window.                                         | `5`                                                |
 | `REFRESH_TOKEN_TTL_DAYS`     | Refresh token time-to-live (in days).                                  | `60`                                               |
+| `ANON_USER_TTL_SECONDS` | Anonymous user time-to-live (in seconds).                                  | `10800`                                            |
 | `SWAGGER_ENABLED`      | Enable Swagger UI and spec routes (disabled by default).                    | `true`                                             |
 | `SWAGGER_UI_USER`      | Basic Auth username for Swagger UI (optional).                            | `admin`                                            |
 | `SWAGGER_UI_PASSWORD`  | Basic Auth password for Swagger UI (optional).                            | `change-me`                                        |
@@ -447,12 +372,16 @@ PORT=3000
 MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/dbname
 JWT_SECRET=your-jwt-secret
 HOST=0.0.0.0
+API_VERSION=v2.0
 HTTPS_SCHEMA=http
+ENABLE_LOGGER=true
 RESET_PASSWORD_TTL_SECONDS=3600
 AUTH_RATE_LIMIT_WINDOW_MS=900000
 AUTH_LOGIN_MAX_ATTEMPTS=10
+AUTH_REGISTER_MAX_ATTEMPTS=5
 AUTH_RESET_MAX_ATTEMPTS=5
 REFRESH_TOKEN_TTL_DAYS=60
+ANON_USER_TTL_SECONDS=10800
 SWAGGER_ENABLED=true
 SWAGGER_UI_USER=admin
 SWAGGER_UI_PASSWORD=change-me
