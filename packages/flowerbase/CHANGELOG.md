@@ -1,3 +1,14 @@
+## 1.6.2 (2026-01-30)
+
+
+### 🩹 Fixes
+
+- trigger auth check providers ([636809e](https://github.com/flowerforce/flowerbase/commit/636809e))
+
+- check providers auth disabled ([85f3988](https://github.com/flowerforce/flowerbase/commit/85f3988))
+
+- add env swagger enable ([0ca2a5a](https://github.com/flowerforce/flowerbase/commit/0ca2a5a))
+
 ## 1.6.1 (2026-01-30)
 
 
