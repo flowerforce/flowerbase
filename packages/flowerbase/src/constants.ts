@@ -35,6 +35,7 @@ export const API_VERSION = `/api/client/${DEFAULT_CONFIG.API_VERSION}`
 export const HTTPS_SCHEMA = DEFAULT_CONFIG.HTTPS_SCHEMA
 export const DB_NAME = database_name
 
+type AuthProviders = Record<string, { disabled?: boolean; config?: unknown }>
 // TODO spostare nell'oggetto providers anche le altre configurazioni
 export const AUTH_CONFIG = {
   authCollection: auth_collection,
@@ -43,6 +44,7 @@ export const AUTH_CONFIG = {
   refreshTokensCollection: 'auth_refresh_tokens',
   resetPasswordConfig: configuration['local-userpass']?.config,
   localUserpassConfig: configuration['local-userpass']?.config,
+  authProviders: configuration as unknown as AuthProviders,
   user_id_field,
   on_user_creation_function_name,
   providers: {

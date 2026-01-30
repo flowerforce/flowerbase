@@ -51,6 +51,7 @@ export async function localUserPassController(app: FastifyInstance) {
   const registerMaxAttempts = DEFAULT_CONFIG.AUTH_REGISTER_MAX_ATTEMPTS
   const resetMaxAttempts = DEFAULT_CONFIG.AUTH_RESET_MAX_ATTEMPTS
   const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
+  const resolveLocalUserpassProvider = () => AUTH_CONFIG.authProviders?.['local-userpass']
 
   try {
     await db.collection(resetPasswordCollection).createIndex(
@@ -132,6 +133,10 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: REGISTRATION_SCHEMA
     },
     async (req, res) => {
+      const localUserpassProvider = resolveLocalUserpassProvider()
+      if (!localUserpassProvider || localUserpassProvider.disabled) {
+        throw new Error('Local userpass authentication disabled')
+      }
       const key = `register:${req.ip}`
       if (isRateLimited(key, registerMaxAttempts, rateLimitWindowMs)) {
         res.status(429).send({ message: 'Too many requests' })
@@ -178,6 +183,10 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: CONFIRM_USER_SCHEMA
     },
     async (req, res) => {
+      const localUserpassProvider = resolveLocalUserpassProvider()
+      if (!localUserpassProvider || localUserpassProvider.disabled) {
+        throw new Error('Local userpass authentication disabled')
+      }
       const key = `confirm:${req.ip}`
       if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
         res.status(429).send({ message: 'Too many requests' })
@@ -222,6 +231,10 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: LOGIN_SCHEMA
     },
     async function (req, res) {
+      const localUserpassProvider = resolveLocalUserpassProvider()
+      if (!localUserpassProvider || localUserpassProvider.disabled) {
+        throw new Error('Local userpass authentication disabled')
+      }
       const key = `login:${req.ip}`
       if (isRateLimited(key, loginMaxAttempts, rateLimitWindowMs)) {
         res.status(429).send({ message: 'Too many requests' })
@@ -295,6 +308,10 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: RESET_SEND_SCHEMA
     },
     async function (req, res) {
+      const localUserpassProvider = resolveLocalUserpassProvider()
+      if (!localUserpassProvider || localUserpassProvider.disabled) {
+        throw new Error('Local userpass authentication disabled')
+      }
       const key = `reset:${req.ip}`
       if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
         res.status(429)
@@ -314,6 +331,10 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: RESET_CALL_SCHEMA
     },
     async function (req, res) {
+      const localUserpassProvider = resolveLocalUserpassProvider()
+      if (!localUserpassProvider || localUserpassProvider.disabled) {
+        throw new Error('Local userpass authentication disabled')
+      }
       const key = `reset:${req.ip}`
       if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
         res.status(429)
@@ -344,6 +365,10 @@ export async function localUserPassController(app: FastifyInstance) {
       schema: CONFIRM_RESET_SCHEMA
     },
     async function (req, res) {
+      const localUserpassProvider = resolveLocalUserpassProvider()
+      if (!localUserpassProvider || localUserpassProvider.disabled) {
+        throw new Error('Local userpass authentication disabled')
+      }
       const key = `reset-confirm:${req.ip}`
       if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
         res.status(429)

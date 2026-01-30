@@ -21,5 +21,18 @@
         "mailToken": "ENV.MAIL_TOKEN"
       }
     }
+  },
+  "custom-function": {
+    "name": "custom-function",
+    "type": "custom-function",
+    "disabled": true,
+    "config": {
+      "authFunctionName": ""
+    }
+  },
+  "anon-user": {
+    "name": "anon-user",
+    "type": "anon-user",
+    "disabled": false
   }
 }

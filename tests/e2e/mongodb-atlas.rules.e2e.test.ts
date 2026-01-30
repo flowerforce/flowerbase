@@ -128,6 +128,7 @@ const PROJECT_ID = 'flowerbase-e2e'
 const FUNCTION_CALL_URL = `${API_VERSION}/app/${PROJECT_ID}/functions/call`
 const AUTH_BASE_URL = `${API_VERSION}/app/${PROJECT_ID}/auth/providers/local-userpass`
 const ANON_AUTH_BASE_URL = `${API_VERSION}/app/${PROJECT_ID}/auth/providers/anon-user`
+const CUSTOM_FUNCTION_AUTH_BASE_URL = `${API_VERSION}/app/${PROJECT_ID}/auth/providers/custom-function`
 const TOKEN_MAP: Record<string, string> = {}
 
 const serializeValue = (value: unknown) => {
@@ -629,6 +630,40 @@ const waitForProviderTriggerEventType = async (documentId: string, type: string)
     await new Promise((resolve) => setTimeout(resolve, 250))
   }
   return null
+}
+
+const cloneAuthProviders = () =>
+  JSON.parse(JSON.stringify(AUTH_CONFIG.authProviders ?? {})) as Record<string, unknown>
+
+const withAuthProviders = async (nextProviders: Record<string, unknown>, fn: () => Promise<void>) => {
+  const originalProviders = cloneAuthProviders()
+  AUTH_CONFIG.authProviders = nextProviders as typeof AUTH_CONFIG.authProviders
+  try {
+    await fn()
+  } finally {
+    AUTH_CONFIG.authProviders = originalProviders as typeof AUTH_CONFIG.authProviders
+  }
+}
+
+const withoutProvider = (providerName: string) => {
+  const next = cloneAuthProviders()
+  delete (next as Record<string, unknown>)[providerName]
+  return next
+}
+
+const withDisabledProvider = (providerName: string) => {
+  const next = cloneAuthProviders()
+  const existing = (next as Record<string, unknown>)[providerName]
+  if (existing && typeof existing === 'object') {
+    ;(existing as { disabled?: boolean }).disabled = true
+  } else {
+    ;(next as Record<string, unknown>)[providerName] = {
+      name: providerName,
+      type: providerName,
+      disabled: true
+    }
+  }
+  return next
 }
 
 const isReplicaSetNotInitializedError = (error: unknown) => {
@@ -2285,6 +2320,148 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       'auth_provider_delete_local-userpass'
     )
     expect(localEvent).toBeNull()
+  })
+
+  it('rejects local-userpass registration when provider is missing', async () => {
+    await withAuthProviders(withoutProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/register`,
+        payload: {
+          email: 'missing-local-register@example.com',
+          password: 'missing-pass'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects local-userpass login when provider is missing', async () => {
+    await withAuthProviders(withoutProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/login`,
+        payload: {
+          username: 'missing-local-login@example.com',
+          password: 'missing-pass'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects local-userpass reset/send when provider is missing', async () => {
+    await withAuthProviders(withoutProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/reset/send`,
+        payload: {
+          email: 'missing-local-reset@example.com'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects local-userpass registration when provider is disabled', async () => {
+    await withAuthProviders(withDisabledProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/register`,
+        payload: {
+          email: 'disabled-local-register@example.com',
+          password: 'disabled-pass'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects local-userpass login when provider is disabled', async () => {
+    await withAuthProviders(withDisabledProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/login`,
+        payload: {
+          username: 'disabled-local-login@example.com',
+          password: 'disabled-pass'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects local-userpass reset/send when provider is disabled', async () => {
+    await withAuthProviders(withDisabledProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/reset/send`,
+        payload: {
+          email: 'disabled-local-reset@example.com'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects anon-user login when provider is missing', async () => {
+    await withAuthProviders(withoutProvider('anon-user'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${ANON_AUTH_BASE_URL}/login`
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects anon-user login when provider is disabled', async () => {
+    await withAuthProviders(withDisabledProvider('anon-user'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${ANON_AUTH_BASE_URL}/login`
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects custom-function login when provider is missing', async () => {
+    await withAuthProviders(withoutProvider('custom-function'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${CUSTOM_FUNCTION_AUTH_BASE_URL}/login`,
+        payload: {
+          apiKey: 'missing-custom',
+          options: {
+            device: {
+              sdkVersion: '1.0.0',
+              platform: 'test',
+              platformVersion: '1.0'
+            }
+          }
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects custom-function login when provider is disabled', async () => {
+    await withAuthProviders(withDisabledProvider('custom-function'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${CUSTOM_FUNCTION_AUTH_BASE_URL}/login`,
+        payload: {
+          apiKey: 'disabled-custom',
+          options: {
+            device: {
+              sdkVersion: '1.0.0',
+              platform: 'test',
+              platformVersion: '1.0'
+            }
+          }
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
   })
 
   it('rejects registration when the email is already used', async () => {
