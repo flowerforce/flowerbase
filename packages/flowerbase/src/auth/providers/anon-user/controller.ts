@@ -13,7 +13,7 @@ import { LoginDto } from './dtos'
  */
 export async function anonUserController(app: FastifyInstance) {
   const db = app.mongo.client.db(DB_NAME)
-  const { authCollection, refreshTokensCollection, providers } = AUTH_CONFIG
+  const { authCollection, refreshTokensCollection } = AUTH_CONFIG
   const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
   const anonUserTtlSeconds = DEFAULT_CONFIG.ANON_USER_TTL_SECONDS
 
@@ -32,8 +32,8 @@ export async function anonUserController(app: FastifyInstance) {
   app.post<LoginDto>(
     AUTH_ENDPOINTS.LOGIN,
     async function () {
-      const anonProvider = providers?.['anon-user']
-      if (anonProvider?.disabled) {
+      const anonProvider = AUTH_CONFIG.authProviders?.['anon-user']
+      if (!anonProvider || anonProvider.disabled) {
         throw new Error('Anonymous authentication disabled')
       }
 

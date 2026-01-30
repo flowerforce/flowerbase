@@ -1,3 +1,18 @@
+## 1.6.1 (2026-01-30)
+
+
+### 🩹 Fixes
+
+- upgrade s3 ([68fb6a3](https://github.com/flowerforce/flowerbase/commit/68fb6a3))
+
+- add BSON.Binary.fromBase64 ([b9e3bdb](https://github.com/flowerforce/flowerbase/commit/b9e3bdb))
+
+- fromBase64Binary ([0fbd7c3](https://github.com/flowerforce/flowerbase/commit/0fbd7c3))
+
+- types ([9050ea0](https://github.com/flowerforce/flowerbase/commit/9050ea0))
+
+- endpoints http methods ([ae7803c](https://github.com/flowerforce/flowerbase/commit/ae7803c))
+
 ## 1.6.0 (2026-01-28)
 
 

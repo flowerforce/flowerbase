@@ -1,0 +1,45 @@
+{
+    "name": "updateUser",
+    "type": "DATABASE",
+    "disabled": false,
+    "config": {
+        "collection": "users",
+        "database": "flowerbase-demo",
+        "full_document": true,
+        "full_document_before_change": false,
+        "match": {
+            "$and": [
+                {
+                    "$expr": {
+                        "$eq": [
+                            {
+                                "$getField": {
+                                    "field": "verify.email",
+                                    "input": "$updateDescription.updatedFields"
+                                }
+                            },
+                            true
+                        ]
+                    }
+                },
+                {
+                    "fullDocument.verify.phone": { "$eq": true }
+                },
+                {
+                    "fullDocument.onboarding": { "$eq": false }
+                }
+            ]
+        },
+        "operation_types": [
+            "UPDATE"
+        ],
+        "service_name": "mongodb-atlas"
+    },
+    "event_processors": {
+        "FUNCTION": {
+            "config": {
+                "function_name": "onUpdateUser"
+            }
+        }
+    }
+}

@@ -208,7 +208,7 @@ export const loadAuthConfig = (): AuthConfig => {
       'anon-user': {
         name: 'anon-user',
         type: 'anon-user',
-        disabled: false
+        disabled: true
       }
     }
   }

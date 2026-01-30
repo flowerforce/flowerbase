@@ -1,0 +1,29 @@
+{
+    "name": "triggerActivity",
+    "type": "DATABASE",
+    "disabled": false,
+    "config": {
+        "collection": "activities",
+        "database": "flowerbase-demo",
+        "full_document": true,
+        "full_document_before_change": false,
+        "match": {},
+        "operation_types": [
+            "INSERT",
+            "UPDATE",
+            "REPLACE"
+        ],
+        "project": {},
+        "service_name": "mongodb-atlas",
+        "skip_catchup_events": false,
+        "tolerate_resume_errors": false,
+        "unordered": true
+    },
+    "event_processors": {
+        "FUNCTION": {
+            "config": {
+                "function_name": "triggerActivity"
+            }
+        }
+    }
+}

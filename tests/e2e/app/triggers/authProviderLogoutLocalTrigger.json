@@ -1,0 +1,27 @@
+{
+  "name": "authProviderLogoutLocalTrigger",
+  "type": "AUTHENTICATION",
+  "disabled": false,
+  "config": {
+    "collection": "auth_users",
+    "database": "flowerbase-e2e",
+    "full_document": true,
+    "full_document_before_change": false,
+    "match": {},
+    "operation_type": "LOGOUT",
+    "providers": ["local-userpass"],
+    "project": {},
+    "service_name": "mongodb-atlas",
+    "skip_catchup_events": false,
+    "tolerate_resume_errors": false,
+    "unordered": false,
+    "schedule": ""
+  },
+  "event_processors": {
+    "FUNCTION": {
+      "config": {
+        "function_name": "logAuthProviderTrigger"
+      }
+    }
+  }
+}

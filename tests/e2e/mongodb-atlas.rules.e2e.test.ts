@@ -123,10 +123,12 @@ const adminUser: TestUser = {
   }
 } as TestUser
 const TRIGGER_EVENTS_COLLECTION = 'triggerEvents'
+const PROVIDER_TRIGGER_EVENTS_COLLECTION = 'providerTriggerEvents'
 const PROJECT_ID = 'flowerbase-e2e'
 const FUNCTION_CALL_URL = `${API_VERSION}/app/${PROJECT_ID}/functions/call`
 const AUTH_BASE_URL = `${API_VERSION}/app/${PROJECT_ID}/auth/providers/local-userpass`
 const ANON_AUTH_BASE_URL = `${API_VERSION}/app/${PROJECT_ID}/auth/providers/anon-user`
+const CUSTOM_FUNCTION_AUTH_BASE_URL = `${API_VERSION}/app/${PROJECT_ID}/auth/providers/custom-function`
 const TOKEN_MAP: Record<string, string> = {}
 
 const serializeValue = (value: unknown) => {
@@ -344,6 +346,7 @@ const resetCollections = async () => {
     db.collection(TRIGGER_ITEMS_DELETE_COLLECTION).deleteMany({}),
     db.collection(FILTERED_TRIGGER_ITEMS_COLLECTION).deleteMany({}),
     db.collection(TRIGGER_EVENTS_COLLECTION).deleteMany({}),
+    db.collection(PROVIDER_TRIGGER_EVENTS_COLLECTION).deleteMany({}),
     db.collection(FILTERED_TRIGGER_EVENTS_COLLECTION).deleteMany({}),
     db.collection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION).deleteMany({})
   ])
@@ -617,6 +620,52 @@ const waitForFilteredUpdateTriggerEvent = async (documentId: string) => {
   return null
 }
 
+const waitForProviderTriggerEventType = async (documentId: string, type: string) => {
+  const collection = client.db(DB_NAME).collection(PROVIDER_TRIGGER_EVENTS_COLLECTION)
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const record = await collection.findOne({ documentId, type })
+    if (record) {
+      return record
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  return null
+}
+
+const cloneAuthProviders = () =>
+  JSON.parse(JSON.stringify(AUTH_CONFIG.authProviders ?? {})) as Record<string, unknown>
+
+const withAuthProviders = async (nextProviders: Record<string, unknown>, fn: () => Promise<void>) => {
+  const originalProviders = cloneAuthProviders()
+  AUTH_CONFIG.authProviders = nextProviders as typeof AUTH_CONFIG.authProviders
+  try {
+    await fn()
+  } finally {
+    AUTH_CONFIG.authProviders = originalProviders as typeof AUTH_CONFIG.authProviders
+  }
+}
+
+const withoutProvider = (providerName: string) => {
+  const next = cloneAuthProviders()
+  delete (next as Record<string, unknown>)[providerName]
+  return next
+}
+
+const withDisabledProvider = (providerName: string) => {
+  const next = cloneAuthProviders()
+  const existing = (next as Record<string, unknown>)[providerName]
+  if (existing && typeof existing === 'object') {
+    ;(existing as { disabled?: boolean }).disabled = true
+  } else {
+    ;(next as Record<string, unknown>)[providerName] = {
+      name: providerName,
+      type: providerName,
+      disabled: true
+    }
+  }
+  return next
+}
+
 const isReplicaSetNotInitializedError = (error: unknown) => {
   if (!(error instanceof Error)) {
     return false
@@ -663,6 +712,7 @@ const ensureReplicaSet = async (client: MongoClient) => {
 describe('MongoDB Atlas rule enforcement (e2e)', () => {
   beforeAll(async () => {
     DEFAULT_CONFIG.AUTH_REGISTER_MAX_ATTEMPTS = 1000
+    DEFAULT_CONFIG.AUTH_LOGIN_MAX_ATTEMPTS = 1000
     const mongoUrl = resolveMongoUrl()
     if (MANAGE_REPLICA_SET) {
       const maintenanceClient = new MongoClient(dropReplicaSetHint(mongoUrl), {
@@ -680,6 +730,19 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     client = new MongoClient(mongoUrl, { serverSelectionTimeoutMS: 60000 })
     await client.connect()
     await ensureFilteredTriggerCollections()
+    try {
+      await client.db(DB_NAME).createCollection(AUTH_USERS_COLLECTION)
+    } catch {
+      // ignore if it already exists
+    }
+    try {
+      await client.db(DB_NAME).command({
+        collMod: AUTH_USERS_COLLECTION,
+        changeStreamPreAndPostImages: { enabled: true }
+      })
+    } catch {
+      // ignore if pre/post images are not supported
+    }
     originalMainPath = require.main?.path
     if (require.main) {
       require.main.path = APP_ROOT
@@ -2049,6 +2112,356 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     )
     expect(logoutEvent).toBeDefined()
     expect(logoutEvent?.email).toBe(email)
+  })
+
+  it('fires provider-filtered create trigger for local-userpass only', async () => {
+    const authId = new ObjectId()
+    const email = 'provider-local-create@example.com'
+    await client.db(DB_NAME).collection(AUTH_USERS_COLLECTION).insertOne({
+      _id: authId,
+      email,
+      password: 'hashed',
+      status: 'pending',
+      createdAt: new Date(),
+      identities: [
+        {
+          id: authId.toString(),
+          provider_id: authId.toString(),
+          provider_type: 'local-userpass',
+          provider_data: { email }
+        }
+      ]
+    })
+
+    await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .updateOne({ _id: authId }, { $set: { status: 'confirmed' } })
+
+    const localEvent = await waitForProviderTriggerEventType(
+      authId.toString(),
+      'auth_provider_create_local-userpass'
+    )
+    expect(localEvent).toBeDefined()
+    const anonEvent = await waitForProviderTriggerEventType(
+      authId.toString(),
+      'auth_provider_create_anon-user'
+    )
+    expect(anonEvent).toBeNull()
+  })
+
+  it('fires provider-filtered create trigger for anon-user only', async () => {
+    const authId = new ObjectId()
+    await client.db(DB_NAME).collection(AUTH_USERS_COLLECTION).insertOne({
+      _id: authId,
+      email: `anon-${authId.toString()}@users.invalid`,
+      status: 'pending',
+      createdAt: new Date(),
+      identities: [
+        {
+          id: authId.toString(),
+          provider_id: authId.toString(),
+          provider_type: 'anon-user',
+          provider_data: {}
+        }
+      ]
+    })
+
+    await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .updateOne({ _id: authId }, { $set: { status: 'confirmed' } })
+
+    const anonEvent = await waitForProviderTriggerEventType(
+      authId.toString(),
+      'auth_provider_create_anon-user'
+    )
+    expect(anonEvent).toBeDefined()
+    const localEvent = await waitForProviderTriggerEventType(
+      authId.toString(),
+      'auth_provider_create_local-userpass'
+    )
+    expect(localEvent).toBeNull()
+  })
+
+  it('fires provider-filtered logout trigger for local-userpass only', async () => {
+    const email = 'provider-local-logout@example.com'
+    const password = 'logout-pass'
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email,
+        password
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: email,
+        password
+      }
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as { refresh_token?: string; user_id?: string }
+    expect(loginBody.refresh_token).toBeDefined()
+    expect(loginBody.user_id).toBeDefined()
+
+    const logout = await appInstance!.inject({
+      method: 'DELETE',
+      url: `${API_VERSION}/auth/session`,
+      headers: {
+        authorization: `Bearer ${loginBody.refresh_token}`
+      }
+    })
+    expect(logout.statusCode).toBe(200)
+
+    const localEvent = await waitForProviderTriggerEventType(
+      loginBody.user_id!,
+      'auth_provider_logout_local-userpass'
+    )
+    expect(localEvent).toBeDefined()
+    const anonEvent = await waitForProviderTriggerEventType(
+      loginBody.user_id!,
+      'auth_provider_logout_anon-user'
+    )
+    expect(anonEvent).toBeNull()
+  })
+
+  it('fires provider-filtered logout trigger for anon-user only', async () => {
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${ANON_AUTH_BASE_URL}/login`
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as { refresh_token?: string; user_id?: string }
+    expect(loginBody.refresh_token).toBeDefined()
+    expect(loginBody.user_id).toBeDefined()
+
+    const logout = await appInstance!.inject({
+      method: 'DELETE',
+      url: `${API_VERSION}/auth/session`,
+      headers: {
+        authorization: `Bearer ${loginBody.refresh_token}`
+      }
+    })
+    expect(logout.statusCode).toBe(200)
+
+    const anonEvent = await waitForProviderTriggerEventType(
+      loginBody.user_id!,
+      'auth_provider_logout_anon-user'
+    )
+    expect(anonEvent).toBeDefined()
+    const localEvent = await waitForProviderTriggerEventType(
+      loginBody.user_id!,
+      'auth_provider_logout_local-userpass'
+    )
+    expect(localEvent).toBeNull()
+  })
+
+  it('fires provider-filtered delete trigger for local-userpass only', async () => {
+    const email = 'provider-local-delete@example.com'
+    const password = 'delete-pass'
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email,
+        password
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+    const registrationBody = registration.json() as { userId?: string }
+    expect(registrationBody.userId).toBeDefined()
+
+    const deleteResult = await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .deleteOne({ _id: new ObjectId(registrationBody.userId) })
+    expect(deleteResult.deletedCount).toBe(1)
+
+    const localEvent = await waitForProviderTriggerEventType(
+      registrationBody.userId!,
+      'auth_provider_delete_local-userpass'
+    )
+    expect(localEvent).toBeDefined()
+    const anonEvent = await waitForProviderTriggerEventType(
+      registrationBody.userId!,
+      'auth_provider_delete_anon-user'
+    )
+    expect(anonEvent).toBeNull()
+  })
+
+  it('fires provider-filtered delete trigger for anon-user only', async () => {
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${ANON_AUTH_BASE_URL}/login`
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as { user_id?: string }
+    expect(loginBody.user_id).toBeDefined()
+
+    const deleteResult = await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .deleteOne({ _id: new ObjectId(loginBody.user_id) })
+    expect(deleteResult.deletedCount).toBe(1)
+
+    const anonEvent = await waitForProviderTriggerEventType(
+      loginBody.user_id!,
+      'auth_provider_delete_anon-user'
+    )
+    expect(anonEvent).toBeDefined()
+    const localEvent = await waitForProviderTriggerEventType(
+      loginBody.user_id!,
+      'auth_provider_delete_local-userpass'
+    )
+    expect(localEvent).toBeNull()
+  })
+
+  it('rejects local-userpass registration when provider is missing', async () => {
+    await withAuthProviders(withoutProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/register`,
+        payload: {
+          email: 'missing-local-register@example.com',
+          password: 'missing-pass'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects local-userpass login when provider is missing', async () => {
+    await withAuthProviders(withoutProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/login`,
+        payload: {
+          username: 'missing-local-login@example.com',
+          password: 'missing-pass'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects local-userpass reset/send when provider is missing', async () => {
+    await withAuthProviders(withoutProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/reset/send`,
+        payload: {
+          email: 'missing-local-reset@example.com'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects local-userpass registration when provider is disabled', async () => {
+    await withAuthProviders(withDisabledProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/register`,
+        payload: {
+          email: 'disabled-local-register@example.com',
+          password: 'disabled-pass'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects local-userpass login when provider is disabled', async () => {
+    await withAuthProviders(withDisabledProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/login`,
+        payload: {
+          username: 'disabled-local-login@example.com',
+          password: 'disabled-pass'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects local-userpass reset/send when provider is disabled', async () => {
+    await withAuthProviders(withDisabledProvider('local-userpass'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${AUTH_BASE_URL}/reset/send`,
+        payload: {
+          email: 'disabled-local-reset@example.com'
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects anon-user login when provider is missing', async () => {
+    await withAuthProviders(withoutProvider('anon-user'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${ANON_AUTH_BASE_URL}/login`
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects anon-user login when provider is disabled', async () => {
+    await withAuthProviders(withDisabledProvider('anon-user'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${ANON_AUTH_BASE_URL}/login`
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects custom-function login when provider is missing', async () => {
+    await withAuthProviders(withoutProvider('custom-function'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${CUSTOM_FUNCTION_AUTH_BASE_URL}/login`,
+        payload: {
+          apiKey: 'missing-custom',
+          options: {
+            device: {
+              sdkVersion: '1.0.0',
+              platform: 'test',
+              platformVersion: '1.0'
+            }
+          }
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
+  })
+
+  it('rejects custom-function login when provider is disabled', async () => {
+    await withAuthProviders(withDisabledProvider('custom-function'), async () => {
+      const response = await appInstance!.inject({
+        method: 'POST',
+        url: `${CUSTOM_FUNCTION_AUTH_BASE_URL}/login`,
+        payload: {
+          apiKey: 'disabled-custom',
+          options: {
+            device: {
+              sdkVersion: '1.0.0',
+              platform: 'test',
+              platformVersion: '1.0'
+            }
+          }
+        }
+      })
+      expect(response.statusCode).toBe(500)
+    })
   })
 
   it('rejects registration when the email is already used', async () => {

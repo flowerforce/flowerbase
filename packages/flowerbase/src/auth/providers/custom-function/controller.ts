@@ -33,8 +33,12 @@ export async function customFunctionController(app: FastifyInstance) {
       schema: LOGIN_SCHEMA
     },
     async function (req, reply) {
-      const { providers } = AUTH_CONFIG
-      const authFunctionName = providers["custom-function"].authFunctionName
+      const customFunctionProvider = AUTH_CONFIG.authProviders?.['custom-function']
+      if (!customFunctionProvider || customFunctionProvider.disabled) {
+        throw new Error('Custom function authentication disabled')
+      }
+      const authFunctionName = (customFunctionProvider as { config?: { authFunctionName?: string } })
+        .config?.authFunctionName
 
       if (!authFunctionName || !functionsList[authFunctionName]) {
         throw new Error("Missing Auth Function")
