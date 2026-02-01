@@ -546,6 +546,11 @@ const createMonitoringPlugin = fp(async (
     : normalizedPrefix
   const maxAgeMs = Math.max(1, DEFAULT_CONFIG.MONIT_CACHE_HOURS) * 60 * 60 * 1000
   const maxEvents = Math.max(1000, DEFAULT_CONFIG.MONIT_MAX_EVENTS)
+  const allowedIps = DEFAULT_CONFIG.MONIT_ALLOWED_IPS
+  const rateLimitWindowMs = Math.max(0, DEFAULT_CONFIG.MONIT_RATE_LIMIT_WINDOW_MS)
+  const rateLimitMax = Math.max(0, DEFAULT_CONFIG.MONIT_RATE_LIMIT_MAX)
+  const allowInvoke = DEFAULT_CONFIG.MONIT_ALLOW_INVOKE
+  const allowEdit = DEFAULT_CONFIG.MONIT_ALLOW_EDIT
 
   const eventStore = createEventStore(maxAgeMs || DAY_MS, maxEvents)
   const functionHistory: FunctionHistoryItem[] = []
@@ -562,6 +567,22 @@ const createMonitoringPlugin = fp(async (
     if (functionHistory.length > maxHistory) {
       functionHistory.splice(maxHistory)
     }
+  }
+
+  const rateBucket = new Map<string, { count: number; resetAt: number }>()
+  const isRateLimited = (key: string) => {
+    if (rateLimitMax <= 0 || rateLimitWindowMs <= 0) return false
+    const now = Date.now()
+    const current = rateBucket.get(key)
+    if (!current || now > current.resetAt) {
+      rateBucket.set(key, { count: 1, resetAt: now + rateLimitWindowMs })
+      return false
+    }
+    current.count += 1
+    if (current.count > rateLimitMax) {
+      return true
+    }
+    return false
   }
 
   const round1 = (value: number) => Math.round(value * 10) / 10
@@ -680,11 +701,40 @@ const createMonitoringPlugin = fp(async (
 
   app.addHook('onRequest', (req, reply, done) => {
     if (isMonitRoute(req.url)) {
+      const audit = (status: 'deny', reason?: string) => {
+        addEvent({
+          id: createEventId(),
+          ts: Date.now(),
+          type: 'auth',
+          source: 'monit',
+          message: `monit ${status}`,
+          data: sanitize({
+            status,
+            reason,
+            ip: req.ip,
+            method: req.method,
+            path: req.url
+          })
+        })
+      }
+      const allowAllIps = allowedIps.includes('0.0.0.0') || allowedIps.includes('*')
+      if (allowedIps.length && !allowAllIps && !allowedIps.includes(req.ip)) {
+        audit('deny', 'ip')
+        reply.code(403).send({ message: 'Forbidden' })
+        return
+      }
+      if (isRateLimited(req.ip)) {
+        audit('deny', 'rate_limit')
+        reply.code(429).send({ message: 'Too Many Requests' })
+        return
+      }
       if (!hasCredentials()) {
+        audit('deny', 'missing_credentials')
         reply.code(503).send({ message: 'Monitoring credentials not configured' })
         return
       }
       if (!isAuthorized(req)) {
+        audit('deny', 'basic_auth')
         reply
           .code(401)
           .header('WWW-Authenticate', `Basic realm="${MONIT_REALM}"`)
@@ -843,6 +893,10 @@ const createMonitoringPlugin = fp(async (
   })
 
   app.get(`${prefix}/api/functions/:name`, async (req, reply) => {
+    if (!allowEdit) {
+      reply.code(403)
+      return { error: 'Function code access disabled' }
+    }
     const params = req.params as { name: string }
     const name = params.name
     const functionsList = StateManager.select('functions') as Record<
@@ -868,6 +922,10 @@ const createMonitoringPlugin = fp(async (
   }))
 
   app.post(`${prefix}/api/functions/invoke`, async (req, reply) => {
+    if (!allowInvoke) {
+      reply.code(403)
+      return { error: 'Function invocation disabled' }
+    }
     const body = req.body as {
       name?: string
       arguments?: unknown[]
@@ -890,6 +948,10 @@ const createMonitoringPlugin = fp(async (
     if (!currentFunction) {
       reply.code(404)
       return { error: `Function "${name}" not found` }
+    }
+    if (!allowEdit && typeof body?.code === 'string' && body.code.trim()) {
+      reply.code(403)
+      return { error: 'Function override disabled' }
     }
     const overrideCode =
       typeof body?.code === 'string' && body.code.trim()

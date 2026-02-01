@@ -46,6 +46,14 @@ export const DEFAULT_CONFIG = {
   MONIT_MAX_EVENTS: Number(process.env.MONIT_MAX_EVENTS) || 5000,
   MONIT_CAPTURE_CONSOLE: parseBoolean(process.env.MONIT_CAPTURE_CONSOLE ?? 'true'),
   MONIT_REDACT_ERROR_DETAILS: parseBoolean(process.env.MONIT_REDACT_ERROR_DETAILS ?? 'true'),
+  MONIT_ALLOWED_IPS: (process.env.MONIT_ALLOWED_IPS ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean),
+  MONIT_RATE_LIMIT_WINDOW_MS: Number(process.env.MONIT_RATE_LIMIT_WINDOW_MS) || 60_000,
+  MONIT_RATE_LIMIT_MAX: Number(process.env.MONIT_RATE_LIMIT_MAX) || 120,
+  MONIT_ALLOW_INVOKE: parseBoolean(process.env.MONIT_ALLOW_INVOKE ?? 'true'),
+  MONIT_ALLOW_EDIT: parseBoolean(process.env.MONIT_ALLOW_EDIT ?? 'true'),
   CORS_OPTIONS: {
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"] as ALLOWED_METHODS[]

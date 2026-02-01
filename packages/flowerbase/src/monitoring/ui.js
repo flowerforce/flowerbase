@@ -67,8 +67,9 @@
   const HISTORY_LIMIT = 30;
 
   const api = async (path, options) => {
+    const headers = { 'Content-Type': 'application/json' };
     const res = await fetch('__MONIT_BASE__/api' + path, {
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       ...options
     });
     const contentType = res.headers.get('content-type') || '';
@@ -186,7 +187,8 @@
 
   const connectWs = () => {
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(scheme + '://' + location.host + '__MONIT_BASE__/ws');
+    const wsUrl = scheme + '://' + location.host + '__MONIT_BASE__/ws';
+    const ws = new WebSocket(wsUrl);
     wsStatus.textContent = 'WS: connecting';
     wsStatus.classList.remove('ok', 'warn');
     ws.onopen = () => {

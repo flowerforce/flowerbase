@@ -370,6 +370,11 @@ Ensure the following environment variables are set in your .env file or deployme
 | `MONIT_MAX_EVENTS`     | Maximum number of cached monitoring events.                               | `5000`                                             |
 | `MONIT_CAPTURE_CONSOLE`| Capture console log/warn/error into monitoring events.                     | `true`                                             |
 | `MONIT_REDACT_ERROR_DETAILS` | Redact error message/stack in monitoring output.                      | `true`                                             |
+| `MONIT_ALLOWED_IPS`    | Comma-separated allowlist for `/monit` (uses `req.ip`). Use `0.0.0.0` or `*` to allow all. | `127.0.0.1,10.0.0.10`                              |
+| `MONIT_RATE_LIMIT_WINDOW_MS` | Rate limit window for `/monit` (ms).                                 | `60000`                                            |
+| `MONIT_RATE_LIMIT_MAX` | Max requests per window for `/monit`.                                     | `120`                                              |
+| `MONIT_ALLOW_INVOKE`   | Allow function invoke from monit UI.                                      | `true`                                             |
+| `MONIT_ALLOW_EDIT`     | Allow function code access/override from monit UI.                         | `true`                                             |
 
 
 Example:
@@ -399,6 +404,11 @@ MONIT_CACHE_HOURS=24
 MONIT_MAX_EVENTS=5000
 MONIT_CAPTURE_CONSOLE=true
 MONIT_REDACT_ERROR_DETAILS=true
+MONIT_ALLOWED_IPS=127.0.0.1,10.0.0.10
+MONIT_RATE_LIMIT_WINDOW_MS=60000
+MONIT_RATE_LIMIT_MAX=120
+MONIT_ALLOW_INVOKE=true
+MONIT_ALLOW_EDIT=true
 ```
 
 🛡️ Note: Never commit .env files to source control. Use a .gitignore file to exclude it.
@@ -407,6 +417,8 @@ MONIT_REDACT_ERROR_DETAILS=true
 
 - The monitoring UI lives at `/monit` and is protected by Basic Auth.
 - Monit routes are registered **only** when `MONIT_ENABLED=true` (credentials alone are not enough).
+- If `MONIT_ALLOWED_IPS` is set, only those IPs can reach `/monit` (ensure `req.ip` reflects your proxy setup / `trustProxy`).
+- You can disable **invoke** or **edit** with `MONIT_ALLOW_INVOKE=false` and/or `MONIT_ALLOW_EDIT=false`.
 
 
 <a id="build"></a>
