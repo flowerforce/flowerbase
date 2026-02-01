@@ -424,6 +424,10 @@ const wrapServicesForMonitoring = (addEvent: (event: MonitorEvent) => void) => {
     auth: 'auth',
     'mongodb-atlas': 'rules'
   }
+  const initMethodMap: Record<string, Set<string>> = {
+    aws: new Set(['lambda', 's3']),
+    'mongodb-atlas': new Set(['db', 'collection'])
+  }
 
   const cache = new WeakMap<object, unknown>()
 
@@ -446,14 +450,15 @@ const wrapServicesForMonitoring = (addEvent: (event: MonitorEvent) => void) => {
         if (typeof prop === 'symbol') return propValue
         if (prop === 'constructor' || prop === 'toJSON') return propValue
         if (typeof propValue === 'function') {
-          const fnPath = `${path}.${String(prop)}`
+          const propName = String(prop)
+          const fnPath = `${path}.${propName}`
           const wrappedFn = (...args: unknown[]) => {
             let nextMeta = meta
             if (serviceName === 'mongodb-atlas') {
-              if (prop === 'db' && typeof args[0] === 'string') {
+              if (propName === 'db' && typeof args[0] === 'string') {
                 nextMeta = { ...(meta ?? { serviceName }), dbName: args[0], serviceName }
               }
-              if (prop === 'collection' && typeof args[0] === 'string') {
+              if (propName === 'collection' && typeof args[0] === 'string') {
                 nextMeta = {
                   ...(meta ?? { serviceName }),
                   collection: args[0],
@@ -461,9 +466,7 @@ const wrapServicesForMonitoring = (addEvent: (event: MonitorEvent) => void) => {
                 }
               }
             }
-            const shouldLog =
-              serviceName !== 'mongodb-atlas' ||
-              (!['db', 'collection'].includes(String(prop)))
+            const shouldLog = !(initMethodMap[serviceName]?.has(propName))
             if (shouldLog) {
               const ruleInfo = buildRulesMeta(nextMeta ?? meta)
               addEvent({

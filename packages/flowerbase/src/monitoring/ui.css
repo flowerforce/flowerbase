@@ -235,6 +235,10 @@ main {
   min-width: 280px;
 }
 
+.controls input {
+  flex: 1
+}
+
 input,
 select,
 textarea,
