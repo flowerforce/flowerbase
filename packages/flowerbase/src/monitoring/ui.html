@@ -134,8 +134,10 @@
           </div>
           <div class="right-column">
             <div class="subpanel function-panel">
-              <div class="subpanel-title">invoke</div>
-              <div class="hint" id="functionSelected">select a function</div>
+              <div class="detail-header">
+                <div class="subpanel-title">invoke</div>
+                <div class="hint" id="functionSelected">select a function</div>
+              </div>
               <div class="function-controls">
                 <div class="control-group">
                   <label for="functionUserInput">user</label>
@@ -155,13 +157,20 @@
                 <textarea id="functionCode" placeholder="// function code"></textarea>
                 <div class="editor-actions">
                   <button id="restoreFunction" class="secondary">restore original</button>
+                  <button id="invokeFunction">invoke</button>
                 </div>
                 <div class="hint" id="functionEditorStatus"></div>
               </div>
-              <textarea id="functionArgs" placeholder='[ "arg1", { "foo": "bar" } ]'></textarea>
-              <button id="invokeFunction">invoke</button>
-              <div class="hint">arguments must be valid JSON array</div>
-              <pre id="functionResult" class="event-detail function-result"></pre>
+              <div class="function-io">
+                <div class="io-column">
+                  <label for="functionArgs">args</label>
+                  <textarea id="functionArgs" placeholder='[ "arg1", { "foo": "bar" } ]'></textarea>
+                </div>
+                <div class="io-column">
+                  <label for="functionResult">result</label>
+                  <pre id="functionResult" class="event-detail function-result"></pre>
+                </div>
+              </div>
             </div>
           </div>
         </div>

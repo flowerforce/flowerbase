@@ -525,12 +525,43 @@ button.small {
   flex-direction: column;
   gap: 8px;
   min-height: 0;
+  height: 100%;
 }
 
 .function-editor textarea {
-  min-height: 200px;
-  max-height: 320px;
+  min-height: 260px;
+  height: 100%;
   resize: vertical;
+}
+
+.function-io {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.io-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.io-column label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.io-column textarea {
+  min-height: 140px;
+}
+
+.io-column .event-detail {
+  flex: 1;
+  min-height: 140px;
 }
 
 .editor-actions {
