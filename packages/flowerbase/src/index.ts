@@ -132,7 +132,16 @@ export async function initialize({
       },
       staticCSP: true,
       transformStaticCSP: (header) => header,
-      transformSpecification: (swaggerObject,) => { return swaggerObject },
+      transformSpecification: (swaggerObject) => {
+        if (!swaggerObject || !swaggerObject.paths) return swaggerObject
+        const filteredPaths = { ...swaggerObject.paths }
+        Object.keys(filteredPaths).forEach((path) => {
+          if (path === '/monit' || path.startsWith('/monit/')) {
+            delete filteredPaths[path]
+          }
+        })
+        return { ...swaggerObject, paths: filteredPaths }
+      },
       transformSpecificationClone: true
     })
   }

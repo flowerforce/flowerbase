@@ -60,31 +60,49 @@ export const getMethodsConfig = (
     config: {
       rawBody: true
     },
+    schema: {
+      tags: ['Endpoints']
+    }
   }, handler),
   GET: () => app.get(endpoint, {
     config: {
       rawBody: true
     },
+    schema: {
+      tags: ['Endpoints']
+    }
   }, handler),
   POST: () => app.post(endpoint, {
     config: {
       rawBody: true
     },
+    schema: {
+      tags: ['Endpoints']
+    }
   }, handler),
   PUT: () => app.put(endpoint, {
     config: {
       rawBody: true
     },
+    schema: {
+      tags: ['Endpoints']
+    }
   }, handler),
   PATCH: () => app.patch(endpoint, {
     config: {
       rawBody: true
     },
+    schema: {
+      tags: ['Endpoints']
+    }
   }, handler),
   DELETE: () => app.delete(endpoint, {
     config: {
       rawBody: true
     },
+    schema: {
+      tags: ['Endpoints']
+    }
   }, handler)
 })
 

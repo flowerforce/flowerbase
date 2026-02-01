@@ -8,7 +8,7 @@ import jwtAuthPlugin from '../../auth/plugins/jwt'
 import { anonUserController } from '../../auth/providers/anon-user/controller'
 import { customFunctionController } from '../../auth/providers/custom-function/controller'
 import { localUserPassController } from '../../auth/providers/local-userpass/controller'
-import { API_VERSION } from '../../constants'
+import { API_VERSION, DEFAULT_CONFIG } from '../../constants'
 import { Functions } from '../../features/functions/interface'
 import monitoringPlugin from '../../monitoring/plugin'
 
@@ -84,7 +84,7 @@ const getRegisterConfig = async ({
     methods: ['POST', 'GET']
   }
 
-  return [
+  const baseConfig = [
     {
       pluginName: 'cors',
       plugin: cors,
@@ -97,11 +97,6 @@ const getRegisterConfig = async ({
         forceClose: true,
         url: mongodbUrl
       }
-    },
-    {
-      pluginName: 'monitoringPlugin',
-      plugin: monitoringPlugin,
-      options: { basePath: '/monit' }
     },
     {
       pluginName: 'jwtAuthPlugin',
@@ -149,4 +144,14 @@ const getRegisterConfig = async ({
       }
     }
   ] as RegisterConfig[]
+
+  if (DEFAULT_CONFIG.MONIT_ENABLED) {
+    baseConfig.splice(2, 0, {
+      pluginName: 'monitoringPlugin',
+      plugin: monitoringPlugin,
+      options: { basePath: '/monit' }
+    } as RegisterConfig)
+  }
+
+  return baseConfig
 }
