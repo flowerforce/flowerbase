@@ -26,6 +26,7 @@
       <button class="tab-button active" data-tab="events">events</button>
       <button class="tab-button" data-tab="users">users</button>
       <button class="tab-button" data-tab="functions">functions</button>
+      <button class="tab-button" data-tab="collections">collections</button>
     </div>
     <div class="tab-panels">
       <section class="panel tab-panel active" data-panel="events">
@@ -175,6 +176,104 @@
                 <div class="io-column">
                   <label for="functionResult">result</label>
                   <pre id="functionResult" class="event-detail function-result"></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="panel tab-panel" data-panel="collections">
+        <div class="panel-header">
+          <span>Collections</span>
+          <button id="refreshCollections" class="secondary">refresh</button>
+        </div>
+        <div class="split-grid collections-grid">
+          <div class="column-stack">
+            <div class="controls">
+              <input id="collectionSearch" class="wide-input" type="text" placeholder="search collections" />
+            </div>
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">collections</div>
+              <div id="collectionList" class="user-list"></div>
+            </div>
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">history</div>
+              <div id="collectionHistory" class="history-list"></div>
+            </div>
+          </div>
+          <div class="right-column">
+            <div class="subpanel collection-detail">
+              <div class="detail-header">
+                <div class="subpanel-title">collection detail</div>
+                <div class="hint" id="collectionSelected">select a collection</div>
+              </div>
+              <div class="mini-tabs">
+                <button class="mini-tab active" data-collection-tab="query">query</button>
+                <button class="mini-tab" data-collection-tab="rules">rules</button>
+              </div>
+              <div class="mini-panels">
+                <div class="mini-panel active" data-collection-panel="query">
+                  <div class="collection-controls">
+                    <div class="control-group">
+                      <label for="collectionUserInput">user</label>
+                      <input id="collectionUserInput" list="collectionUserList" placeholder="select user" />
+                      <datalist id="collectionUserList"></datalist>
+                    </div>
+                    <div class="control-group">
+                      <label for="collectionRunMode">run as</label>
+                      <select id="collectionRunMode">
+                        <option value="system" selected>system</option>
+                        <option value="user">user</option>
+                      </select>
+                    </div>
+                    <div class="control-group">
+                      <label for="collectionMode">mode</label>
+                      <select id="collectionMode">
+                        <option value="query" selected>query</option>
+                        <option value="aggregate">aggregate</option>
+                      </select>
+                    </div>
+                    <div class="control-group">
+                      <label for="collectionSort">sort</label>
+                      <input id="collectionSort" type="text" placeholder='{"createdAt": -1}' />
+                    </div>
+                  </div>
+                <div class="collection-io">
+                  <div class="io-column">
+                    <label for="collectionQuery">query</label>
+                    <div class="json-editor">
+                      <pre id="collectionQueryHighlight" class="json-highlight"></pre>
+                      <textarea id="collectionQuery" placeholder='{"field": "value"}'></textarea>
+                    </div>
+                  </div>
+                  <div class="io-column">
+                    <label for="collectionAggregate">aggregate</label>
+                    <div class="json-editor">
+                      <pre id="collectionAggregateHighlight" class="json-highlight"></pre>
+                      <textarea id="collectionAggregate" placeholder='[{ "$match": { "field": "value" } }]'></textarea>
+                    </div>
+                  </div>
+                </div>
+                  <div class="editor-actions">
+                    <button id="runCollectionQuery">run</button>
+                    <div class="pager">
+                      <div class="pager-controls">
+                        <button id="collectionPrev" class="secondary">prev</button>
+                        <button id="collectionNext" class="secondary">next</button>
+                      </div>
+                      <div>page <span id="collectionPage">1</span> · total <span id="collectionTotal">0</span></div>
+                    </div>
+                  </div>
+                  <div class="result-toolbar">
+                    <div class="toggle-buttons">
+                      <button id="collectionViewJson" class="secondary active">json</button>
+                      <button id="collectionViewTable" class="secondary">table</button>
+                    </div>
+                  </div>
+                  <div id="collectionResult" class="event-detail function-result"></div>
+                </div>
+                <div class="mini-panel" data-collection-panel="rules">
+                  <pre id="collectionRules" class="event-detail">select a collection</pre>
                 </div>
               </div>
             </div>

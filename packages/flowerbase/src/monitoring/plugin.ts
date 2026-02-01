@@ -33,6 +33,18 @@ type FunctionHistoryItem = {
   user?: { id?: string; email?: string }
 }
 
+type CollectionHistoryItem = {
+  ts: number
+  collection: string
+  mode: 'query' | 'aggregate'
+  query?: unknown
+  pipeline?: unknown
+  sort?: Record<string, unknown>
+  runAsSystem: boolean
+  user?: { id?: string; email?: string }
+  page?: number
+}
+
 type EventQuery = {
   q?: string
   type?: string
@@ -49,6 +61,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const MAX_DEPTH = 6
 const MAX_ARRAY = 50
 const MAX_STRING = 500
+const COLLECTION_PAGE_SIZE = 50
 const MONIT_REALM = 'Flowerbase Monitor'
 
 const isTestEnv = () =>
@@ -56,6 +69,9 @@ const isTestEnv = () =>
 
 const isPromiseLike = (value: unknown): value is Promise<unknown> =>
   !!value && typeof value === 'object' && typeof (value as { then?: unknown }).then === 'function'
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value)
 
 const safeStringify = (value: unknown) => {
   const seen = new WeakSet<object>()
@@ -316,6 +332,43 @@ const buildRulesMeta = (meta?: MonitMeta) => {
   }
 }
 
+const buildCollectionRulesSnapshot = (
+  rules: Rules | undefined,
+  collection: string,
+  user?: unknown,
+  runAsSystem?: boolean
+) => {
+  const collectionRules = rules?.[collection]
+  if (!collectionRules) {
+    return {
+      collection,
+      rules: null,
+      filters: [],
+      matchedFilters: [],
+      roles: [],
+      matchedRoles: [],
+      runAsSystem: !!runAsSystem
+    }
+  }
+  const filters = collectionRules.filters ?? []
+  const roles = collectionRules.roles ?? []
+  const safeUser = (user ?? {}) as Parameters<typeof getValidRule>[0]['user']
+  const matchedFilters = getValidRule({ filters, user: safeUser })
+  const matchedFilterNames = matchedFilters.map((filter) => filter.name)
+  const matchedRoles = roles
+    .filter((role) => checkApplyWhen(role.apply_when, safeUser as never, null))
+    .map((role) => role.name)
+  return {
+    collection,
+    rules: sanitize(collectionRules),
+    filters: filters.map((filter) => filter.name),
+    matchedFilters: matchedFilterNames,
+    roles: roles.map((role) => role.name),
+    matchedRoles,
+    runAsSystem: !!runAsSystem
+  }
+}
+
 const resolveAssetCandidates = (filename: string, prefix: string) => {
   const rootDir = process.cwd()
   const cleanPrefix = prefix.replace(/^\/+/, '').replace(/\/+$/, '')
@@ -394,6 +447,21 @@ const resolveUserContext = async (
   }
 
   return user
+}
+
+const getUserInfo = (resolvedUser?: Record<string, unknown>) => {
+  if (!resolvedUser || typeof resolvedUser !== 'object') return undefined
+  const record = resolvedUser as {
+    id?: unknown
+    email?: unknown
+    user_data?: { email?: unknown }
+  }
+  const id = typeof record.id === 'string' ? record.id : undefined
+  const email = typeof record.email === 'string'
+    ? record.email
+    : (typeof record.user_data?.email === 'string' ? record.user_data.email : undefined)
+  if (!id && !email) return undefined
+  return { id, email }
 }
 
 const readAsset = (filename: string, prefix: string) => {
@@ -558,6 +626,8 @@ const createMonitoringPlugin = fp(async (
   const eventStore = createEventStore(maxAgeMs || DAY_MS, maxEvents)
   const functionHistory: FunctionHistoryItem[] = []
   const maxHistory = 30
+  const collectionHistory: CollectionHistoryItem[] = []
+  const maxCollectionHistory = 30
   const statsState = {
     lastCpu: process.cpuUsage(),
     lastHr: process.hrtime.bigint(),
@@ -569,6 +639,13 @@ const createMonitoringPlugin = fp(async (
     functionHistory.unshift(entry)
     if (functionHistory.length > maxHistory) {
       functionHistory.splice(maxHistory)
+    }
+  }
+
+  const addCollectionHistory = (entry: CollectionHistoryItem) => {
+    collectionHistory.unshift(entry)
+    if (collectionHistory.length > maxCollectionHistory) {
+      collectionHistory.splice(maxCollectionHistory)
     }
   }
 
@@ -1253,6 +1330,198 @@ const createMonitoringPlugin = fp(async (
     })
 
     return { status: 'ok' }
+  })
+
+  app.get(`${prefix}/api/collections`, async () => {
+    const db = app.mongo.client.db(DB_NAME)
+    const collections = await db.listCollections().toArray()
+    const items = collections
+      .filter((entry) => !entry.name.startsWith('system.'))
+      .map((entry) => ({
+        name: entry.name,
+        type: entry.type
+      }))
+    return { items }
+  })
+
+  app.get(`${prefix}/api/collections/:name/rules`, async (req) => {
+    const params = req.params as { name: string }
+    const query = req.query as { userId?: string; runAsSystem?: string }
+    const rules = StateManager.select('rules') as Rules
+    const runAsSystem = query?.runAsSystem === 'true'
+    const resolvedUser = await resolveUserContext(app, query?.userId)
+    return buildCollectionRulesSnapshot(rules, params.name, resolvedUser, runAsSystem)
+  })
+
+  app.get(`${prefix}/api/collections/history`, async () => ({
+    items: collectionHistory.slice(0, maxCollectionHistory)
+  }))
+
+  app.post(`${prefix}/api/collections/query`, async (req, reply) => {
+    const body = req.body as {
+      collection?: string
+      query?: unknown
+      sort?: unknown
+      page?: number
+      recordHistory?: boolean
+      runAsSystem?: boolean
+      userId?: string
+    }
+    const collection = body?.collection
+    if (!collection) {
+      reply.code(400)
+      return { error: 'Missing collection name' }
+    }
+    const rawQuery = body?.query ?? {}
+    if (Array.isArray(rawQuery) || typeof rawQuery !== 'object' || rawQuery === null) {
+      reply.code(400)
+      return { error: 'Query must be an object' }
+    }
+    const sort = body?.sort
+    if (sort !== undefined && !isPlainObject(sort)) {
+      reply.code(400)
+      return { error: 'Sort must be an object' }
+    }
+    const page = Math.max(1, Math.floor(Number(body?.page ?? 1) || 1))
+    const skip = (page - 1) * COLLECTION_PAGE_SIZE
+    const rules = StateManager.select('rules') as Rules
+    const services = StateManager.select('services') as typeof coreServices
+    const resolvedUser = await resolveUserContext(app, body?.userId)
+    const runAsSystem = body?.runAsSystem !== false
+    const recordHistory = body?.recordHistory !== false
+
+    try {
+      const mongoService = services['mongodb-atlas'](app, {
+        rules,
+        user: resolvedUser ?? {},
+        run_as_system: runAsSystem
+      })
+      const options: Record<string, unknown> = {}
+      if (isPlainObject(sort)) options.sort = sort
+      const cursor = mongoService
+        .db(DB_NAME)
+        .collection(collection)
+        .find(rawQuery, undefined, Object.keys(options).length ? options : undefined)
+        .skip(skip)
+        .limit(COLLECTION_PAGE_SIZE + 1)
+      const countPromise = mongoService
+        .db(DB_NAME)
+        .collection(collection)
+        .count(rawQuery)
+      const [items, total] = await Promise.all([cursor.toArray(), countPromise])
+      const hasMore = page * COLLECTION_PAGE_SIZE < total
+      const pageItems = items.length > COLLECTION_PAGE_SIZE
+        ? items.slice(0, COLLECTION_PAGE_SIZE)
+        : items
+      if (recordHistory) {
+        addCollectionHistory({
+          ts: Date.now(),
+          collection,
+          mode: 'query',
+          query: sanitize(rawQuery),
+          sort: sort ? (sanitize(sort) as Record<string, unknown>) : undefined,
+          runAsSystem,
+          user: getUserInfo(resolvedUser as Record<string, unknown> | undefined),
+          page
+        })
+      }
+      return {
+        items: sanitize(pageItems),
+        count: pageItems.length,
+        total,
+        page,
+        pageSize: COLLECTION_PAGE_SIZE,
+        hasMore
+      }
+    } catch (error) {
+      const details = getErrorDetails(error)
+      reply.code(500)
+      return { error: details.message, stack: details.stack }
+    }
+  })
+
+  app.post(`${prefix}/api/collections/aggregate`, async (req, reply) => {
+    const body = req.body as {
+      collection?: string
+      pipeline?: unknown
+      sort?: unknown
+      page?: number
+      recordHistory?: boolean
+      runAsSystem?: boolean
+      userId?: string
+    }
+    const collection = body?.collection
+    if (!collection) {
+      reply.code(400)
+      return { error: 'Missing collection name' }
+    }
+    const rawPipeline = body?.pipeline ?? []
+    if (!Array.isArray(rawPipeline)) {
+      reply.code(400)
+      return { error: 'Aggregate pipeline must be an array' }
+    }
+    const sort = body?.sort
+    if (sort !== undefined && !isPlainObject(sort)) {
+      reply.code(400)
+      return { error: 'Sort must be an object' }
+    }
+    const page = Math.max(1, Math.floor(Number(body?.page ?? 1) || 1))
+    const skip = (page - 1) * COLLECTION_PAGE_SIZE
+    const rules = StateManager.select('rules') as Rules
+    const services = StateManager.select('services') as typeof coreServices
+    const resolvedUser = await resolveUserContext(app, body?.userId)
+    const runAsSystem = body?.runAsSystem !== false
+    const recordHistory = body?.recordHistory !== false
+
+    try {
+      const pipeline = [...rawPipeline]
+      if (sort) pipeline.push({ $sort: sort })
+      if (skip > 0) pipeline.push({ $skip: skip })
+      pipeline.push({ $limit: COLLECTION_PAGE_SIZE + 1 })
+      const mongoService = services['mongodb-atlas'](app, {
+        rules,
+        user: resolvedUser ?? {},
+        run_as_system: runAsSystem
+      })
+      const cursor = mongoService
+        .db(DB_NAME)
+        .collection(collection)
+        .aggregate(pipeline, undefined, true)
+      const countCursor = mongoService
+        .db(DB_NAME)
+        .collection(collection)
+        .aggregate([...rawPipeline, { $count: 'total' }], undefined, true)
+      const [items, totalResult] = await Promise.all([cursor.toArray(), countCursor.toArray()])
+      const total = totalResult?.[0]?.total ?? 0
+      const hasMore = page * COLLECTION_PAGE_SIZE < total
+      const pageItems = items.length > COLLECTION_PAGE_SIZE
+        ? items.slice(0, COLLECTION_PAGE_SIZE)
+        : items
+      if (recordHistory) {
+        addCollectionHistory({
+          ts: Date.now(),
+          collection,
+          mode: 'aggregate',
+          pipeline: sanitize(rawPipeline),
+          sort: sort ? (sanitize(sort) as Record<string, unknown>) : undefined,
+          runAsSystem,
+          user: getUserInfo(resolvedUser as Record<string, unknown> | undefined),
+          page
+        })
+      }
+      return {
+        items: sanitize(pageItems),
+        count: pageItems.length,
+        total,
+        page,
+        pageSize: COLLECTION_PAGE_SIZE,
+        hasMore
+      }
+    } catch (error) {
+      const details = getErrorDetails(error)
+      reply.code(500)
+      return { error: details.message, stack: details.stack }
+    }
   })
 }, { name: 'monitoring' })
 
