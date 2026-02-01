@@ -96,6 +96,27 @@
     const date = new Date(ts);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
+  const formatDateTime = (value) => {
+    if (!value) return '';
+    let date;
+    if (typeof value === 'number') {
+      date = new Date(value);
+    } else if (typeof value === 'string') {
+      date = new Date(value);
+    } else if (value instanceof Date) {
+      date = value;
+    } else {
+      return '';
+    }
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString([], {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   state.customLimit = Number(customLimit.value || 25) || 25;
 
@@ -247,7 +268,25 @@
         custom: customMap[id]
       });
     });
+    const getCreatedAt = (entry) => {
+      const auth = entry && entry.auth ? entry.auth : null;
+      const custom = entry && entry.custom ? entry.custom : null;
+      const raw = (auth && auth.createdAt) || (custom && custom.createdAt);
+      if (typeof raw === 'number') return raw;
+      if (typeof raw === 'string') {
+        const ts = Date.parse(raw);
+        if (!Number.isNaN(ts)) return ts;
+      }
+      return null;
+    };
     merged.sort((a, b) => {
+      const aTs = getCreatedAt(a);
+      const bTs = getCreatedAt(b);
+      if (aTs !== null || bTs !== null) {
+        const aScore = aTs === null ? -Infinity : aTs;
+        const bScore = bTs === null ? -Infinity : bTs;
+        if (aScore !== bScore) return bScore - aScore;
+      }
       const aLabel = (a.auth && a.auth.email) || (a.custom && a.custom.email) || String(a.id || '');
       const bLabel = (b.auth && b.auth.email) || (b.custom && b.custom.email) || String(b.id || '');
       return aLabel.localeCompare(bLabel);
@@ -274,13 +313,16 @@
       const userId = String(entry.id || '');
       const primaryEmail = (auth && auth.email) || (custom && custom.email) || (custom && custom.name) || userId || 'unknown';
       const status = (auth && auth.status) || (auth && auth.email ? 'unknown' : 'no-auth');
+      const createdAt = (auth && auth.createdAt) || (custom && custom.createdAt);
+      const createdLabel = formatDateTime(createdAt);
+      const hint = createdLabel ? status + ' · ' + createdLabel : status;
       const hasAuth = !!(auth && auth._id);
       const row = document.createElement('div');
       row.className = 'user-row' + (state.selectedUserId === userId ? ' active' : '');
       row.dataset.id = userId;
       row.innerHTML = '<div class="user-meta">' +
         '<div class="code">' + primaryEmail + '</div>' +
-        '<div class="hint">' + status + '</div>' +
+        '<div class="hint">' + hint + '</div>' +
         '</div>' +
         '<div class="user-actions">' +
         (hasAuth ? ('<button data-action="toggle" data-id="' + auth._id + '">' + (auth.status === 'disabled' ? 'enable' : 'disable') + '</button>' +

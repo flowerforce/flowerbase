@@ -1075,7 +1075,7 @@ const createMonitoringPlugin = fp(async (
       const authItems = await db
         .collection(authCollection)
         .find(authFilter)
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .limit(resolvedAuthLimit)
         .toArray()
       response.auth = {
@@ -1104,6 +1104,7 @@ const createMonitoringPlugin = fp(async (
       const customItems = await db
         .collection(userCollection)
         .find(customFilter)
+        .sort({ createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(resolvedCustomLimit)
         .toArray()
