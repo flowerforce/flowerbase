@@ -342,6 +342,12 @@ button.danger {
   border-radius: 8px;
 }
 
+.detail-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .subpanel-title {
   font-size: 12px;
   text-transform: uppercase;
@@ -349,11 +355,68 @@ button.danger {
   margin-bottom: 8px;
 }
 
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detail-header .subpanel-title {
+  margin-bottom: 0;
+}
+
+.is-hidden {
+  display: none;
+}
+
+button.small {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
 .user-list {
   flex: 1;
   min-height: 0;
   overflow: auto;
   font-size: 12px;
+}
+
+.history-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  font-size: 12px;
+}
+
+.history-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 6px;
+  border-bottom: 1px dashed rgba(26, 47, 34, 0.6);
+  cursor: pointer;
+}
+
+.history-row.active {
+  background: rgba(49, 233, 129, 0.12);
+  border-color: rgba(49, 233, 129, 0.35);
+}
+
+.history-row:hover {
+  background: rgba(49, 233, 129, 0.08);
+}
+
+.history-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-empty {
+  padding: 6px;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .pager {
@@ -443,6 +506,30 @@ button.danger {
   flex: 1;
   min-height: 0;
   gap: 10px;
+}
+
+.function-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(120px, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-group label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.control-group .hint {
+  margin: 0;
 }
 
 .function-result {

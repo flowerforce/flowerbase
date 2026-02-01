@@ -2,6 +2,7 @@
   const state = {
     events: [],
     selectedId: null,
+    selectedEvent: null,
     authUsers: [],
     customUsers: [],
     mergedUsers: [],
@@ -11,6 +12,11 @@
     functions: [],
     selectedFunction: null,
     functionQuery: '',
+    functionHistory: [],
+    selectedFunctionUser: null,
+    functionUserMap: {},
+    functionUserQuery: '',
+    __functionUserTimer: null,
     selectedUserId: null,
     __userSearchTimer: null,
     customPage: 1,
@@ -19,6 +25,7 @@
   };
   const eventsList = document.getElementById('eventsList');
   const eventDetail = document.getElementById('eventDetail');
+  const eventFunctionButton = document.getElementById('eventFunctionButton');
   const searchInput = document.getElementById('searchInput');
   const typeFilter = document.getElementById('typeFilter');
   const eventCount = document.getElementById('eventCount');
@@ -39,24 +46,43 @@
   const functionList = document.getElementById('functionList');
   const functionSelected = document.getElementById('functionSelected');
   const functionSearch = document.getElementById('functionSearch');
+  const functionUserInput = document.getElementById('functionUserInput');
+  const functionUserList = document.getElementById('functionUserList');
+  const functionUserHint = document.getElementById('functionUserHint');
+  const functionRunMode = document.getElementById('functionRunMode');
   const functionArgs = document.getElementById('functionArgs');
   const invokeFunction = document.getElementById('invokeFunction');
   const functionResult = document.getElementById('functionResult');
   const refreshFunctions = document.getElementById('refreshFunctions');
+  const functionHistory = document.getElementById('functionHistory');
   const clearEvents = document.getElementById('clearEvents');
   const tabButtons = document.querySelectorAll('[data-tab]');
   const tabPanels = document.querySelectorAll('[data-panel]');
+  const HISTORY_LIMIT = 30;
 
   const api = async (path, options) => {
     const res = await fetch('__MONIT_BASE__/api' + path, {
       headers: { 'Content-Type': 'application/json' },
       ...options
     });
+    const contentType = res.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    const payload = isJson
+      ? await res.json().catch(() => null)
+      : await res.text();
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || res.status);
+      let message = '';
+      if (payload && typeof payload === 'object') {
+        message = payload.error || payload.message || '';
+      } else if (typeof payload === 'string') {
+        message = payload;
+      }
+      if (!message) message = String(res.status);
+      const error = new Error(message);
+      error.payload = payload;
+      throw error;
     }
-    return res.json();
+    return payload;
   };
 
   const formatTime = (ts) => {
@@ -71,6 +97,32 @@
     const type = (event.type || 'log').toLowerCase();
     const msg = event.message || '';
     return time + '  ' + type.padEnd(12, ' ') + '  ' + msg;
+  };
+
+  const getFunctionEventData = (event) => {
+    if (!event || !event.type || event.type !== 'function') return null;
+    const data = event.data || {};
+    let name = null;
+    if (data && typeof data === 'object') {
+      if (typeof data.function === 'string') name = data.function;
+      if (!name && typeof data.name === 'string') name = data.name;
+    }
+    if (!name && typeof event.message === 'string') {
+      const match = event.message.match(/^invoke\s+(.+)$/i);
+      if (match) name = match[1].trim();
+    }
+    if (!name) return null;
+    let args = null;
+    if (data && typeof data === 'object') {
+      if (Array.isArray(data.arguments)) args = data.arguments;
+      else if (Array.isArray(data.args)) args = data.args;
+      else if (data.arguments !== undefined) args = data.arguments;
+      else if (data.args !== undefined) args = data.args;
+    }
+    if (!Array.isArray(args)) {
+      args = args === null || args === undefined ? [] : [args];
+    }
+    return { name, args };
   };
 
   const matchesQuery = (event, query) => {
@@ -104,7 +156,16 @@
 
   const showDetail = (event) => {
     state.selectedId = event.id;
+    state.selectedEvent = event;
     eventDetail.textContent = JSON.stringify(event, null, 2);
+    const functionData = getFunctionEventData(event);
+    if (functionData && eventFunctionButton) {
+      eventFunctionButton.classList.remove('is-hidden');
+      eventFunctionButton.textContent = 'use in invoke · ' + functionData.name;
+    } else if (eventFunctionButton) {
+      eventFunctionButton.classList.add('is-hidden');
+      eventFunctionButton.textContent = 'use in invoke';
+    }
   };
 
   const addEvents = (events) => {
@@ -270,11 +331,146 @@
     });
   };
 
+  const formatArgsPreview = (args) => {
+    try {
+      let preview = JSON.stringify(args);
+      if (preview.length > 80) {
+        preview = preview.slice(0, 80) + '...';
+      }
+      return preview;
+    } catch (err) {
+      return '[unserializable]';
+    }
+  };
+
+  const renderHistory = () => {
+    if (!functionHistory) return;
+    functionHistory.innerHTML = '';
+    if (!state.functionHistory.length) {
+      const empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = 'no history yet';
+      functionHistory.appendChild(empty);
+      return;
+    }
+    state.functionHistory.forEach((entry, index) => {
+      const row = document.createElement('div');
+      row.className = 'history-row' + (state.selectedFunction === entry.name ? ' active' : '');
+      row.dataset.index = String(index);
+      const runMode = entry.runAsSystem === false ? 'user' : 'system';
+      const userLabel = entry.user && (entry.user.email || entry.user.id)
+        ? (entry.user.email || entry.user.id)
+        : '';
+      const metaParts = [];
+      metaParts.push(formatTime(entry.ts));
+      metaParts.push(runMode);
+      if (userLabel) metaParts.push(userLabel);
+      row.innerHTML = '<div class="history-meta">' +
+        '<div class="code">' + entry.name + '</div>' +
+        '<div class="hint">' + metaParts.join(' · ') + ' · ' + formatArgsPreview(entry.args) + '</div>' +
+        '</div>' +
+        '<div class="hint"></div>';
+      functionHistory.appendChild(row);
+    });
+  };
+
+  const loadFunctionHistory = async () => {
+    try {
+      const data = await api('/functions/history');
+      const items = data.items || [];
+      state.functionHistory = items.slice(0, HISTORY_LIMIT);
+      renderHistory();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const setRunModeForFunction = (name) => {
+    if (!functionRunMode) return;
+    const fn = (state.functions || []).find((item) => item.name === name);
+    if (!fn || typeof fn.run_as_system !== 'boolean') return;
+    functionRunMode.value = fn.run_as_system ? 'system' : 'user';
+  };
+
+  const buildFunctionUserOptions = (authItems, customItems) => {
+    const merged = buildMergedUsers(authItems, customItems);
+    return merged.map((entry) => {
+      const auth = entry.auth || {};
+      const custom = entry.custom || {};
+      const id = String(entry.id || '');
+      const email = auth.email || custom.email || custom.name || id || 'unknown';
+      const label = email && id && email !== id ? email + ' · ' + id : (email || id || 'unknown');
+      return { entry, id, label };
+    });
+  };
+
+  const renderFunctionUserOptions = (options) => {
+    if (!functionUserList) return;
+    functionUserList.innerHTML = '';
+    state.functionUserMap = {};
+    options.forEach((option) => {
+      const item = document.createElement('option');
+      item.value = option.label;
+      functionUserList.appendChild(item);
+      state.functionUserMap[option.label.toLowerCase()] = option.entry;
+      if (option.id) {
+        state.functionUserMap[String(option.id).toLowerCase()] = option.entry;
+      }
+    });
+  };
+
+  const setSelectedFunctionUser = (entry, label) => {
+    state.selectedFunctionUser = entry || null;
+    if (!functionUserHint) return;
+    if (!entry) {
+      functionUserHint.textContent = 'context.user: system';
+      return;
+    }
+    const auth = entry.auth || {};
+    const custom = entry.custom || {};
+    const email = auth.email || custom.email || custom.name || entry.id || 'unknown';
+    const id = entry.id || '';
+    functionUserHint.textContent = 'context.user: ' + (label || (email && id ? email + ' · ' + id : (email || id)));
+  };
+
+  const resolveFunctionUserFromInput = () => {
+    if (!functionUserInput) return;
+    const value = functionUserInput.value.trim();
+    if (!value) {
+      setSelectedFunctionUser(null);
+      return;
+    }
+    const entry = state.functionUserMap[value.toLowerCase()];
+    if (entry) {
+      setSelectedFunctionUser(entry, value);
+    } else {
+      setSelectedFunctionUser(null);
+    }
+  };
+
+  const searchFunctionUsers = async (query) => {
+    try {
+      const search = query ? '&q=' + encodeURIComponent(query) : '';
+      const data = await api('/users?scope=all&authLimit=50&customLimit=50&customPage=1' + search);
+      if (data.meta && data.meta.userIdField) {
+        state.userIdField = data.meta.userIdField;
+      }
+      const authItems = (data.auth && data.auth.items) || [];
+      const customItems = (data.custom && data.custom.items) || [];
+      const options = buildFunctionUserOptions(authItems, customItems);
+      renderFunctionUserOptions(options);
+      resolveFunctionUserFromInput();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const loadFunctions = async () => {
     try {
       const data = await api('/functions');
       state.functions = data.items || [];
       renderFunctions(state.functions);
+      loadFunctionHistory();
     } catch (err) {
       console.error(err);
     }
@@ -286,7 +482,12 @@
     searchInput.value = '';
     typeFilter.value = '';
     state.events = [];
+    state.selectedEvent = null;
     eventDetail.textContent = 'select an event to inspect payload';
+    if (eventFunctionButton) {
+      eventFunctionButton.classList.add('is-hidden');
+      eventFunctionButton.textContent = 'use in invoke';
+    }
     renderEvents();
   });
 
@@ -388,15 +589,95 @@
     state.selectedFunction = name;
     functionSelected.textContent = 'selected: ' + name;
     functionResult.textContent = '';
+    setRunModeForFunction(name);
     functionList.querySelectorAll('.function-row').forEach((row) => {
       row.classList.toggle('active', row.dataset.name === name);
     });
+    renderHistory();
   });
 
   functionSearch.addEventListener('input', () => {
     state.functionQuery = functionSearch.value.trim();
     renderFunctions(state.functions);
   });
+
+  if (functionUserInput) {
+    functionUserInput.addEventListener('input', () => {
+      state.functionUserQuery = functionUserInput.value.trim();
+      resolveFunctionUserFromInput();
+      if (state.__functionUserTimer) {
+        clearTimeout(state.__functionUserTimer);
+      }
+      if (!state.functionUserQuery || state.functionUserQuery.length < 2) {
+        renderFunctionUserOptions([]);
+        return;
+      }
+      state.__functionUserTimer = setTimeout(() => {
+        searchFunctionUsers(state.functionUserQuery);
+      }, 250);
+    });
+    functionUserInput.addEventListener('change', resolveFunctionUserFromInput);
+  }
+
+  const setActiveTab = (tab) => {
+    tabButtons.forEach((item) => {
+      item.classList.toggle('active', item.dataset.tab === tab);
+    });
+    tabPanels.forEach((panel) => {
+      panel.classList.toggle('active', panel.dataset.panel === tab);
+    });
+  };
+
+  if (eventFunctionButton) {
+    eventFunctionButton.addEventListener('click', () => {
+      const functionData = getFunctionEventData(state.selectedEvent);
+      if (!functionData) return;
+      state.selectedFunction = functionData.name;
+      functionSelected.textContent = 'selected: ' + functionData.name;
+      functionArgs.value = JSON.stringify(functionData.args || [], null, 2);
+      functionResult.textContent = '';
+      setRunModeForFunction(functionData.name);
+      renderFunctions(state.functions);
+      renderHistory();
+      setActiveTab('functions');
+    });
+  }
+
+  if (functionHistory) {
+    functionHistory.addEventListener('click', (event) => {
+      const target = (event.target && event.target.closest)
+        ? event.target.closest('.history-row')
+        : null;
+      if (!target) return;
+      const index = Number(target.dataset.index);
+      const entry = state.functionHistory[index];
+      if (!entry) return;
+      state.selectedFunction = entry.name;
+      functionSelected.textContent = 'selected: ' + entry.name;
+      functionArgs.value = JSON.stringify(entry.args || [], null, 2);
+      if (functionRunMode && typeof entry.runAsSystem === 'boolean') {
+        functionRunMode.value = entry.runAsSystem ? 'system' : 'user';
+      }
+      if (entry.user && (entry.user.email || entry.user.id)) {
+        const label = entry.user.email || entry.user.id;
+        if (functionUserInput) functionUserInput.value = label;
+        setSelectedFunctionUser({
+          id: entry.user.id || label,
+          auth: {
+            _id: entry.user.id || label,
+            email: entry.user.email || undefined
+          },
+          custom: {}
+        }, label);
+      } else {
+        if (functionUserInput) functionUserInput.value = '';
+        setSelectedFunctionUser(null);
+      }
+      functionResult.textContent = '';
+      renderFunctions(state.functions);
+      renderHistory();
+    });
+  }
 
   invokeFunction.addEventListener('click', async () => {
     const name = state.selectedFunction;
@@ -416,13 +697,34 @@
       return;
     }
     try {
+      const runAsSystem = !functionRunMode || functionRunMode.value === 'system';
+      const selectedUser = state.selectedFunctionUser;
+      const userId = selectedUser
+        ? String(selectedUser.id || (selectedUser.auth && selectedUser.auth._id) || '')
+        : '';
       const data = await api('/functions/invoke', {
         method: 'POST',
-        body: JSON.stringify({ name, arguments: args })
+        body: JSON.stringify({
+          name,
+          arguments: args,
+          runAsSystem,
+          userId: userId || undefined
+        })
       });
       functionResult.textContent = JSON.stringify(data, null, 2);
     } catch (err) {
-      functionResult.textContent = 'Error: ' + err.message;
+      const payload = err && err.payload && typeof err.payload === 'object'
+        ? err.payload
+        : null;
+      if (payload) {
+        const baseMessage = payload.error || payload.message || err.message || 'Error';
+        const stack = typeof payload.stack === 'string' ? payload.stack : '';
+        functionResult.textContent = stack ? (baseMessage + '\n' + stack) : ('Error: ' + baseMessage);
+      } else {
+        functionResult.textContent = 'Error: ' + err.message;
+      }
+    } finally {
+      loadFunctionHistory();
     }
   });
 
@@ -434,11 +736,7 @@
   tabButtons.forEach((button) => {
     button.addEventListener('click', () => {
       const tab = button.dataset.tab;
-      tabButtons.forEach((item) => item.classList.remove('active'));
-      tabPanels.forEach((panel) => panel.classList.remove('active'));
-      button.classList.add('active');
-      const panel = document.querySelector('[data-panel="' + tab + '"]');
-      if (panel) panel.classList.add('active');
+      setActiveTab(tab);
     });
   });
   connectWs();

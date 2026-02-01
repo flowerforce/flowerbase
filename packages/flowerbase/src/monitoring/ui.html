@@ -53,7 +53,12 @@
             <div id="eventsList" class="events-list"></div>
           </div>
           <div class="subpanel detail-panel">
-            <div class="subpanel-title">event detail</div>
+            <div class="detail-header">
+              <div class="subpanel-title">event detail</div>
+              <button id="eventFunctionButton" type="button" class="secondary small is-hidden">
+                use in invoke
+              </button>
+            </div>
             <div id="eventDetail" class="event-detail">select an event to inspect payload</div>
           </div>
         </div>
@@ -122,11 +127,30 @@
               <div class="subpanel-title">functions</div>
               <div id="functionList" class="user-list"></div>
             </div>
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">history</div>
+              <div id="functionHistory" class="history-list"></div>
+            </div>
           </div>
           <div class="right-column">
             <div class="subpanel function-panel">
               <div class="subpanel-title">invoke</div>
               <div class="hint" id="functionSelected">select a function</div>
+              <div class="function-controls">
+                <div class="control-group">
+                  <label for="functionUserInput">user</label>
+                  <input id="functionUserInput" list="functionUserList" type="text"
+                    placeholder="search user by email or id" />
+                  <datalist id="functionUserList"></datalist>
+                </div>
+                <div class="control-group">
+                  <label for="functionRunMode">run as</label>
+                  <select id="functionRunMode">
+                    <option value="system" selected>system</option>
+                    <option value="user">user</option>
+                  </select>
+                </div>
+              </div>
               <textarea id="functionArgs" placeholder='[ "arg1", { "foo": "bar" } ]'></textarea>
               <button id="invokeFunction">invoke</button>
               <div class="hint">arguments must be valid JSON array</div>

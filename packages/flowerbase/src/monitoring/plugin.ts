@@ -25,6 +25,14 @@ type MonitorEvent = {
   data?: unknown
 }
 
+type FunctionHistoryItem = {
+  ts: number
+  name: string
+  args: unknown[]
+  runAsSystem: boolean
+  user?: { id?: string; email?: string }
+}
+
 type EventQuery = {
   q?: string
   type?: string
@@ -91,11 +99,91 @@ const redactString = (value: string) => {
   return result
 }
 
+const stripSensitiveFields = (value: Record<string, unknown>) => {
+  const out: Record<string, unknown> = {}
+  Object.keys(value).forEach((key) => {
+    if (SENSITIVE_KEYS.some((re) => re.test(key))) return
+    out[key] = value[key]
+  })
+  return out
+}
+
+const isErrorLike = (value: unknown): value is Record<string, unknown> => {
+  if (!value || typeof value !== 'object') return false
+  if (value instanceof Error) return true
+  const record = value as Record<string, unknown>
+  return (
+    typeof record.message === 'string' ||
+    typeof record.stack === 'string' ||
+    typeof record.name === 'string'
+  )
+}
+
+const sanitizeErrorLike = (value: Record<string, unknown>, depth: number): Record<string, unknown> => {
+  const out: Record<string, unknown> = {}
+  const names = new Set<string>(Object.getOwnPropertyNames(value))
+  ;['name', 'message', 'stack', 'code', 'statusCode', 'cause'].forEach((key) => names.add(key))
+
+  names.forEach((key) => {
+    if (SENSITIVE_KEYS.some((re) => re.test(key))) {
+      out[key] = '[redacted]'
+      return
+    }
+    const raw = value[key]
+    if (raw === value) {
+      out[key] = '[Circular]'
+      return
+    }
+    if ((key === 'message' || key === 'stack') && typeof raw === 'string') {
+      out[key] = DEFAULT_CONFIG.MONIT_REDACT_ERROR_DETAILS ? redactString(raw) : raw
+      return
+    }
+    if (typeof raw === 'string') {
+      out[key] = redactString(raw)
+      return
+    }
+    if (raw !== undefined) {
+      out[key] = sanitize(raw, depth + 1)
+    }
+  })
+
+  if (value instanceof Error) {
+    if (!out.name) out.name = value.name
+    if (!out.message) {
+      out.message = DEFAULT_CONFIG.MONIT_REDACT_ERROR_DETAILS ? redactString(value.message) : value.message
+    }
+    if (!out.stack && value.stack) {
+      out.stack = DEFAULT_CONFIG.MONIT_REDACT_ERROR_DETAILS ? redactString(value.stack) : value.stack
+    }
+  }
+
+  return out
+}
+
+const getErrorDetails = (error: unknown) => {
+  if (isErrorLike(error)) {
+    const sanitized = sanitizeErrorLike(error as Record<string, unknown>, 0)
+    const message =
+      typeof sanitized.message === 'string' && sanitized.message
+        ? sanitized.message
+        : typeof sanitized.name === 'string' && sanitized.name
+          ? sanitized.name
+          : safeStringify(error)
+    const stack = typeof sanitized.stack === 'string' ? sanitized.stack : undefined
+    return { message, stack }
+  }
+  if (typeof error === 'string') return { message: error }
+  return { message: safeStringify(error) }
+}
+
 const sanitize = (value: unknown, depth = 0): unknown => {
   if (depth > MAX_DEPTH) return '[max-depth]'
   if (value === null || value === undefined) return value
   if (value instanceof Date) return value.toISOString()
   if (Buffer.isBuffer(value)) return `[buffer ${value.length} bytes]`
+  if (isErrorLike(value)) {
+    return sanitizeErrorLike(value as Record<string, unknown>, depth)
+  }
   if (typeof value === 'object') {
     const maybeObjectId = value as { _bsontype?: string; toString?: () => string }
     if (maybeObjectId?._bsontype === 'ObjectId' && typeof maybeObjectId.toString === 'function') {
@@ -246,6 +334,56 @@ const resolveAssetCandidates = (filename: string, prefix: string) => {
   addCandidate(path.join(__dirname, '..', '..', 'src', 'monitoring', filename))
 
   return candidates
+}
+
+const resolveUserContext = async (
+  app: FastifyInstance,
+  userId?: string,
+  userPayload?: Record<string, unknown>
+) => {
+  if (userPayload && typeof userPayload === 'object') {
+    return stripSensitiveFields(userPayload)
+  }
+  if (!userId) return undefined
+
+  const db = app.mongo.client.db(DB_NAME)
+  const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
+  const userCollection = AUTH_CONFIG.userCollection
+  const userIdField = AUTH_CONFIG.user_id_field ?? 'id'
+  const isObjectId = ObjectId.isValid(userId)
+  const lowerId = userId.toLowerCase()
+  const emailLookup = userId.includes('@') ? lowerId : ''
+
+  const authSelector = isObjectId
+    ? { _id: new ObjectId(userId) }
+    : (emailLookup ? { email: emailLookup } : { id: userId })
+  const authUser = await db.collection(authCollection).findOne(authSelector)
+
+  let customUser: Record<string, unknown> | null = null
+  if (userCollection) {
+    const customSelector = isObjectId
+      ? { [userIdField]: userId }
+      : (emailLookup ? { email: emailLookup } : { [userIdField]: userId })
+    customUser = await db.collection(userCollection).findOne(customSelector)
+    if (!customUser && isObjectId) {
+      customUser = await db.collection(userCollection).findOne({ _id: new ObjectId(userId) })
+    }
+  }
+
+  const merged: Record<string, unknown> = {
+    ...(customUser ? stripSensitiveFields(customUser) : {}),
+    ...(authUser ? stripSensitiveFields(authUser as Record<string, unknown>) : {})
+  }
+
+  if (authUser && typeof (authUser as { _id?: unknown })._id !== 'undefined') {
+    merged.id = String((authUser as { _id?: ObjectId })._id)
+  } else if (customUser && typeof customUser[userIdField] !== 'undefined') {
+    merged.id = String(customUser[userIdField])
+  } else {
+    merged.id = userId
+  }
+
+  return Object.keys(merged).length ? merged : { id: userId }
 }
 
 const readAsset = (filename: string, prefix: string) => {
@@ -400,7 +538,15 @@ const createMonitoringPlugin = fp(async (
   const maxEvents = Math.max(1000, DEFAULT_CONFIG.MONIT_MAX_EVENTS)
 
   const eventStore = createEventStore(maxAgeMs || DAY_MS, maxEvents)
+  const functionHistory: FunctionHistoryItem[] = []
+  const maxHistory = 30
   const clients = new Set<{ send: (data: string) => void; readyState: number }>()
+  const addFunctionHistory = (entry: FunctionHistoryItem) => {
+    functionHistory.unshift(entry)
+    if (functionHistory.length > maxHistory) {
+      functionHistory.splice(maxHistory)
+    }
+  }
 
   const addEvent = (event: MonitorEvent) => {
     const sanitizedEvent: MonitorEvent = {
@@ -499,7 +645,7 @@ const createMonitoringPlugin = fp(async (
         return
       }
     }
-    ;(req as { __monitStart?: number }).__monitStart = Date.now()
+    ; (req as { __monitStart?: number }).__monitStart = Date.now()
     done()
   })
 
@@ -647,8 +793,18 @@ const createMonitoringPlugin = fp(async (
     return { items }
   })
 
+  app.get(`${prefix}/api/functions/history`, async () => ({
+    items: functionHistory.slice(0, maxHistory)
+  }))
+
   app.post(`${prefix}/api/functions/invoke`, async (req, reply) => {
-    const body = req.body as { name?: string; arguments?: unknown[]; runAsSystem?: boolean }
+    const body = req.body as {
+      name?: string
+      arguments?: unknown[]
+      runAsSystem?: boolean
+      userId?: string
+      user?: Record<string, unknown>
+    }
     const name = body?.name
     const args = Array.isArray(body?.arguments) ? body.arguments : []
     if (!name) {
@@ -665,13 +821,37 @@ const createMonitoringPlugin = fp(async (
       return { error: `Function "${name}" not found` }
     }
 
+    const resolvedUser = await resolveUserContext(app, body?.userId, body?.user)
+    const safeArgs = (Array.isArray(args) ? sanitize(args) : sanitize([args])) as unknown[]
+    const userInfo = resolvedUser
+      ? {
+        id: typeof (resolvedUser as { id?: unknown }).id === 'string'
+          ? (resolvedUser as { id?: string }).id
+          : undefined,
+        email: typeof (resolvedUser as { email?: unknown }).email === 'string'
+          ? (resolvedUser as { email?: string }).email
+          : undefined
+      }
+      : undefined
+    addFunctionHistory({
+      ts: Date.now(),
+      name,
+      args: safeArgs,
+      runAsSystem: body?.runAsSystem !== false,
+      user: userInfo
+    })
+
     addEvent({
       id: createEventId(),
       ts: Date.now(),
       type: 'function',
       source: 'monit',
       message: `invoke ${name}`,
-      data: sanitize({ args })
+      data: sanitize({
+        args,
+        user: userInfo,
+        runAsSystem: body?.runAsSystem !== false
+      })
     })
 
     try {
@@ -679,7 +859,7 @@ const createMonitoringPlugin = fp(async (
         args,
         app: appRef,
         rules,
-        user: { id: 'monitor', role: 'system' },
+        user: resolvedUser ?? { id: 'monitor', role: 'system' },
         currentFunction,
         functionsList,
         services,
@@ -696,7 +876,8 @@ const createMonitoringPlugin = fp(async (
         data: sanitize({ error })
       })
       reply.code(500)
-      return { error: 'Function invocation failed' }
+      const details = getErrorDetails(error)
+      return { error: details.message, stack: details.stack }
     }
   })
 

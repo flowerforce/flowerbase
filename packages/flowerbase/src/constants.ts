@@ -39,6 +39,7 @@ export const DEFAULT_CONFIG = {
   MONIT_CACHE_HOURS: Number(process.env.MONIT_CACHE_HOURS) || 24,
   MONIT_MAX_EVENTS: Number(process.env.MONIT_MAX_EVENTS) || 5000,
   MONIT_CAPTURE_CONSOLE: parseBoolean(process.env.MONIT_CAPTURE_CONSOLE ?? 'true'),
+  MONIT_REDACT_ERROR_DETAILS: parseBoolean(process.env.MONIT_REDACT_ERROR_DETAILS ?? 'true'),
   CORS_OPTIONS: {
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"] as ALLOWED_METHODS[]
