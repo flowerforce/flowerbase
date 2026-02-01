@@ -58,7 +58,7 @@ type EventStore = {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
-const MAX_DEPTH = 6
+const MAX_DEPTH = 15
 const MAX_ARRAY = 50
 const MAX_STRING = 500
 const COLLECTION_PAGE_SIZE = 50
