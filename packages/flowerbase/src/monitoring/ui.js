@@ -167,7 +167,7 @@
     const functionData = getFunctionEventData(event);
     if (functionData && eventFunctionButton) {
       eventFunctionButton.classList.remove('is-hidden');
-      eventFunctionButton.textContent = 'use in invoke · ' + functionData.name;
+      eventFunctionButton.textContent = 'use in invoke';
     } else if (eventFunctionButton) {
       eventFunctionButton.classList.add('is-hidden');
       eventFunctionButton.textContent = 'use in invoke';
@@ -637,7 +637,7 @@
     if (!name) return;
     state.selectedFunction = name;
     state.selectedHistoryIndex = null;
-    functionSelected.textContent = 'selected: ' + name;
+    functionSelected.textContent = name;
     functionResult.textContent = '';
     setRunModeForFunction(name);
     loadFunctionCode();
@@ -691,7 +691,7 @@
       if (!functionData) return;
       state.selectedFunction = functionData.name;
       state.selectedHistoryIndex = null;
-      functionSelected.textContent = 'selected: ' + functionData.name;
+      functionSelected.textContent = functionData.name;
       functionArgs.value = JSON.stringify(functionData.args || [], null, 2);
       functionResult.textContent = '';
       setRunModeForFunction(functionData.name);
@@ -713,7 +713,7 @@
       if (!entry) return;
       state.selectedFunction = entry.name;
       state.selectedHistoryIndex = index;
-      functionSelected.textContent = 'selected: ' + entry.name;
+      functionSelected.textContent = entry.name;
       functionArgs.value = JSON.stringify(entry.args || [], null, 2);
       if (functionRunMode && typeof entry.runAsSystem === 'boolean') {
         functionRunMode.value = entry.runAsSystem ? 'system' : 'user';
@@ -766,16 +766,16 @@
         : fallbackUserId;
       const liveCode = functionCode ? functionCode.value || '' : '';
       const overrideCode = liveCode.trim() ? liveCode : undefined;
-    const data = await api('/functions/invoke', {
-      method: 'POST',
-      body: JSON.stringify({
-        name,
-        arguments: args,
-        runAsSystem,
-        userId: userId || undefined,
-        code: overrideCode || undefined
-      })
-    });
+      const data = await api('/functions/invoke', {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          arguments: args,
+          runAsSystem,
+          userId: userId || undefined,
+          code: overrideCode || undefined
+        })
+      });
       functionResult.textContent = JSON.stringify(data, null, 2);
     } catch (err) {
       const payload = err && err.payload && typeof err.payload === 'object'
