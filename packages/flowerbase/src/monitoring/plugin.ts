@@ -895,9 +895,10 @@ const createMonitoringPlugin = fp(async (
       typeof body?.code === 'string' && body.code.trim()
         ? body.code
         : undefined
+    const effectiveRunAsSystem = body?.runAsSystem !== false
     const effectiveFunction = overrideCode
-      ? { ...currentFunction, code: overrideCode }
-      : currentFunction
+      ? { ...currentFunction, code: overrideCode, run_as_system: effectiveRunAsSystem }
+      : { ...currentFunction, run_as_system: effectiveRunAsSystem }
 
     const resolvedUser = await resolveUserContext(app, body?.userId, body?.user)
     const safeArgs = (Array.isArray(args) ? sanitize(args) : sanitize([args])) as unknown[]
@@ -920,7 +921,7 @@ const createMonitoringPlugin = fp(async (
       ts: Date.now(),
       name,
       args: safeArgs,
-      runAsSystem: body?.runAsSystem !== false,
+      runAsSystem: effectiveRunAsSystem,
       user: userInfo
     })
 
@@ -933,7 +934,7 @@ const createMonitoringPlugin = fp(async (
       data: sanitize({
         args,
         user: userInfo,
-        runAsSystem: body?.runAsSystem !== false,
+        runAsSystem: effectiveRunAsSystem,
         override: Boolean(overrideCode)
       })
     })
@@ -947,7 +948,7 @@ const createMonitoringPlugin = fp(async (
         currentFunction: effectiveFunction,
         functionsList,
         services,
-        runAsSystem: body?.runAsSystem !== false
+        runAsSystem: effectiveRunAsSystem
       })
       return { result: sanitize(result) }
     } catch (error) {
