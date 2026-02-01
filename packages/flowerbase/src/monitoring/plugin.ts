@@ -793,6 +793,27 @@ const createMonitoringPlugin = fp(async (
     return { items }
   })
 
+  app.get(`${prefix}/api/functions/:name`, async (req, reply) => {
+    const params = req.params as { name: string }
+    const name = params.name
+    const functionsList = StateManager.select('functions') as Record<
+      string,
+      { code?: string; private?: boolean; run_as_system?: boolean; disable_arg_logs?: boolean }
+    >
+    const currentFunction = functionsList?.[name]
+    if (!currentFunction) {
+      reply.code(404)
+      return { error: `Function "${name}" not found` }
+    }
+    return {
+      name,
+      code: currentFunction.code ?? '',
+      private: !!currentFunction.private,
+      run_as_system: !!currentFunction.run_as_system,
+      disable_arg_logs: !!currentFunction.disable_arg_logs
+    }
+  })
+
   app.get(`${prefix}/api/functions/history`, async () => ({
     items: functionHistory.slice(0, maxHistory)
   }))
@@ -804,6 +825,7 @@ const createMonitoringPlugin = fp(async (
       runAsSystem?: boolean
       userId?: string
       user?: Record<string, unknown>
+      code?: string
     }
     const name = body?.name
     const args = Array.isArray(body?.arguments) ? body.arguments : []
@@ -820,6 +842,13 @@ const createMonitoringPlugin = fp(async (
       reply.code(404)
       return { error: `Function "${name}" not found` }
     }
+    const overrideCode =
+      typeof body?.code === 'string' && body.code.trim()
+        ? body.code
+        : undefined
+    const effectiveFunction = overrideCode
+      ? { ...currentFunction, code: overrideCode }
+      : currentFunction
 
     const resolvedUser = await resolveUserContext(app, body?.userId, body?.user)
     const safeArgs = (Array.isArray(args) ? sanitize(args) : sanitize([args])) as unknown[]
@@ -850,7 +879,8 @@ const createMonitoringPlugin = fp(async (
       data: sanitize({
         args,
         user: userInfo,
-        runAsSystem: body?.runAsSystem !== false
+        runAsSystem: body?.runAsSystem !== false,
+        override: Boolean(overrideCode)
       })
     })
 
@@ -860,7 +890,7 @@ const createMonitoringPlugin = fp(async (
         app: appRef,
         rules,
         user: resolvedUser ?? { id: 'monitor', role: 'system' },
-        currentFunction,
+        currentFunction: effectiveFunction,
         functionsList,
         services,
         runAsSystem: body?.runAsSystem !== false

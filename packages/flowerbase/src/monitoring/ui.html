@@ -151,6 +151,13 @@
                   </select>
                 </div>
               </div>
+              <div id="functionEditor" class="function-editor">
+                <textarea id="functionCode" placeholder="// function code"></textarea>
+                <div class="editor-actions">
+                  <button id="restoreFunction" class="secondary">restore original</button>
+                </div>
+                <div class="hint" id="functionEditorStatus"></div>
+              </div>
               <textarea id="functionArgs" placeholder='[ "arg1", { "foo": "bar" } ]'></textarea>
               <button id="invokeFunction">invoke</button>
               <div class="hint">arguments must be valid JSON array</div>

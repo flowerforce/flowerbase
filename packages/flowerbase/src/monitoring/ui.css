@@ -515,6 +515,29 @@ button.small {
   align-items: end;
 }
 
+.function-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.function-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.function-editor textarea {
+  min-height: 200px;
+  max-height: 320px;
+  resize: vertical;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .control-group {
   display: flex;
   flex-direction: column;
@@ -547,6 +570,10 @@ button.small {
 .hint {
   color: var(--muted);
   font-size: 11px;
+}
+
+.hint.error {
+  color: var(--err);
 }
 
 .code {

@@ -13,6 +13,8 @@
     selectedFunction: null,
     functionQuery: '',
     functionHistory: [],
+    functionCodeCache: {},
+    selectedHistoryIndex: null,
     selectedFunctionUser: null,
     functionUserMap: {},
     functionUserQuery: '',
@@ -48,8 +50,11 @@
   const functionSearch = document.getElementById('functionSearch');
   const functionUserInput = document.getElementById('functionUserInput');
   const functionUserList = document.getElementById('functionUserList');
-  const functionUserHint = document.getElementById('functionUserHint');
   const functionRunMode = document.getElementById('functionRunMode');
+  const functionEditor = document.getElementById('functionEditor');
+  const functionCode = document.getElementById('functionCode');
+  const restoreFunction = document.getElementById('restoreFunction');
+  const functionEditorStatus = document.getElementById('functionEditorStatus');
   const functionArgs = document.getElementById('functionArgs');
   const invokeFunction = document.getElementById('invokeFunction');
   const functionResult = document.getElementById('functionResult');
@@ -355,7 +360,7 @@
     }
     state.functionHistory.forEach((entry, index) => {
       const row = document.createElement('div');
-      row.className = 'history-row' + (state.selectedFunction === entry.name ? ' active' : '');
+      row.className = 'history-row' + (state.selectedHistoryIndex === index ? ' active' : '');
       row.dataset.index = String(index);
       const runMode = entry.runAsSystem === false ? 'user' : 'system';
       const userLabel = entry.user && (entry.user.email || entry.user.id)
@@ -392,6 +397,41 @@
     functionRunMode.value = fn.run_as_system ? 'system' : 'user';
   };
 
+  const setEditorStatus = (text, isError) => {
+    if (!functionEditorStatus) return;
+    functionEditorStatus.textContent = text || '';
+    functionEditorStatus.classList.toggle('error', !!isError);
+  };
+
+  const loadFunctionCode = async () => {
+    if (!functionCode) return;
+    const name = state.selectedFunction;
+    if (!name) {
+      functionCode.value = '';
+      setEditorStatus('Select a function first', true);
+      return;
+    }
+    try {
+      setEditorStatus('loading...');
+      const data = await api('/functions/' + encodeURIComponent(name));
+      const baseCode = data && data.code ? data.code : '';
+      state.functionCodeCache[name] = baseCode;
+      functionCode.value = baseCode;
+      setEditorStatus('loaded');
+    } catch (err) {
+      setEditorStatus('Error: ' + err.message, true);
+    }
+  };
+
+  const clearFunctionOverride = () => {
+    const name = state.selectedFunction;
+    if (!name) return;
+    if (functionCode) {
+      functionCode.value = state.functionCodeCache[name] || '';
+    }
+    setEditorStatus('override cleared');
+  };
+
   const buildFunctionUserOptions = (authItems, customItems) => {
     const merged = buildMergedUsers(authItems, customItems);
     return merged.map((entry) => {
@@ -421,16 +461,6 @@
 
   const setSelectedFunctionUser = (entry, label) => {
     state.selectedFunctionUser = entry || null;
-    if (!functionUserHint) return;
-    if (!entry) {
-      functionUserHint.textContent = 'context.user: system';
-      return;
-    }
-    const auth = entry.auth || {};
-    const custom = entry.custom || {};
-    const email = auth.email || custom.email || custom.name || entry.id || 'unknown';
-    const id = entry.id || '';
-    functionUserHint.textContent = 'context.user: ' + (label || (email && id ? email + ' · ' + id : (email || id)));
   };
 
   const resolveFunctionUserFromInput = () => {
@@ -587,9 +617,11 @@
     const name = target.dataset.name;
     if (!name) return;
     state.selectedFunction = name;
+    state.selectedHistoryIndex = null;
     functionSelected.textContent = 'selected: ' + name;
     functionResult.textContent = '';
     setRunModeForFunction(name);
+    loadFunctionCode();
     functionList.querySelectorAll('.function-row').forEach((row) => {
       row.classList.toggle('active', row.dataset.name === name);
     });
@@ -600,6 +632,12 @@
     state.functionQuery = functionSearch.value.trim();
     renderFunctions(state.functions);
   });
+
+  if (restoreFunction) {
+    restoreFunction.addEventListener('click', () => {
+      clearFunctionOverride();
+    });
+  }
 
   if (functionUserInput) {
     functionUserInput.addEventListener('input', () => {
@@ -633,10 +671,12 @@
       const functionData = getFunctionEventData(state.selectedEvent);
       if (!functionData) return;
       state.selectedFunction = functionData.name;
+      state.selectedHistoryIndex = null;
       functionSelected.textContent = 'selected: ' + functionData.name;
       functionArgs.value = JSON.stringify(functionData.args || [], null, 2);
       functionResult.textContent = '';
       setRunModeForFunction(functionData.name);
+      loadFunctionCode();
       renderFunctions(state.functions);
       renderHistory();
       setActiveTab('functions');
@@ -653,6 +693,7 @@
       const entry = state.functionHistory[index];
       if (!entry) return;
       state.selectedFunction = entry.name;
+      state.selectedHistoryIndex = index;
       functionSelected.textContent = 'selected: ' + entry.name;
       functionArgs.value = JSON.stringify(entry.args || [], null, 2);
       if (functionRunMode && typeof entry.runAsSystem === 'boolean') {
@@ -674,6 +715,7 @@
         setSelectedFunctionUser(null);
       }
       functionResult.textContent = '';
+      loadFunctionCode();
       renderFunctions(state.functions);
       renderHistory();
     });
@@ -702,13 +744,16 @@
       const userId = selectedUser
         ? String(selectedUser.id || (selectedUser.auth && selectedUser.auth._id) || '')
         : '';
+      const liveCode = functionCode ? functionCode.value || '' : '';
+      const overrideCode = liveCode.trim() ? liveCode : undefined;
       const data = await api('/functions/invoke', {
         method: 'POST',
         body: JSON.stringify({
           name,
           arguments: args,
           runAsSystem,
-          userId: userId || undefined
+          userId: userId || undefined,
+          code: overrideCode || undefined
         })
       });
       functionResult.textContent = JSON.stringify(data, null, 2);
