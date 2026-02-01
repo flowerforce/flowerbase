@@ -363,6 +363,13 @@ Ensure the following environment variables are set in your .env file or deployme
 | `SWAGGER_ENABLED`      | Enable Swagger UI and spec routes (disabled by default).                    | `true`                                             |
 | `SWAGGER_UI_USER`      | Basic Auth username for Swagger UI (optional).                            | `admin`                                            |
 | `SWAGGER_UI_PASSWORD`  | Basic Auth password for Swagger UI (optional).                            | `change-me`                                        |
+| `MONIT_ENABLED`        | Enable monitoring UI at `/monit`. Must be `true` for monit to run (credentials alone are not enough). | `true` |
+| `MONIT_USER`           | Basic Auth username for `/monit`.                                         | `monit`                                            |
+| `MONIT_PASSWORD`       | Basic Auth password for `/monit`.                                         | `change-me`                                        |
+| `MONIT_CACHE_HOURS`    | Cache duration for monitoring events (hours).                             | `24`                                               |
+| `MONIT_MAX_EVENTS`     | Maximum number of cached monitoring events.                               | `5000`                                             |
+| `MONIT_CAPTURE_CONSOLE`| Capture console log/warn/error into monitoring events.                     | `true`                                             |
+| `MONIT_REDACT_ERROR_DETAILS` | Redact error message/stack in monitoring output.                      | `true`                                             |
 
 
 Example:
@@ -385,9 +392,21 @@ ANON_USER_TTL_SECONDS=10800
 SWAGGER_ENABLED=true
 SWAGGER_UI_USER=admin
 SWAGGER_UI_PASSWORD=change-me
+MONIT_ENABLED=true
+MONIT_USER=monit
+MONIT_PASSWORD=change-me
+MONIT_CACHE_HOURS=24
+MONIT_MAX_EVENTS=5000
+MONIT_CAPTURE_CONSOLE=true
+MONIT_REDACT_ERROR_DETAILS=true
 ```
 
 🛡️ Note: Never commit .env files to source control. Use a .gitignore file to exclude it.
+
+### 🔎 Monitoring (Monit UI)
+
+- The monitoring UI lives at `/monit` and is protected by Basic Auth.
+- Monit routes are registered **only** when `MONIT_ENABLED=true` (credentials alone are not enough).
 
 
 <a id="build"></a>

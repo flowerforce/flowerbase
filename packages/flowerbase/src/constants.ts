@@ -6,6 +6,13 @@ const parseBoolean = (value?: string) => {
   return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase())
 }
 
+const monitUser = process.env.MONIT_USER || process.env.SWAGGER_UI_USER || ''
+const monitPassword = process.env.MONIT_PASSWORD || process.env.SWAGGER_UI_PASSWORD || ''
+const monitEnabledEnv = process.env.MONIT_ENABLED
+const monitEnabled = typeof monitEnabledEnv === 'string'
+  ? parseBoolean(monitEnabledEnv)
+  : false
+
 const {
   database_name,
   collection_name = 'users',
@@ -32,10 +39,9 @@ export const DEFAULT_CONFIG = {
   SWAGGER_ENABLED: parseBoolean(process.env.SWAGGER_ENABLED),
   SWAGGER_UI_USER: process.env.SWAGGER_UI_USER || '',
   SWAGGER_UI_PASSWORD: process.env.SWAGGER_UI_PASSWORD || '',
-  MONIT_ENABLED: parseBoolean(process.env.MONIT_ENABLED) ||
-    !!(process.env.MONIT_USER && process.env.MONIT_PASSWORD),
-  MONIT_USER: process.env.MONIT_USER || process.env.SWAGGER_UI_USER || '',
-  MONIT_PASSWORD: process.env.MONIT_PASSWORD || process.env.SWAGGER_UI_PASSWORD || '',
+  MONIT_ENABLED: monitEnabled,
+  MONIT_USER: monitUser,
+  MONIT_PASSWORD: monitPassword,
   MONIT_CACHE_HOURS: Number(process.env.MONIT_CACHE_HOURS) || 24,
   MONIT_MAX_EVENTS: Number(process.env.MONIT_MAX_EVENTS) || 5000,
   MONIT_CAPTURE_CONSOLE: parseBoolean(process.env.MONIT_CAPTURE_CONSOLE ?? 'true'),
