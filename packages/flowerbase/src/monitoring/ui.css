@@ -594,6 +594,8 @@ button.small {
 .function-result {
   flex: 1;
   min-height: 0;
+  max-height: 240px;
+  overflow: auto;
 }
 
 .function-panel textarea,

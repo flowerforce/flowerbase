@@ -46,6 +46,7 @@
   const createUserForm = document.getElementById('createUserForm');
   const newUserEmail = document.getElementById('newUserEmail');
   const newUserPassword = document.getElementById('newUserPassword');
+  const createUserError = document.getElementById('createUserError');
   const functionList = document.getElementById('functionList');
   const functionSelected = document.getElementById('functionSelected');
   const functionSearch = document.getElementById('functionSearch');
@@ -649,14 +650,39 @@
     event.preventDefault();
     const email = newUserEmail.value.trim();
     const password = newUserPassword.value.trim();
+    if (createUserError) {
+      createUserError.textContent = '';
+      createUserError.classList.add('is-hidden');
+    }
     if (!email || !password) return;
-    await api('/users', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
-    newUserEmail.value = '';
-    newUserPassword.value = '';
-    loadUsers();
+    try {
+      await api('/users', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+      newUserEmail.value = '';
+      newUserPassword.value = '';
+      loadUsers();
+    } catch (error) {
+      if (!createUserError) return;
+      let message = 'Failed to create user';
+      if (error && typeof error === 'object') {
+        const err = error;
+        if (typeof err.message === 'string' && err.message) {
+          message = err.message;
+        }
+        if (err.payload && typeof err.payload === 'object') {
+          const payload = err.payload;
+          if (typeof payload.error === 'string' && payload.error) {
+            message = payload.error;
+          } else if (typeof payload.message === 'string' && payload.message) {
+            message = payload.message;
+          }
+        }
+      }
+      createUserError.textContent = message;
+      createUserError.classList.remove('is-hidden');
+    }
   });
 
   userSearch.addEventListener('input', () => {
