@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>flowerbase monit</title>
+  <link rel="stylesheet" href="__MONIT_BASE__/ui.css" />
+</head>
+
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">flowerbase</div>
+      <div class="title">monit</div>
+    </div>
+    <div class="status">
+      <span id="clock" class="pill"></span>
+      <span id="wsStatus" class="pill">WS: offline</span>
+      <span class="pill">events <span id="eventCount">0</span></span>
+    </div>
+  </header>
+  <main>
+    <div class="tabs">
+      <button class="tab-button active" data-tab="events">events</button>
+      <button class="tab-button" data-tab="users">users</button>
+      <button class="tab-button" data-tab="functions">functions</button>
+    </div>
+    <div class="tab-panels">
+      <section class="panel tab-panel active" data-panel="events">
+        <div class="panel-header">
+          <span>Events</span>
+          <span class="hint">last 24h cache</span>
+        </div>
+        <div class="split-grid">
+          <div class="column-stack">
+            <div class="controls">
+              <input id="searchInput" type="text" placeholder="search events or payload" />
+              <select id="typeFilter">
+                <option value="">all types</option>
+                <option value="auth">auth</option>
+                <option value="function">function</option>
+                <option value="trigger">trigger</option>
+                <option value="http_endpoint">http_endpoint</option>
+                <option value="api">api</option>
+                <option value="aws">aws</option>
+                <option value="rules">rules</option>
+                <option value="log">log</option>
+                <option value="error">error</option>
+              </select>
+              <button id="clearEvents" class="secondary">clear view</button>
+            </div>
+            <div id="eventsList" class="events-list"></div>
+          </div>
+          <div class="subpanel detail-panel">
+            <div class="subpanel-title">event detail</div>
+            <div id="eventDetail" class="event-detail">select an event to inspect payload</div>
+          </div>
+        </div>
+      </section>
+      <section class="panel tab-panel" data-panel="users">
+        <div class="panel-header">
+          <span>Users</span>
+          <button id="refreshUsers" class="secondary">refresh</button>
+        </div>
+        <div class="controls">
+          <input id="userSearch" class="wide-input" type="text" placeholder="search users (email, id, status)" />
+        </div>
+        <div class="split-grid users-grid">
+          <div class="column-stack">
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">users</div>
+              <div id="mergedUsers" class="user-list"></div>
+              <div class="pager">
+                <div class="pager-controls">
+                  <button id="customPrev" class="secondary">prev</button>
+                  <button id="customNext" class="secondary">next</button>
+                </div>
+                <div>
+                  page <span id="customPage">1</span>/<span id="customPages">1</span>
+                </div>
+                <div class="pager-controls">
+                  <label for="customLimit">size</label>
+                  <select id="customLimit">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="right-column">
+            <div class="subpanel detail-panel">
+              <div class="subpanel-title">user detail</div>
+              <pre id="userDetail" class="event-detail">select a user to inspect</pre>
+            </div>
+            <div class="subpanel">
+              <div class="subpanel-title">create user</div>
+              <form id="createUserForm">
+                <input id="newUserEmail" type="email" placeholder="email" required />
+                <input id="newUserPassword" type="password" placeholder="password" required />
+                <button type="submit">create</button>
+              </form>
+              <div class="hint">uses local-userpass provider</div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="panel tab-panel" data-panel="functions">
+        <div class="panel-header">
+          <span>Functions</span>
+          <button id="refreshFunctions" class="secondary">refresh</button>
+        </div>
+        <div class="split-grid functions-grid">
+          <div class="column-stack">
+            <div class="controls">
+              <input id="functionSearch" class="wide-input" type="text" placeholder="search functions" />
+            </div>
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">functions</div>
+              <div id="functionList" class="user-list"></div>
+            </div>
+          </div>
+          <div class="right-column">
+            <div class="subpanel function-panel">
+              <div class="subpanel-title">invoke</div>
+              <div class="hint" id="functionSelected">select a function</div>
+              <textarea id="functionArgs" placeholder='[ "arg1", { "foo": "bar" } ]'></textarea>
+              <button id="invokeFunction">invoke</button>
+              <div class="hint">arguments must be valid JSON array</div>
+              <pre id="functionResult" class="event-detail function-result"></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script src="__MONIT_BASE__/ui.js"></script>
+
+</body>
+
+</html>

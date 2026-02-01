@@ -1,6 +1,8 @@
 import fp from 'fastify-plugin'
 import fastifyWebsocket from '@fastify/websocket'
 import '@fastify/websocket'
+import fs from 'node:fs'
+import path from 'node:path'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { ObjectId } from 'mongodb'
 import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../constants'
@@ -13,7 +15,6 @@ import { GenerateContext } from '../utils/context'
 import type { Rules } from '../features/rules/interface'
 import { getValidRule } from '../services/mongodb-atlas/utils'
 import { checkApplyWhen } from '../utils/roles/machines/utils'
-import { MONITOR_UI_HTML } from './ui'
 
 type MonitorEvent = {
   id: string
@@ -227,6 +228,40 @@ const buildRulesMeta = (meta?: MonitMeta) => {
   }
 }
 
+const resolveAssetCandidates = (filename: string, prefix: string) => {
+  const rootDir = process.cwd()
+  const cleanPrefix = prefix.replace(/^\/+/, '').replace(/\/+$/, '')
+  const candidates: string[] = []
+  const addCandidate = (candidate: string) => {
+    if (!candidates.includes(candidate)) candidates.push(candidate)
+  }
+
+  if (cleanPrefix) {
+    addCandidate(path.join(rootDir, cleanPrefix, filename))
+  }
+  addCandidate(path.join(rootDir, 'monitoring', filename))
+
+  // Fallbacks: try package-local assets (works in dev and when bundled).
+  addCandidate(path.join(__dirname, filename))
+  addCandidate(path.join(__dirname, '..', '..', 'src', 'monitoring', filename))
+
+  return candidates
+}
+
+const readAsset = (filename: string, prefix: string) => {
+  const candidates = resolveAssetCandidates(filename, prefix)
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        return fs.readFileSync(candidate, 'utf8')
+      }
+    } catch {
+      // ignore and try next
+    }
+  }
+  return ''
+}
+
 const wrapServicesForMonitoring = (addEvent: (event: MonitorEvent) => void) => {
   const wrapped = coreServices as unknown as Record<
     string,
@@ -347,7 +382,10 @@ const wrapServicesForMonitoring = (addEvent: (event: MonitorEvent) => void) => {
   })
 }
 
-const createMonitoringPlugin = fp(async (app: FastifyInstance, opts: { basePath?: string } = {}) => {
+const createMonitoringPlugin = fp(async (
+  app: FastifyInstance,
+  opts: { basePath?: string } = {}
+) => {
   if (isTestEnv()) return
 
   const enabled = DEFAULT_CONFIG.MONIT_ENABLED
@@ -527,13 +565,40 @@ const createMonitoringPlugin = fp(async (app: FastifyInstance, opts: { basePath?
   await app.register(fastifyWebsocket)
 
   const sendUi = async (_req: FastifyRequest, reply: FastifyReply) => {
-    const html = MONITOR_UI_HTML.replace(/__MONIT_BASE__/g, prefix)
+    const raw = readAsset('ui.html', prefix)
+    if (!raw) {
+      const tried = resolveAssetCandidates('ui.html', prefix).join(', ')
+      reply.code(404).send(`ui.html not found. Tried: ${tried}`)
+      return
+    }
+    const html = raw.replace(/__MONIT_BASE__/g, prefix)
     reply.header('Cache-Control', 'no-store')
     reply.type('text/html').send(html)
   }
 
   app.get(prefix, sendUi)
   app.get(`${prefix}/`, sendUi)
+  app.get(`${prefix}/ui.css`, async (_req, reply) => {
+    const css = readAsset('ui.css', prefix)
+    if (!css) {
+      const tried = resolveAssetCandidates('ui.css', prefix).join(', ')
+      reply.code(404).send(`ui.css not found. Tried: ${tried}`)
+      return
+    }
+    reply.header('Cache-Control', 'no-store')
+    reply.type('text/css').send(css)
+  })
+  app.get(`${prefix}/ui.js`, async (_req, reply) => {
+    const raw = readAsset('ui.js', prefix)
+    if (!raw) {
+      const tried = resolveAssetCandidates('ui.js', prefix).join(', ')
+      reply.code(404).send(`ui.js not found. Tried: ${tried}`)
+      return
+    }
+    const js = raw.replace(/__MONIT_BASE__/g, prefix)
+    reply.header('Cache-Control', 'no-store')
+    reply.type('application/javascript').send(js)
+  })
 
   app.get(`${prefix}/ws`, { websocket: true }, (connection) => {
     const socket =
