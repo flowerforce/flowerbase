@@ -30,9 +30,10 @@
   const eventFunctionButton = document.getElementById('eventFunctionButton');
   const searchInput = document.getElementById('searchInput');
   const typeFilter = document.getElementById('typeFilter');
-  const eventCount = document.getElementById('eventCount');
   const wsStatus = document.getElementById('wsStatus');
   const clock = document.getElementById('clock');
+  const ramStat = document.getElementById('ramStat');
+  const cpuStat = document.getElementById('cpuStat');
   const mergedUsers = document.getElementById('mergedUsers');
   const userDetail = document.getElementById('userDetail');
   const userSearch = document.getElementById('userSearch');
@@ -156,7 +157,6 @@
       row.addEventListener('click', () => showDetail(event));
       eventsList.appendChild(row);
     });
-    eventCount.textContent = state.events.length;
   };
 
   const showDetail = (event) => {
@@ -796,6 +796,22 @@
   };
   setInterval(updateClock, 1000);
   updateClock();
+  const updateStats = async () => {
+    if (!ramStat || !cpuStat) return;
+    try {
+      const data = await api('/stats');
+      if (!data) return;
+      const ramMb = typeof data.ramMb === 'number' ? data.ramMb : null;
+      const cpu = typeof data.cpuPercent === 'number' ? data.cpuPercent : null;
+      ramStat.textContent = ramMb !== null ? `RAM ${ramMb.toFixed(1)}MB` : 'RAM --';
+      cpuStat.textContent = cpu !== null ? `CPU ${cpu.toFixed(1)}%` : 'CPU --';
+    } catch (err) {
+      ramStat.textContent = 'RAM --';
+      cpuStat.textContent = 'CPU --';
+    }
+  };
+  setInterval(updateStats, 2000);
+  updateStats();
   tabButtons.forEach((button) => {
     button.addEventListener('click', () => {
       const tab = button.dataset.tab;

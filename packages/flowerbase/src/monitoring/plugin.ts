@@ -550,11 +550,48 @@ const createMonitoringPlugin = fp(async (
   const eventStore = createEventStore(maxAgeMs || DAY_MS, maxEvents)
   const functionHistory: FunctionHistoryItem[] = []
   const maxHistory = 30
+  const statsState = {
+    lastCpu: process.cpuUsage(),
+    lastHr: process.hrtime.bigint(),
+    maxRssMb: 0,
+    maxCpu: 0
+  }
   const clients = new Set<{ send: (data: string) => void; readyState: number }>()
   const addFunctionHistory = (entry: FunctionHistoryItem) => {
     functionHistory.unshift(entry)
     if (functionHistory.length > maxHistory) {
       functionHistory.splice(maxHistory)
+    }
+  }
+
+  const round1 = (value: number) => Math.round(value * 10) / 10
+
+  const getStats = () => {
+    const mem = process.memoryUsage()
+    const rssMb = mem.rss / (1024 * 1024)
+    const now = process.hrtime.bigint()
+    const currentCpu = process.cpuUsage()
+    const deltaCpu = {
+      user: currentCpu.user - statsState.lastCpu.user,
+      system: currentCpu.system - statsState.lastCpu.system
+    }
+    const deltaTimeMicros = Number(now - statsState.lastHr) / 1000
+    const cpuPercent =
+      deltaTimeMicros > 0
+        ? ((deltaCpu.user + deltaCpu.system) / deltaTimeMicros) * 100
+        : 0
+
+    statsState.lastCpu = currentCpu
+    statsState.lastHr = now
+    statsState.maxRssMb = Math.max(statsState.maxRssMb, rssMb)
+    statsState.maxCpu = Math.max(statsState.maxCpu, cpuPercent)
+
+    return {
+      ramMb: round1(rssMb),
+      cpuPercent: round1(cpuPercent),
+      topRamMb: round1(statsState.maxRssMb),
+      topCpuPercent: round1(statsState.maxCpu),
+      uptimeSec: Math.round(process.uptime())
     }
   }
 
@@ -792,6 +829,8 @@ const createMonitoringPlugin = fp(async (
       })
     }
   })
+
+  app.get(`${prefix}/api/stats`, async () => getStats())
 
   app.get(`${prefix}/api/functions`, async () => {
     const functionsList = StateManager.select('functions') as Record<string, { private?: boolean }>
