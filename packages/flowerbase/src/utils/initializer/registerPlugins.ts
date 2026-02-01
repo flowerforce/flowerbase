@@ -10,6 +10,7 @@ import { customFunctionController } from '../../auth/providers/custom-function/c
 import { localUserPassController } from '../../auth/providers/local-userpass/controller'
 import { API_VERSION } from '../../constants'
 import { Functions } from '../../features/functions/interface'
+import monitoringPlugin from '../../monitoring/plugin'
 
 type RegisterFunction = FastifyInstance['register']
 type RegisterParameters = Parameters<RegisterFunction>
@@ -96,6 +97,11 @@ const getRegisterConfig = async ({
         forceClose: true,
         url: mongodbUrl
       }
+    },
+    {
+      pluginName: 'monitoringPlugin',
+      plugin: monitoringPlugin,
+      options: { basePath: '/monit' }
     },
     {
       pluginName: 'jwtAuthPlugin',

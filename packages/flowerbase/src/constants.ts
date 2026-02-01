@@ -32,6 +32,13 @@ export const DEFAULT_CONFIG = {
   SWAGGER_ENABLED: parseBoolean(process.env.SWAGGER_ENABLED),
   SWAGGER_UI_USER: process.env.SWAGGER_UI_USER || '',
   SWAGGER_UI_PASSWORD: process.env.SWAGGER_UI_PASSWORD || '',
+  MONIT_ENABLED: parseBoolean(process.env.MONIT_ENABLED) ||
+    !!(process.env.MONIT_USER && process.env.MONIT_PASSWORD),
+  MONIT_USER: process.env.MONIT_USER || process.env.SWAGGER_UI_USER || '',
+  MONIT_PASSWORD: process.env.MONIT_PASSWORD || process.env.SWAGGER_UI_PASSWORD || '',
+  MONIT_CACHE_HOURS: Number(process.env.MONIT_CACHE_HOURS) || 24,
+  MONIT_MAX_EVENTS: Number(process.env.MONIT_MAX_EVENTS) || 5000,
+  MONIT_CAPTURE_CONSOLE: parseBoolean(process.env.MONIT_CAPTURE_CONSOLE ?? 'true'),
   CORS_OPTIONS: {
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"] as ALLOWED_METHODS[]
