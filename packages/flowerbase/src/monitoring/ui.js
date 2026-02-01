@@ -437,10 +437,10 @@
     return merged.map((entry) => {
       const auth = entry.auth || {};
       const custom = entry.custom || {};
-      const id = String(entry.id || '');
+      const id = String(entry.id || auth._id || '');
       const email = auth.email || custom.email || custom.name || id || 'unknown';
       const label = email && id && email !== id ? email + ' · ' + id : (email || id || 'unknown');
-      return { entry, id, label };
+      return { entry, id, label, value: id };
     });
   };
 
@@ -450,12 +450,21 @@
     state.functionUserMap = {};
     options.forEach((option) => {
       const item = document.createElement('option');
-      item.value = option.label;
-      functionUserList.appendChild(item);
-      state.functionUserMap[option.label.toLowerCase()] = option.entry;
-      if (option.id) {
-        state.functionUserMap[String(option.id).toLowerCase()] = option.entry;
+      item.value = option.value || option.id || option.label;
+      if (option.label) {
+        item.label = option.label;
       }
+      functionUserList.appendChild(item);
+      const entry = option.entry || {};
+      const auth = entry.auth || {};
+      const keys = new Set();
+      if (option.id) keys.add(String(option.id));
+      if (entry.id) keys.add(String(entry.id));
+      if (auth._id) keys.add(String(auth._id));
+      keys.forEach((key) => {
+        if (!key) return;
+        state.functionUserMap[String(key).toLowerCase()] = option.entry;
+      });
     });
   };
 
@@ -474,7 +483,15 @@
     if (entry) {
       setSelectedFunctionUser(entry, value);
     } else {
-      setSelectedFunctionUser(null);
+      const parts = value.split('·').map((item) => item.trim()).filter(Boolean);
+      const tail = parts.length ? parts[parts.length - 1] : '';
+      const tailEntry = tail ? state.functionUserMap[tail.toLowerCase()] : null;
+      if (tailEntry) {
+        if (functionUserInput) functionUserInput.value = tail;
+        setSelectedFunctionUser(tailEntry, tail);
+      } else {
+        setSelectedFunctionUser(null);
+      }
     }
   };
 
@@ -699,13 +716,13 @@
       if (functionRunMode && typeof entry.runAsSystem === 'boolean') {
         functionRunMode.value = entry.runAsSystem ? 'system' : 'user';
       }
-      if (entry.user && (entry.user.email || entry.user.id)) {
-        const label = entry.user.email || entry.user.id;
+      if (entry.user && entry.user.id) {
+        const label = entry.user.id;
         if (functionUserInput) functionUserInput.value = label;
         setSelectedFunctionUser({
-          id: entry.user.id || label,
+          id: entry.user.id,
           auth: {
-            _id: entry.user.id || label,
+            _id: entry.user.id,
             email: entry.user.email || undefined
           },
           custom: {}
@@ -741,21 +758,22 @@
     try {
       const runAsSystem = !functionRunMode || functionRunMode.value === 'system';
       const selectedUser = state.selectedFunctionUser;
+      const fallbackUserId = functionUserInput ? functionUserInput.value.trim() : '';
       const userId = selectedUser
         ? String(selectedUser.id || (selectedUser.auth && selectedUser.auth._id) || '')
-        : '';
+        : fallbackUserId;
       const liveCode = functionCode ? functionCode.value || '' : '';
       const overrideCode = liveCode.trim() ? liveCode : undefined;
-      const data = await api('/functions/invoke', {
-        method: 'POST',
-        body: JSON.stringify({
-          name,
-          arguments: args,
-          runAsSystem,
-          userId: userId || undefined,
-          code: overrideCode || undefined
-        })
-      });
+    const data = await api('/functions/invoke', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        arguments: args,
+        runAsSystem,
+        userId: userId || undefined,
+        code: overrideCode || undefined
+      })
+    });
       functionResult.textContent = JSON.stringify(data, null, 2);
     } catch (err) {
       const payload = err && err.payload && typeof err.payload === 'object'

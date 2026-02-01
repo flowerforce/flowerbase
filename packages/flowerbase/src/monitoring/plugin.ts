@@ -122,7 +122,7 @@ const isErrorLike = (value: unknown): value is Record<string, unknown> => {
 const sanitizeErrorLike = (value: Record<string, unknown>, depth: number): Record<string, unknown> => {
   const out: Record<string, unknown> = {}
   const names = new Set<string>(Object.getOwnPropertyNames(value))
-  ;['name', 'message', 'stack', 'code', 'statusCode', 'cause'].forEach((key) => names.add(key))
+    ;['name', 'message', 'stack', 'code', 'statusCode', 'cause'].forEach((key) => names.add(key))
 
   names.forEach((key) => {
     if (SENSITIVE_KEYS.some((re) => re.test(key))) {
@@ -345,45 +345,55 @@ const resolveUserContext = async (
     return stripSensitiveFields(userPayload)
   }
   if (!userId) return undefined
+  const normalizedUserId = userId.trim()
 
   const db = app.mongo.client.db(DB_NAME)
   const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
   const userCollection = AUTH_CONFIG.userCollection
   const userIdField = AUTH_CONFIG.user_id_field ?? 'id'
-  const isObjectId = ObjectId.isValid(userId)
-  const lowerId = userId.toLowerCase()
-  const emailLookup = userId.includes('@') ? lowerId : ''
-
+  const isObjectId = ObjectId.isValid(normalizedUserId)
   const authSelector = isObjectId
-    ? { _id: new ObjectId(userId) }
-    : (emailLookup ? { email: emailLookup } : { id: userId })
+    ? { _id: new ObjectId(normalizedUserId) }
+    : { id: normalizedUserId }
   const authUser = await db.collection(authCollection).findOne(authSelector)
 
   let customUser: Record<string, unknown> | null = null
   if (userCollection) {
-    const customSelector = isObjectId
-      ? { [userIdField]: userId }
-      : (emailLookup ? { email: emailLookup } : { [userIdField]: userId })
+    const customSelector = { [userIdField]: normalizedUserId }
     customUser = await db.collection(userCollection).findOne(customSelector)
     if (!customUser && isObjectId) {
-      customUser = await db.collection(userCollection).findOne({ _id: new ObjectId(userId) })
+      customUser = await db.collection(userCollection).findOne({ _id: new ObjectId(normalizedUserId) })
     }
   }
 
-  const merged: Record<string, unknown> = {
+  const id =
+    authUser && typeof (authUser as { _id?: unknown })._id !== 'undefined'
+      ? String((authUser as { _id?: ObjectId })._id)
+      : (customUser && typeof customUser[userIdField] !== 'undefined'
+        ? String(customUser[userIdField])
+        : normalizedUserId)
+
+  const user_data = {
     ...(customUser ? stripSensitiveFields(customUser) : {}),
-    ...(authUser ? stripSensitiveFields(authUser as Record<string, unknown>) : {})
+    id,
+    _id: id,
+    email: authUser && typeof (authUser as { email?: unknown }).email === 'string'
+      ? (authUser as { email?: string }).email
+      : undefined
   }
 
-  if (authUser && typeof (authUser as { _id?: unknown })._id !== 'undefined') {
-    merged.id = String((authUser as { _id?: ObjectId })._id)
-  } else if (customUser && typeof customUser[userIdField] !== 'undefined') {
-    merged.id = String(customUser[userIdField])
-  } else {
-    merged.id = userId
+  const user: Record<string, unknown> = {
+    id,
+    user_data,
+    data: user_data,
+    custom_data: user_data
   }
 
-  return Object.keys(merged).length ? merged : { id: userId }
+  if (isObjectId) {
+    user._id = new ObjectId(id)
+  }
+
+  return user
 }
 
 const readAsset = (filename: string, prefix: string) => {
@@ -852,14 +862,19 @@ const createMonitoringPlugin = fp(async (
 
     const resolvedUser = await resolveUserContext(app, body?.userId, body?.user)
     const safeArgs = (Array.isArray(args) ? sanitize(args) : sanitize([args])) as unknown[]
-    const userInfo = resolvedUser
+    const resolvedUserRecord = resolvedUser as {
+      id?: unknown
+      email?: unknown
+      user_data?: { email?: unknown }
+    } | undefined
+    const userInfo = resolvedUserRecord
       ? {
-        id: typeof (resolvedUser as { id?: unknown }).id === 'string'
-          ? (resolvedUser as { id?: string }).id
-          : undefined,
-        email: typeof (resolvedUser as { email?: unknown }).email === 'string'
-          ? (resolvedUser as { email?: string }).email
-          : undefined
+        id: typeof resolvedUserRecord.id === 'string' ? resolvedUserRecord.id : undefined,
+        email: typeof resolvedUserRecord.email === 'string'
+          ? resolvedUserRecord.email
+          : (typeof resolvedUserRecord.user_data?.email === 'string'
+            ? resolvedUserRecord.user_data?.email
+            : undefined)
       }
       : undefined
     addFunctionHistory({

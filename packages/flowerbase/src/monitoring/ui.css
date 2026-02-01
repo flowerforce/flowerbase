@@ -160,7 +160,7 @@ main {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
   flex: 1;
   min-height: 0;
 }
