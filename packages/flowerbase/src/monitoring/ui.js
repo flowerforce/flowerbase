@@ -55,6 +55,8 @@
   const functionRunMode = document.getElementById('functionRunMode');
   const functionEditor = document.getElementById('functionEditor');
   const functionCode = document.getElementById('functionCode');
+  const functionHighlight = document.getElementById('functionHighlight');
+  const functionGutter = document.getElementById('functionGutter');
   const restoreFunction = document.getElementById('restoreFunction');
   const functionEditorStatus = document.getElementById('functionEditorStatus');
   const functionArgs = document.getElementById('functionArgs');
@@ -120,6 +122,70 @@
   };
 
   state.customLimit = Number(customLimit.value || 25) || 25;
+
+  const escapeHtml = (value) => {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  };
+
+  const tokenRegex = /`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*[\s\S]*?\*\/|\/\/[^\n]*|\b\d+(?:\.\d+)?\b|\b(?:const|let|var|function|return|if|else|for|while|switch|case|break|continue|try|catch|finally|throw|new|class|extends|async|await|import|export|default)\b|\b(?:true|false|null|undefined)\b/g;
+
+  const classifyToken = (token) => {
+    if (!token) return 'keyword';
+    if (token.startsWith('//') || token.startsWith('/*')) return 'comment';
+    const first = token[0];
+    if (first === '"' || first === "'" || first === '`') return 'string';
+    if (/^\d/.test(token)) return 'number';
+    if (/^(true|false|null|undefined)$/.test(token)) return 'literal';
+    return 'keyword';
+  };
+
+  const highlightCode = (code) => {
+    if (!code) return ' ';
+    let output = '';
+    let lastIndex = 0;
+    tokenRegex.lastIndex = 0;
+    let match;
+    while ((match = tokenRegex.exec(code))) {
+      const token = match[0];
+      output += escapeHtml(code.slice(lastIndex, match.index));
+      const type = classifyToken(token);
+      output += '<span class="token ' + type + '">' + escapeHtml(token) + '</span>';
+      lastIndex = match.index + token.length;
+    }
+    output += escapeHtml(code.slice(lastIndex));
+    return output || ' ';
+  };
+
+  const syncFunctionEditorScroll = () => {
+    if (!functionCode) return;
+    if (functionHighlight) {
+      functionHighlight.scrollTop = functionCode.scrollTop;
+      functionHighlight.scrollLeft = functionCode.scrollLeft;
+    }
+    if (functionGutter) {
+      functionGutter.scrollTop = functionCode.scrollTop;
+    }
+  };
+
+  const updateFunctionEditor = () => {
+    if (!functionCode) return;
+    const code = functionCode.value || '';
+    if (functionHighlight) {
+      functionHighlight.innerHTML = highlightCode(code);
+    }
+    if (functionGutter) {
+      const lines = Math.max(1, code.split('\n').length);
+      let out = '';
+      for (let i = 1; i <= lines; i += 1) {
+        out += i + (i === lines ? '' : '\n');
+      }
+      functionGutter.textContent = out;
+    }
+    syncFunctionEditorScroll();
+  };
 
   const formatLine = (event) => {
     const time = formatTime(event.ts);
@@ -453,6 +519,7 @@
     const name = state.selectedFunction;
     if (!name) {
       functionCode.value = '';
+      updateFunctionEditor();
       setEditorStatus('Select a function first', true);
       return;
     }
@@ -462,6 +529,7 @@
       const baseCode = data && data.code ? data.code : '';
       state.functionCodeCache[name] = baseCode;
       functionCode.value = baseCode;
+      updateFunctionEditor();
       setEditorStatus('loaded');
     } catch (err) {
       setEditorStatus('Error: ' + err.message, true);
@@ -473,6 +541,7 @@
     if (!name) return;
     if (functionCode) {
       functionCode.value = state.functionCodeCache[name] || '';
+      updateFunctionEditor();
     }
     setEditorStatus('override cleared');
   };
@@ -645,6 +714,70 @@
     state.customPage = 1;
     loadUsers();
   });
+
+  if (functionCode) {
+    functionCode.addEventListener('input', () => {
+      updateFunctionEditor();
+    });
+    functionCode.addEventListener('scroll', () => {
+      syncFunctionEditorScroll();
+    });
+    functionCode.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab') return;
+      event.preventDefault();
+      const indent = '  ';
+      const value = functionCode.value || '';
+      const start = functionCode.selectionStart || 0;
+      const end = functionCode.selectionEnd || 0;
+      const hasSelection = start !== end;
+      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+      if (!hasSelection && !event.shiftKey) {
+        const nextValue = value.slice(0, start) + indent + value.slice(end);
+        functionCode.value = nextValue;
+        const cursor = start + indent.length;
+        functionCode.selectionStart = cursor;
+        functionCode.selectionEnd = cursor;
+        updateFunctionEditor();
+        return;
+      }
+
+      const lineEndIndex = value.indexOf('\n', end);
+      const blockEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+      const block = value.slice(lineStart, blockEnd);
+      const lines = block.split('\n');
+      if (!event.shiftKey) {
+        const newLines = lines.map((line) => indent + line);
+        const newBlock = newLines.join('\n');
+        const nextValue = value.slice(0, lineStart) + newBlock + value.slice(blockEnd);
+        functionCode.value = nextValue;
+        functionCode.selectionStart = start + indent.length;
+        functionCode.selectionEnd = end + indent.length * lines.length;
+        updateFunctionEditor();
+        return;
+      }
+
+      const removedCounts = lines.map((line) => {
+        if (line.startsWith(indent)) return indent.length;
+        if (line.startsWith('\t')) return 1;
+        if (line.startsWith(' ')) return 1;
+        return 0;
+      });
+      const newLines = lines.map((line, index) => {
+        const remove = removedCounts[index];
+        return remove > 0 ? line.slice(remove) : line;
+      });
+      const newBlock = newLines.join('\n');
+      const nextValue = value.slice(0, lineStart) + newBlock + value.slice(blockEnd);
+      functionCode.value = nextValue;
+      const removedTotal = removedCounts.reduce((acc, count) => acc + count, 0);
+      const removedFirst = removedCounts[0] || 0;
+      const nextStart = Math.max(lineStart, start - removedFirst);
+      const nextEnd = Math.max(nextStart, end - removedTotal);
+      functionCode.selectionStart = nextStart;
+      functionCode.selectionEnd = nextEnd;
+      updateFunctionEditor();
+    });
+  }
 
   createUserForm.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -866,6 +999,7 @@
   };
   setInterval(updateClock, 1000);
   updateClock();
+  updateFunctionEditor();
   const updateStats = async () => {
     if (!ramStat || !cpuStat) return;
     try {

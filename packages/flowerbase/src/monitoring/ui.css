@@ -533,10 +533,93 @@ button.small {
   height: 100%;
 }
 
-.function-editor textarea {
+.code-editor {
+  display: flex;
+  flex: 1;
   min-height: 260px;
+  border: 1px solid #2b2b2b;
+  border-radius: 8px;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+.code-gutter {
+  padding: 10px 8px;
+  min-width: 42px;
+  text-align: right;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b6b6b;
+  background: #141414;
+  border-right: 1px solid #2b2b2b;
+  user-select: none;
+  white-space: pre;
+}
+
+.code-surface {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.code-highlight {
+  margin: 0;
+  padding: 10px;
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+  font-size: 12px;
+  line-height: 1.5;
+  font-family: inherit;
+  color: #d4d4d4;
+  white-space: pre;
+  word-break: normal;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#functionCode {
+  position: absolute;
+  inset: 0;
+  padding: 10px;
+  width: 100%;
   height: 100%;
-  resize: vertical;
+  font-size: 12px;
+  line-height: 1.5;
+  font-family: inherit;
+  color: transparent;
+  background: transparent;
+  border: 0;
+  outline: none;
+  caret-color: #ffffff;
+  resize: none;
+  overflow: auto;
+  white-space: pre;
+}
+
+#functionCode::selection {
+  background: rgba(88, 166, 255, 0.35);
+}
+
+.code-highlight .token.comment {
+  color: #6a9955;
+}
+
+.code-highlight .token.string {
+  color: #ce9178;
+}
+
+.code-highlight .token.number {
+  color: #b5cea8;
+}
+
+.code-highlight .token.keyword {
+  color: #569cd6;
+}
+
+.code-highlight .token.literal {
+  color: #dcdcaa;
 }
 
 .function-io {

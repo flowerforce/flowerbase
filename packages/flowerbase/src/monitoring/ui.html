@@ -154,7 +154,13 @@
                 </div>
               </div>
               <div id="functionEditor" class="function-editor">
-                <textarea id="functionCode" placeholder="// function code"></textarea>
+                <div class="code-editor">
+                  <div id="functionGutter" class="code-gutter">1</div>
+                  <div class="code-surface">
+                    <pre id="functionHighlight" class="code-highlight"></pre>
+                    <textarea id="functionCode" placeholder="// function code" spellcheck="false" wrap="off"></textarea>
+                  </div>
+                </div>
                 <div class="editor-actions">
                   <button id="restoreFunction" class="secondary">restore original</button>
                   <button id="invokeFunction">invoke</button>
