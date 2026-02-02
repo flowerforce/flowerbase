@@ -2,10 +2,20 @@
 
 > **A serverless-native MongoDB package designed for modern cloud applications**
 
-Unlike MongoDB Realm or other cloud platforms, we do not offer a graphical interface where you can configure services through a dashboard.
-Instead, everything is code-based and developer-driven, offering full flexibility through configuration files and source code.
+Flowerbase is a Fastify‑based application that closely mirrors the Realm platform, while keeping consumer project structure and configuration identical to Realm for near‑zero‑impact migrations.
 
-This documentation is structured to guide both experienced Realm users and newcomers alike — whether you’re migrating or starting clean.
+We rewrote the core in Node.js and TypeScript, but preserved the same folder structure and configuration format as Realm services.
+
+In addition to rewriting the core, we designed and built a dedicated Monitoring interface to give operators a real-time view of what’s happening inside Flowerbase, while keeping security and parity with Realm-like workflows.
+
+
+Monitor Key capabilities:
+- Live event stream, auth, functions, triggers, endpoints, service calls, console logs, and errors, with quick filtering/search.
+- System stats snapshot (CPU, RAM, uptime, peaks) for quick health checks.
+- Functions panel: list functions, view code (if allowed), invoke functions with custom args, and review recent invocation history.
+- Endpoints panel: list HTTP endpoints and invoke them with custom method, headers, query, and payload.
+- Users panel: search auth/custom users, create users, reset passwords, and enable/disable accounts.
+- Collections panel: list collections, inspect rules snapshot for a given user/system context, and run query/aggregate with pagination + history.
 
 #### 🧠 Features Summary
 | Feature                  | Status                                  |
@@ -18,6 +28,7 @@ This documentation is structured to guide both experienced Realm users and newco
 | Functions  | ✅ Supported (unchanged)                               |
 | Triggers  | ✅ Supported (unchanged)                                |
 | HTTP Endpoints  | ✅ Supported (unchanged)                          |
+| Monitoring UI  | ✅      New                                        |
 
 
 > ⚠️ **Already have an existing Realm project?**  
