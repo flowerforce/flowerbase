@@ -12,6 +12,7 @@ type State = {
   services?: Services
   endpoints: Endpoints
   rules: Rules
+  projectId: string
   app?: FastifyInstance
   functionsQueue: FunctionsQueue
 }
@@ -21,6 +22,7 @@ export class StateManager {
     functions: {},
     triggers: [],
     endpoints: [],
+    projectId: '',
     rules: {},
     functionsQueue: new FunctionsQueue()
   }

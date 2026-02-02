@@ -45,7 +45,16 @@
     __userSearchTimer: null,
     customPage: 1,
     customPages: 1,
-    customLimit: 25
+    customLimit: 25,
+    endpoints: [],
+    selectedEndpoint: null,
+    selectedEndpointKey: '',
+    endpointSearch: '',
+    endpointQuery: '',
+    endpointHeaders: '',
+    endpointBody: '',
+    endpointResult: 'invoke an endpoint to see the response',
+    endpointFunctionMap: {}
   };
   const eventsList = document.getElementById('eventsList');
   const eventDetail = document.getElementById('eventDetail');
@@ -116,6 +125,18 @@
   const collectionViewTable = document.getElementById('collectionViewTable');
   const collectionTabButtons = document.querySelectorAll('[data-collection-tab]');
   const collectionTabPanels = document.querySelectorAll('[data-collection-panel]');
+  const endpointSearch = document.getElementById('endpointSearch');
+  const endpointList = document.getElementById('endpointList');
+  const endpointHint = document.getElementById('endpointHint');
+  const endpointMeta = document.getElementById('endpointMeta');
+  const endpointFunctionButton = document.getElementById('endpointFunctionButton');
+  const endpointMethod = document.getElementById('endpointMethod');
+  const endpointQuery = document.getElementById('endpointQuery');
+  const endpointHeaders = document.getElementById('endpointHeaders');
+  const endpointBody = document.getElementById('endpointBody');
+  const endpointResult = document.getElementById('endpointResult');
+  const refreshEndpoints = document.getElementById('refreshEndpoints');
+  const invokeEndpoint = document.getElementById('invokeEndpoint');
   const clearEvents = document.getElementById('clearEvents');
   const tabButtons = document.querySelectorAll('[data-tab]');
   const tabPanels = document.querySelectorAll('[data-panel]');
@@ -180,6 +201,17 @@
       throw new Error(label + ' must be a JSON object');
     }
     return parsed;
+  };
+  const parseOptionalJsonValue = (raw, label) => {
+    if (!raw) return undefined;
+    const value = typeof raw === 'string' ? raw.trim() : raw;
+    if (!value) return undefined;
+    try {
+      return JSON.parse(value);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(label + ' must be valid JSON: ' + message);
+    }
   };
 
   const updateCollectionPager = () => {
@@ -838,8 +870,15 @@
       const triggerTag = triggerName
         ? ' · <span class="trigger-link" data-trigger="' + escapeHtml(triggerName) + '">isTrigger</span>'
         : '';
+      const endpointRoutes = state.endpointFunctionMap ? state.endpointFunctionMap[fn.name] : null;
+      const endpointTitle = endpointRoutes && endpointRoutes.length
+        ? ('endpoints: ' + endpointRoutes.join(', '))
+        : '';
+      const endpointTag = endpointRoutes && endpointRoutes.length
+        ? ' · <span class="endpoint-link" title="' + escapeHtml(endpointTitle) + '">isEndpoint</span>'
+        : '';
       row.innerHTML = '<div class="code">' + fn.name + '</div>' +
-        '<div class="hint">' + metaParts.join(' · ') + triggerTag + '</div>';
+        '<div class="hint">' + metaParts.join(' · ') + triggerTag + endpointTag + '</div>';
       functionList.appendChild(row);
     });
   };
@@ -1516,6 +1555,213 @@
     }
   };
 
+  const ENDPOINT_RESULT_PLACEHOLDER = state.endpointResult;
+
+  const getEndpointKey = (endpoint) => {
+    if (!endpoint) return '';
+    const method = (endpoint.http_method || 'POST').toUpperCase();
+    const route = endpoint.route || '';
+    return method + ':' + route;
+  };
+
+  const setEndpointDetail = (endpoint) => {
+    if (!endpointMeta) return;
+    if (!endpoint) {
+      endpointMeta.textContent = 'select an endpoint to inspect';
+      endpointMeta.classList.remove('json-highlight');
+      if (endpointHint) endpointHint.textContent = 'select an endpoint';
+      if (endpointFunctionButton) {
+        endpointFunctionButton.classList.add('is-hidden');
+        endpointFunctionButton.dataset.functionName = '';
+      }
+      if (endpointResult) endpointResult.textContent = ENDPOINT_RESULT_PLACEHOLDER;
+      if (endpointMethod) endpointMethod.value = 'POST';
+      state.selectedEndpoint = null;
+      state.selectedEndpointKey = '';
+      return;
+    }
+    const method = (endpoint.http_method || 'POST').toUpperCase();
+    const route = endpoint.route || '';
+    const functionName = endpoint.function_name || 'unknown';
+    const status = endpoint.disabled ? 'disabled' : 'active';
+    const jsonPayload = JSON.stringify(endpoint, null, 2) || '';
+    endpointMeta.classList.add('json-highlight');
+    endpointMeta.innerHTML = highlightJson(jsonPayload);
+    if (endpointHint) endpointHint.textContent = status;
+    if (endpointMethod) endpointMethod.value = method;
+    if (endpointFunctionButton) {
+      if (functionName && functionName !== 'unknown') {
+        endpointFunctionButton.dataset.functionName = functionName;
+        endpointFunctionButton.classList.remove('is-hidden');
+      } else {
+        endpointFunctionButton.dataset.functionName = '';
+        endpointFunctionButton.classList.add('is-hidden');
+      }
+    }
+  };
+
+  const renderEndpoints = () => {
+    if (!endpointList) return;
+    endpointList.innerHTML = '';
+    const query = (state.endpointSearch || '').toLowerCase();
+    const endpoints = state.endpoints || [];
+    endpoints.forEach((endpoint) => {
+      const route = endpoint.route || '';
+      const method = (endpoint.http_method || 'POST').toUpperCase();
+      const functionName = endpoint.function_name || 'unknown';
+      if (
+        query &&
+        !route.toLowerCase().includes(query) &&
+        !method.toLowerCase().includes(query) &&
+        !functionName.toLowerCase().includes(query)
+      ) {
+        return;
+      }
+      const row = document.createElement('div');
+      row.className = 'endpoint-row';
+      const key = getEndpointKey(endpoint);
+      if (state.selectedEndpointKey === key) {
+        row.classList.add('active');
+      }
+      if (endpoint.disabled) {
+        row.classList.add('disabled');
+      }
+      row.dataset.endpointKey = key;
+      row.dataset.route = route;
+      row.dataset.method = method;
+      row.innerHTML =
+        '<div class="endpoint-meta">' +
+        '<div class="code">' + escapeHtml(route) + '</div>' +
+        '<div class="hint">' + escapeHtml(method + ' · ' + functionName) + '</div>' +
+        '</div>';
+      endpointList.appendChild(row);
+    });
+    if (!endpointList.children.length) {
+      const empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = query ? 'no endpoints match' : 'no endpoints configured';
+      endpointList.appendChild(empty);
+    }
+  };
+
+  const applyEndpointSelection = (endpoint) => {
+    if (!endpoint) {
+      setEndpointDetail(null);
+      renderEndpoints();
+      return;
+    }
+    state.selectedEndpoint = endpoint;
+    state.selectedEndpointKey = getEndpointKey(endpoint);
+    setEndpointDetail(endpoint);
+    if (endpointResult) {
+      endpointResult.textContent = ENDPOINT_RESULT_PLACEHOLDER;
+    }
+    renderEndpoints();
+  };
+
+  const loadEndpoints = async () => {
+    try {
+      const data = await api('/endpoints');
+      state.endpoints = data.items || [];
+      const map = {};
+      (state.endpoints || []).forEach((endpoint) => {
+        if (!endpoint || !endpoint.function_name) return;
+        const fnName = endpoint.function_name;
+        if (!map[fnName]) {
+          map[fnName] = [];
+        }
+        if (endpoint.route) {
+          map[fnName].push(endpoint.route);
+        }
+      });
+      state.endpointFunctionMap = map;
+      setEndpointDetail(null);
+      renderEndpoints();
+      if (state.functions && state.functions.length) {
+        renderFunctions(state.functions);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const openEndpointForFunction = async (functionName) => {
+    if (!functionName) return;
+    if (!state.endpoints || !state.endpoints.length) {
+      await loadEndpoints();
+    }
+    const endpoint = (state.endpoints || []).find((item) => item.function_name === functionName);
+    setActiveTab('endpoints');
+    if (endpointSearch) {
+      endpointSearch.value = '';
+      state.endpointSearch = '';
+    }
+    if (endpoint) {
+      applyEndpointSelection(endpoint);
+      return;
+    }
+    state.endpointSearch = functionName;
+    if (endpointSearch) endpointSearch.value = functionName;
+    setEndpointDetail(null);
+    renderEndpoints();
+  };
+
+  const invokeEndpointAction = async () => {
+    if (!state.selectedEndpoint) {
+      if (endpointResult) endpointResult.textContent = 'Select an endpoint first';
+      return;
+    }
+    let query;
+    let headers;
+    let payloadValue;
+    try {
+      query = parseOptionalJsonValue(endpointQuery ? endpointQuery.value : '', 'Query');
+      headers = parseOptionalJsonValue(endpointHeaders ? endpointHeaders.value : '', 'Headers');
+      payloadValue = parseOptionalJsonValue(endpointBody ? endpointBody.value : '', 'Body');
+    } catch (err) {
+      if (endpointResult) endpointResult.textContent = 'Error: ' + err.message;
+      return;
+    }
+    const method = endpointMethod
+      ? endpointMethod.value || (state.selectedEndpoint.http_method || 'POST')
+      : (state.selectedEndpoint.http_method || 'POST');
+    try {
+      const data = await api('/endpoints/invoke', {
+        method: 'POST',
+        body: JSON.stringify({
+          route: state.selectedEndpoint.route,
+          method,
+          query,
+          headers,
+          payload: payloadValue
+        })
+      });
+      const headerLines = data.headers
+        ? Object.entries(data.headers).map(([key, value]) => `${key}: ${value}`)
+        : [];
+      const bodyText =
+        typeof data.body === 'object'
+          ? JSON.stringify(data.body, null, 2)
+          : String(data.body ?? '');
+      const sections = [
+        `status ${data.statusCode}`,
+        headerLines.length ? headerLines.join('\n') : '',
+        bodyText
+      ].filter(Boolean);
+      if (endpointResult) {
+        endpointResult.textContent = sections.join('\n\n');
+      }
+    } catch (err) {
+      const payload = err && err.payload && typeof err.payload === 'object' ? err.payload : null;
+      const message = payload
+        ? payload.error || payload.message || err.message || 'Error'
+        : err.message || 'Error';
+      if (endpointResult) {
+        endpointResult.textContent = 'Error: ' + message;
+      }
+    }
+  };
+
   searchInput.addEventListener('input', renderEvents);
   typeFilter.addEventListener('change', renderEvents);
   clearEvents.addEventListener('click', () => {
@@ -1540,11 +1786,31 @@
   if (refreshCollections) {
     refreshCollections.addEventListener('click', loadCollections);
   }
+  if (refreshEndpoints) {
+    refreshEndpoints.addEventListener('click', loadEndpoints);
+  }
 
   if (collectionSearch) {
     collectionSearch.addEventListener('input', () => {
       state.collectionSearch = collectionSearch.value.trim();
       renderCollections(state.collections);
+    });
+  }
+  if (endpointSearch) {
+    endpointSearch.addEventListener('input', () => {
+      state.endpointSearch = endpointSearch.value.trim();
+      renderEndpoints();
+    });
+  }
+  if (endpointList) {
+    endpointList.addEventListener('click', (event) => {
+      const target = event.target && event.target.closest ? event.target.closest('.endpoint-row') : null;
+      if (!target) return;
+      const key = target.dataset.endpointKey;
+      if (!key) return;
+      const endpoint = (state.endpoints || []).find((item) => getEndpointKey(item) === key);
+      if (!endpoint) return;
+      applyEndpointSelection(endpoint);
     });
   }
 
@@ -1876,7 +2142,7 @@
     }, 250);
   });
 
-  functionList.addEventListener('click', (event) => {
+  functionList.addEventListener('click', async (event) => {
     const target = (event.target && event.target.closest)
       ? event.target.closest('.function-row')
       : null;
@@ -1884,6 +2150,14 @@
       const triggerName = event.target.dataset ? event.target.dataset.trigger : null;
       if (triggerName) {
         openTriggerByName(triggerName);
+      }
+      event.stopPropagation();
+      return;
+    }
+    if (event.target && event.target.classList && event.target.classList.contains('endpoint-link')) {
+      const fnName = target ? target.dataset.name : null;
+      if (fnName) {
+        await openEndpointForFunction(fnName);
       }
       event.stopPropagation();
       return;
@@ -2078,6 +2352,21 @@
     }
   });
 
+  if (invokeEndpoint) {
+    invokeEndpoint.addEventListener('click', invokeEndpointAction);
+  }
+  if (endpointFunctionButton) {
+    endpointFunctionButton.addEventListener('click', () => {
+      const fnName = endpointFunctionButton.dataset.functionName;
+      if (!fnName) return;
+      state.selectedFunction = fnName;
+      setFunctionSelectedLabel(fnName, false);
+      setActiveTab('functions');
+      renderFunctions(state.functions);
+      loadFunctionCode(fnName);
+    });
+  }
+
   const updateClock = () => {
     clock.textContent = new Date().toLocaleString();
   };
@@ -2121,6 +2410,7 @@
   connectWs();
   loadUsers();
   loadFunctions();
+  loadEndpoints();
   loadTriggers();
   loadCollections();
   loadCollectionHistory();

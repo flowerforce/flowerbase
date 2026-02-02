@@ -6,6 +6,7 @@ import { DEFAULT_CONFIG } from '../constants'
 import type { Rules } from '../features/rules/interface'
 import { services as coreServices } from '../services'
 import { registerCollectionRoutes } from './routes/collections'
+import { registerEndpointRoutes } from './routes/endpoints'
 import { registerEventsRoutes } from './routes/events'
 import { registerFunctionRoutes } from './routes/functions'
 import { registerTriggerRoutes } from './routes/triggers'
@@ -504,6 +505,7 @@ const createMonitoringPlugin = fp(async (
 
   registerEventsRoutes(app, { prefix, eventStore, getStats })
   registerTriggerRoutes(app, { prefix })
+  registerEndpointRoutes(app, { prefix, allowInvoke, addEvent })
   registerFunctionRoutes(app, {
     prefix,
     allowEdit,

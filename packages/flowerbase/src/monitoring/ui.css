@@ -560,6 +560,43 @@ button.small {
   cursor: pointer;
 }
 
+.endpoint-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px;
+  border-bottom: 1px dashed rgba(26, 47, 34, 0.6);
+  cursor: pointer;
+}
+
+.endpoint-row.active {
+  background: rgba(49, 233, 129, 0.12);
+  border-color: rgba(49, 233, 129, 0.35);
+}
+
+.endpoint-row:hover {
+  background: rgba(49, 233, 129, 0.08);
+}
+
+.endpoint-row.disabled {
+  opacity: 0.55;
+}
+
+.endpoint-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.endpoint-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+}
+
 .function-row.active {
   background: rgba(49, 233, 129, 0.12);
   border-color: rgba(49, 233, 129, 0.35);
@@ -581,6 +618,15 @@ button.small {
 .trigger-link {
   color: var(--accent);
   cursor: pointer;
+}
+
+.endpoint-link {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.endpoint-link:hover {
+  text-decoration: underline;
 }
 
 .trigger-link:hover {

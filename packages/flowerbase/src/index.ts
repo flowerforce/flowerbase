@@ -83,6 +83,7 @@ export async function initialize({
     triggers: triggersList,
     endpoints: endpointsList,
     rules: rulesList,
+    projectId,
     app: fastify,
     services
   }
