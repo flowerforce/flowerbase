@@ -31,6 +31,8 @@ type FunctionHistoryItem = {
   args: unknown[]
   runAsSystem: boolean
   user?: { id?: string; email?: string }
+  code?: string
+  codeModified?: boolean
 }
 
 type CollectionHistoryItem = {
@@ -945,6 +947,11 @@ const createMonitoringPlugin = fp(async (
     return { items }
   })
 
+  app.get(`${prefix}/api/triggers`, async () => {
+    const triggersList = StateManager.select('triggers') as { fileName: string; content: unknown }[] | undefined
+    return { items: triggersList || [] }
+  })
+
   app.get(`${prefix}/api/functions/:name`, async (req, reply) => {
     if (!allowEdit) {
       reply.code(403)
@@ -1032,12 +1039,15 @@ const createMonitoringPlugin = fp(async (
             : undefined)
       }
       : undefined
+    const codeModified = typeof overrideCode === 'string' && overrideCode !== currentFunction.code
     addFunctionHistory({
       ts: Date.now(),
       name,
       args: safeArgs,
       runAsSystem: effectiveRunAsSystem,
-      user: userInfo
+      user: userInfo,
+      code: codeModified ? overrideCode : undefined,
+      codeModified
     })
 
     addEvent({

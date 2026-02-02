@@ -19,6 +19,9 @@
     functionUserMap: {},
     functionUserQuery: '',
     __functionUserTimer: null,
+    triggers: [],
+    selectedTrigger: null,
+    triggerFunctionMap: {},
     collections: [],
     selectedCollection: null,
     collectionSearch: '',
@@ -77,12 +80,15 @@
   const functionHighlight = document.getElementById('functionHighlight');
   const functionGutter = document.getElementById('functionGutter');
   const restoreFunction = document.getElementById('restoreFunction');
-  const functionEditorStatus = document.getElementById('functionEditorStatus');
   const functionArgs = document.getElementById('functionArgs');
   const invokeFunction = document.getElementById('invokeFunction');
   const functionResult = document.getElementById('functionResult');
   const refreshFunctions = document.getElementById('refreshFunctions');
+  const refreshTriggers = document.getElementById('refreshTriggers');
   const functionHistory = document.getElementById('functionHistory');
+  const triggerList = document.getElementById('triggerList');
+  const triggerDetail = document.getElementById('triggerDetail');
+  const triggerFunctionButton = document.getElementById('triggerFunctionButton');
   const refreshCollections = document.getElementById('refreshCollections');
   const collectionSearch = document.getElementById('collectionSearch');
   const collectionList = document.getElementById('collectionList');
@@ -764,7 +770,10 @@
       const hint = createdLabel ? status + ' · ' + createdLabel : status;
       const hasAuth = !!(auth && auth._id);
       const row = document.createElement('div');
-      row.className = 'user-row' + (state.selectedUserId === userId ? ' active' : '');
+      const isDisabled = auth && auth.status === 'disabled';
+      row.className = 'user-row' +
+        (state.selectedUserId === userId ? ' active' : '') +
+        (isDisabled ? ' disabled' : '');
       row.dataset.id = userId;
       row.innerHTML = '<div class="user-meta">' +
         '<div class="code">' + primaryEmail + '</div>' +
@@ -824,10 +833,110 @@
       row.dataset.name = fn.name;
       const runMode = fn.run_as_system ? 'system' : 'user';
       const visibility = fn.private ? 'private' : 'public';
+      const triggerName = state.triggerFunctionMap ? state.triggerFunctionMap[fn.name] : null;
+      const metaParts = [visibility, runMode];
+      const triggerTag = triggerName
+        ? ' · <span class="trigger-link" data-trigger="' + escapeHtml(triggerName) + '">isTrigger</span>'
+        : '';
       row.innerHTML = '<div class="code">' + fn.name + '</div>' +
-        '<div class="hint">' + visibility + ' · ' + runMode + '</div>';
+        '<div class="hint">' + metaParts.join(' · ') + triggerTag + '</div>';
       functionList.appendChild(row);
     });
+  };
+
+  const buildTriggerFunctionMap = (items) => {
+    const map = {};
+    (items || []).forEach((entry) => {
+      const content = entry && entry.content ? entry.content : null;
+      const handler = content && content.event_processors ? content.event_processors.FUNCTION : null;
+      const fnName = handler && handler.config ? handler.config.function_name : null;
+      const triggerName = (content && content.name) || entry.fileName || 'trigger';
+      if (typeof fnName === 'string' && fnName) {
+        map[fnName] = triggerName;
+      }
+    });
+    state.triggerFunctionMap = map;
+  };
+
+  const renderTriggers = (items) => {
+    if (!triggerList) return;
+    triggerList.innerHTML = '';
+    if (!items || !items.length) {
+      const empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = 'no triggers yet';
+      triggerList.appendChild(empty);
+      return;
+    }
+    items.forEach((entry) => {
+      const content = entry && entry.content ? entry.content : null;
+      const name = (content && content.name) || entry.fileName || 'trigger';
+      const type = content && content.type ? content.type : 'unknown';
+      const handler = content && content.event_processors ? content.event_processors.FUNCTION : null;
+      const fnName = handler && handler.config ? handler.config.function_name : null;
+      const hint = fnName ? (type + ' · ' + fnName) : type;
+      const row = document.createElement('div');
+      row.className = 'trigger-row' + (state.selectedTrigger === entry ? ' active' : '');
+      row.dataset.name = name;
+      row.innerHTML = '<div class="code">' + name + '</div>' +
+        '<div class="hint">' + hint + '</div>';
+      triggerList.appendChild(row);
+    });
+  };
+
+  const showTriggerDetail = (entry) => {
+    state.selectedTrigger = entry;
+    const content = entry && entry.content ? entry.content : null;
+    const handler = content && content.event_processors ? content.event_processors.FUNCTION : null;
+    const fnName = handler && handler.config ? handler.config.function_name : null;
+    if (triggerList) {
+      triggerList.querySelectorAll('.trigger-row').forEach((row) => {
+        const name = row.dataset.name;
+        const currentName = (content && content.name) || entry.fileName || 'trigger';
+        row.classList.toggle('active', name === currentName);
+      });
+    }
+    if (triggerDetail) {
+      triggerDetail.classList.add('json-highlight');
+      triggerDetail.innerHTML = highlightJson(JSON.stringify(entry, null, 2) || '');
+    }
+    if (triggerFunctionButton) {
+      if (fnName) {
+        triggerFunctionButton.classList.remove('is-hidden');
+        triggerFunctionButton.dataset.functionName = fnName;
+      } else {
+        triggerFunctionButton.classList.add('is-hidden');
+        triggerFunctionButton.dataset.functionName = '';
+      }
+    }
+  };
+
+  const loadTriggers = async () => {
+    try {
+      const data = await api('/triggers');
+      state.triggers = data.items || [];
+      buildTriggerFunctionMap(state.triggers);
+      renderTriggers(state.triggers);
+      renderFunctions(state.functions);
+      return state.triggers;
+    } catch (err) {
+      console.error(err);
+      return [];
+    }
+  };
+
+  const openTriggerByName = async (triggerName) => {
+    if (!triggerName) return;
+    setActiveTab('triggers');
+    const entries = state.triggers && state.triggers.length ? state.triggers : await loadTriggers();
+    const entry = (entries || []).find((item) => {
+      const content = item && item.content ? item.content : null;
+      const name = (content && content.name) || item.fileName || 'trigger';
+      return name === triggerName;
+    });
+    if (entry) {
+      showTriggerDetail(entry);
+    }
   };
 
   const formatArgsPreview = (args) => {
@@ -864,9 +973,11 @@
       metaParts.push(formatTime(entry.ts));
       metaParts.push(runMode);
       if (userLabel) metaParts.push(userLabel);
+      const modifiedTag = entry.codeModified ? '<span class="modified-pill">modified</span>' : '';
       row.innerHTML = '<div class="history-meta">' +
         '<div class="code">' + entry.name + '</div>' +
-        '<div class="hint">' + metaParts.join(' · ') + ' · ' + formatArgsPreview(entry.args) + '</div>' +
+        '<div class="hint">' + metaParts.join(' · ') + ' · ' + formatArgsPreview(entry.args) +
+        (modifiedTag ? (' · ' + modifiedTag) : '') + '</div>' +
         '</div>' +
         '<div class="hint"></div>';
       functionHistory.appendChild(row);
@@ -891,10 +1002,34 @@
     functionRunMode.value = fn.run_as_system ? 'system' : 'user';
   };
 
-  const setEditorStatus = (text, isError) => {
-    if (!functionEditorStatus) return;
-    functionEditorStatus.textContent = text || '';
-    functionEditorStatus.classList.toggle('error', !!isError);
+  const setFunctionSelectedLabel = (name, modified) => {
+    if (!functionSelected) return;
+    if (!name) {
+      functionSelected.textContent = 'select a function';
+      return;
+    }
+    if (modified) {
+      functionSelected.innerHTML =
+        escapeHtml(name) + ' <span class="modified-pill">modified</span>';
+    } else {
+      functionSelected.textContent = name;
+    }
+  };
+
+  const isFunctionCodeModified = (name) => {
+    if (!name || !functionCode) return false;
+    const base = state.functionCodeCache[name];
+    if (typeof base !== 'string') return false;
+    return functionCode.value !== base;
+  };
+
+  const updateFunctionModifiedState = () => {
+    const name = state.selectedFunction;
+    const modified = isFunctionCodeModified(name);
+    setFunctionSelectedLabel(name, modified);
+    if (restoreFunction) {
+      restoreFunction.disabled = !modified;
+    }
   };
 
   const loadFunctionCode = async () => {
@@ -903,20 +1038,26 @@
     if (!name) {
       functionCode.value = '';
       updateFunctionEditor();
-      setEditorStatus('Select a function first', true);
+      updateFunctionModifiedState();
       return;
     }
     try {
-      setEditorStatus('loading...');
       const data = await api('/functions/' + encodeURIComponent(name));
       const baseCode = data && data.code ? data.code : '';
       state.functionCodeCache[name] = baseCode;
       functionCode.value = baseCode;
       updateFunctionEditor();
-      setEditorStatus('loaded');
     } catch (err) {
-      setEditorStatus('Error: ' + err.message, true);
+      console.error(err);
     }
+    updateFunctionModifiedState();
+  };
+
+  const applyFunctionOverride = (code) => {
+    if (!functionCode) return;
+    functionCode.value = code || '';
+    updateFunctionEditor();
+    updateFunctionModifiedState();
   };
 
   const clearFunctionOverride = () => {
@@ -926,7 +1067,7 @@
       functionCode.value = state.functionCodeCache[name] || '';
       updateFunctionEditor();
     }
-    setEditorStatus('override cleared');
+    updateFunctionModifiedState();
   };
 
   const buildFunctionUserOptions = (authItems, customItems) => {
@@ -1393,6 +1534,9 @@
 
   refreshUsers.addEventListener('click', loadUsers);
   refreshFunctions.addEventListener('click', loadFunctions);
+  if (refreshTriggers) {
+    refreshTriggers.addEventListener('click', loadTriggers);
+  }
   if (refreshCollections) {
     refreshCollections.addEventListener('click', loadCollections);
   }
@@ -1521,6 +1665,34 @@
     });
   }
 
+  if (triggerList) {
+    triggerList.addEventListener('click', (event) => {
+      const target = (event.target && event.target.closest)
+        ? event.target.closest('.trigger-row')
+        : null;
+      if (!target) return;
+      const name = target.dataset.name;
+      const entry = (state.triggers || []).find((item) => {
+        const content = item && item.content ? item.content : null;
+        const triggerName = (content && content.name) || item.fileName || 'trigger';
+        return triggerName === name;
+      });
+      if (!entry) return;
+      showTriggerDetail(entry);
+    });
+  }
+
+  if (triggerFunctionButton) {
+    triggerFunctionButton.addEventListener('click', () => {
+      const fnName = triggerFunctionButton.dataset.functionName;
+      if (!fnName) return;
+      state.selectedFunction = fnName;
+      setActiveTab('functions');
+      renderFunctions(state.functions);
+      loadFunctionCode(fnName);
+    });
+  }
+
   updateCollectionModeView();
 
   mergedUsers.addEventListener('click', async (event) => {
@@ -1532,6 +1704,10 @@
       if (!id) return;
       if (action === 'toggle') {
         const disabled = target.textContent === 'disable';
+        if (disabled) {
+          const ok = confirm('Disable user ' + id + '?');
+          if (!ok) return;
+        }
         await api('/users/' + id + '/status', {
           method: 'PATCH',
           body: JSON.stringify({ disabled })
@@ -1559,8 +1735,10 @@
     });
     const entry = state.mergedUserMap[id];
     if (entry) {
-      userDetail.textContent = JSON.stringify(entry, null, 2);
+      userDetail.classList.add('json-highlight');
+      userDetail.innerHTML = highlightJson(JSON.stringify(entry, null, 2) || '');
     } else {
+      userDetail.classList.remove('json-highlight');
       userDetail.textContent = 'User not found in cache';
     }
   });
@@ -1586,6 +1764,7 @@
   if (functionCode) {
     functionCode.addEventListener('input', () => {
       updateFunctionEditor();
+      updateFunctionModifiedState();
     });
     functionCode.addEventListener('scroll', () => {
       syncFunctionEditorScroll();
@@ -1701,12 +1880,20 @@
     const target = (event.target && event.target.closest)
       ? event.target.closest('.function-row')
       : null;
+    if (event.target && event.target.classList && event.target.classList.contains('trigger-link')) {
+      const triggerName = event.target.dataset ? event.target.dataset.trigger : null;
+      if (triggerName) {
+        openTriggerByName(triggerName);
+      }
+      event.stopPropagation();
+      return;
+    }
     if (!target) return;
     const name = target.dataset.name;
     if (!name) return;
     state.selectedFunction = name;
     state.selectedHistoryIndex = null;
-    functionSelected.textContent = name;
+    setFunctionSelectedLabel(name, false);
     functionResult.textContent = '';
     setRunModeForFunction(name);
     loadFunctionCode();
@@ -1782,7 +1969,7 @@
       if (!functionData) return;
       state.selectedFunction = functionData.name;
       state.selectedHistoryIndex = null;
-      functionSelected.textContent = functionData.name;
+      setFunctionSelectedLabel(functionData.name, false);
       functionArgs.value = JSON.stringify(functionData.args || [], null, 2);
       functionResult.textContent = '';
       setRunModeForFunction(functionData.name);
@@ -1804,7 +1991,7 @@
       if (!entry) return;
       state.selectedFunction = entry.name;
       state.selectedHistoryIndex = index;
-      functionSelected.textContent = entry.name;
+      setFunctionSelectedLabel(entry.name, false);
       functionArgs.value = JSON.stringify(entry.args || [], null, 2);
       if (functionRunMode && typeof entry.runAsSystem === 'boolean') {
         functionRunMode.value = entry.runAsSystem ? 'system' : 'user';
@@ -1825,7 +2012,14 @@
         setSelectedFunctionUser(null);
       }
       functionResult.textContent = '';
-      loadFunctionCode();
+      const loadPromise = loadFunctionCode();
+      if (entry.code) {
+        Promise.resolve(loadPromise).then(() => {
+          applyFunctionOverride(entry.code);
+        });
+      } else {
+        updateFunctionModifiedState();
+      }
       renderFunctions(state.functions);
       renderHistory();
     });
@@ -1890,6 +2084,7 @@
   setInterval(updateClock, 1000);
   updateClock();
   updateFunctionEditor();
+  updateFunctionModifiedState();
   updateCollectionPager();
   setCollectionTab('query');
   setCollectionResultView('json');
@@ -1926,6 +2121,7 @@
   connectWs();
   loadUsers();
   loadFunctions();
+  loadTriggers();
   loadCollections();
   loadCollectionHistory();
 })();
