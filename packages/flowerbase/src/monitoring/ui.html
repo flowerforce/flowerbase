@@ -27,6 +27,7 @@
       <button class="tab-button" data-tab="users">users</button>
       <button class="tab-button" data-tab="functions">functions</button>
       <button class="tab-button" data-tab="triggers">triggers</button>
+      <button class="tab-button" data-tab="endpoints">endpoints</button>
       <button class="tab-button" data-tab="collections">collections</button>
     </div>
     <div class="tab-panels">
@@ -205,6 +206,73 @@
             </div>
           </div>
         </section>
+      <section class="panel tab-panel" data-panel="endpoints">
+        <div class="panel-header">
+          <span>Endpoints</span>
+          <button id="refreshEndpoints" class="secondary">refresh</button>
+        </div>
+        <div class="split-grid functions-grid">
+          <div class="column-stack">
+            <div class="controls">
+              <input id="endpointSearch" class="wide-input" type="text" placeholder="search endpoints" />
+            </div>
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">endpoints</div>
+              <div id="endpointList" class="user-list"></div>
+            </div>
+          </div>
+          <div class="right-column">
+            <div class="subpanel endpoint-panel">
+              <div class="detail-header">
+                <div class="subpanel-title">endpoint detail</div>
+                <div class="detail-actions">
+                  <span id="endpointHint" class="hint">select an endpoint</span>
+                  <button id="endpointFunctionButton" type="button" class="secondary small is-hidden">
+                    go to function
+                  </button>
+                </div>
+              </div>
+              <pre id="endpointMeta" class="event-detail">select an endpoint to inspect</pre>
+              <div class="function-controls">
+                <div class="control-group">
+                  <label for="endpointMethod">method</label>
+                  <select id="endpointMethod">
+                    <option value="GET">GET</option>
+                    <option value="POST" selected>POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="PATCH">PATCH</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="ALL">ALL</option>
+                  </select>
+                </div>
+              </div>
+              <div class="function-io">
+                <div class="io-column">
+                  <label for="endpointQuery">query</label>
+                  <textarea id="endpointQuery" placeholder='{"foo":"bar"}'></textarea>
+                </div>
+                <div class="io-column">
+                  <label for="endpointHeaders">headers</label>
+                  <textarea id="endpointHeaders" placeholder='{"x-api-key":"value"}'></textarea>
+                </div>
+              </div>
+              <div class="function-io">
+                <div class="io-column">
+                  <label for="endpointBody">body</label>
+                  <textarea id="endpointBody" placeholder='{"some":"data"}'></textarea>
+                </div>
+                <div class="io-column">
+                  <label for="endpointResult">result</label>
+                  <pre id="endpointResult" class="event-detail function-result">invoke an endpoint to see the response</pre>
+                </div>
+              </div>
+              <div class="editor-actions">
+                <button id="invokeEndpoint">invoke</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
       <section class="panel tab-panel" data-panel="collections">
         <div class="panel-header">
           <span>Collections</span>
@@ -309,6 +377,13 @@
       </section>
     </div>
   </main>
+  <script src="__MONIT_BASE__/ui.shared.js"></script>
+  <script src="__MONIT_BASE__/ui.events.js"></script>
+  <script src="__MONIT_BASE__/ui.users.js"></script>
+  <script src="__MONIT_BASE__/ui.functions.js"></script>
+  <script src="__MONIT_BASE__/ui.triggers.js"></script>
+  <script src="__MONIT_BASE__/ui.collections.js"></script>
+  <script src="__MONIT_BASE__/ui.endpoints.js"></script>
   <script src="__MONIT_BASE__/ui.js"></script>
 
 </body>
