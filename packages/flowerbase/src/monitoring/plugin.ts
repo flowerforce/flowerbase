@@ -465,16 +465,28 @@ const createMonitoringPlugin = fp(async (
     reply.header('Cache-Control', 'no-store')
     reply.type('text/css').send(css)
   })
-  app.get(`${prefix}/ui.js`, async (_req, reply) => {
-    const raw = readAsset('ui.js', prefix)
-    if (!raw) {
-      const tried = resolveAssetCandidates('ui.js', prefix).join(', ')
-      reply.code(404).send(`ui.js not found. Tried: ${tried}`)
-      return
-    }
-    const js = raw.replace(/__MONIT_BASE__/g, prefix)
-    reply.header('Cache-Control', 'no-store')
-    reply.type('application/javascript').send(js)
+  const jsAssets = [
+    'ui.js',
+    'ui.shared.js',
+    'ui.events.js',
+    'ui.users.js',
+    'ui.functions.js',
+    'ui.triggers.js',
+    'ui.collections.js',
+    'ui.endpoints.js'
+  ]
+  jsAssets.forEach((asset) => {
+    app.get(`${prefix}/${asset}`, async (_req, reply) => {
+      const raw = readAsset(asset, prefix)
+      if (!raw) {
+        const tried = resolveAssetCandidates(asset, prefix).join(', ')
+        reply.code(404).send(`${asset} not found. Tried: ${tried}`)
+        return
+      }
+      const js = raw.replace(/__MONIT_BASE__/g, prefix)
+      reply.header('Cache-Control', 'no-store')
+      reply.type('application/javascript').send(js)
+    })
   })
 
   app.get(`${prefix}/ws`, { websocket: true }, (connection) => {
