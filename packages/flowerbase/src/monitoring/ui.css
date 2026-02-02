@@ -276,6 +276,12 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+}
+
 button.secondary {
   color: var(--muted);
   border-color: var(--border);
@@ -301,7 +307,7 @@ button.danger {
 
 .event-row {
   display: grid;
-  grid-template-columns: 86px 90px 1fr;
+  grid-template-columns: 86px 90px 160px 1fr;
   gap: 8px;
   padding: 4px 6px;
   border-bottom: 1px dashed rgba(26, 47, 34, 0.6);
@@ -326,6 +332,22 @@ button.danger {
 
 .event-type.warn {
   color: var(--warn);
+}
+
+.event-user {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-user.is-link {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.event-user.is-link:hover {
+  text-decoration: underline;
 }
 
 .event-detail {
@@ -549,6 +571,26 @@ button.small {
   min-height: 0;
 }
 
+.collection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.collection-actions .editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.collection-actions .result-toolbar {
+  margin-left: auto;
+}
+
 .mini-tabs {
   display: flex;
   gap: 8px;
@@ -597,22 +639,46 @@ button.small {
   min-height: 0;
 }
 
-.collection-controls {
+.collection-layout {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: minmax(200px, 30%) minmax(0, 70%);
+  gap: 12px;
+  align-items: start;
+}
+
+.collection-controls {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: end;
 }
 
 .collection-io {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
 }
 
+.collection-io[data-mode="query"] [data-collection-mode="aggregate"] {
+  display: none;
+}
+
+.collection-io[data-mode="aggregate"] [data-collection-mode="query"] {
+  display: none;
+}
+
+.collection-io {
+  height: 100%;
+}
+
 .collection-io textarea {
   min-height: 140px;
+  height: 100%;
+}
+
+.collection-io .json-editor {
+  height: 100%;
+  min-height: 100%;
 }
 
 .json-editor {
@@ -977,7 +1043,7 @@ button.small {
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   }
 
-  .collection-controls {
+  .collection-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 }

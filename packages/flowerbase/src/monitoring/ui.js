@@ -28,6 +28,9 @@
     collectionPage: 1,
     collectionHasMore: false,
     collectionTotal: 0,
+    collectionPageSize: 50,
+    collectionLoading: false,
+    collectionTotalsLoading: false,
     collectionResultView: 'json',
     collectionResultPayload: null,
     collectionResultHighlight: false,
@@ -86,6 +89,7 @@
   const collectionHistory = document.getElementById('collectionHistory');
   const collectionRules = document.getElementById('collectionRules');
   const collectionSelected = document.getElementById('collectionSelected');
+  const collectionIo = document.getElementById('collectionIo');
   const collectionUserInput = document.getElementById('collectionUserInput');
   const collectionUserList = document.getElementById('collectionUserList');
   const collectionRunMode = document.getElementById('collectionRunMode');
@@ -100,6 +104,7 @@
   const collectionPrev = document.getElementById('collectionPrev');
   const collectionNext = document.getElementById('collectionNext');
   const collectionPage = document.getElementById('collectionPage');
+  const collectionPages = document.getElementById('collectionPages');
   const collectionTotal = document.getElementById('collectionTotal');
   const collectionViewJson = document.getElementById('collectionViewJson');
   const collectionViewTable = document.getElementById('collectionViewTable');
@@ -172,8 +177,25 @@
   };
 
   const updateCollectionPager = () => {
+    if (state.collectionLoading) {
+      if (collectionPage) collectionPage.textContent = '...';
+      if (state.collectionTotalsLoading) {
+        if (collectionPages) collectionPages.textContent = '...';
+        if (collectionTotal) collectionTotal.textContent = '...';
+      }
+      if (collectionPrev) collectionPrev.disabled = true;
+      if (collectionNext) collectionNext.disabled = true;
+      if (state.collectionTotalsLoading) return;
+    }
     if (collectionPage) {
       collectionPage.textContent = String(state.collectionPage || 1);
+    }
+    const totalPages = Math.max(
+      1,
+      Math.ceil((state.collectionTotal || 0) / Math.max(state.collectionPageSize || 1, 1))
+    );
+    if (collectionPages) {
+      collectionPages.textContent = String(totalPages);
     }
     if (collectionTotal) {
       collectionTotal.textContent = String(state.collectionTotal || 0);
@@ -503,6 +525,40 @@
     return time + '  ' + type.padEnd(12, ' ') + '  ' + msg;
   };
 
+  const getEventUserId = (event) => {
+    if (!event || typeof event !== 'object') return '';
+    if (typeof event.userId === 'string') return event.userId;
+    if (event.user && typeof event.user === 'object') {
+      if (typeof event.user.id === 'string') return event.user.id;
+      if (typeof event.user._id === 'string') return event.user._id;
+      if (typeof event.user.userId === 'string') return event.user.userId;
+    }
+    const data = event.data;
+    if (!data || typeof data !== 'object') return '';
+    if (typeof data.userId === 'string') return data.userId;
+    if (typeof data.user_id === 'string') return data.user_id;
+    if (data.user && typeof data.user === 'object') {
+      if (typeof data.user.id === 'string') return data.user.id;
+      if (typeof data.user._id === 'string') return data.user._id;
+      if (typeof data.user.userId === 'string') return data.user.userId;
+    }
+    if (data.user_data && typeof data.user_data === 'object') {
+      if (typeof data.user_data.id === 'string') return data.user_data.id;
+      if (typeof data.user_data._id === 'string') return data.user_data._id;
+    }
+    return '';
+  };
+
+  const goToUser = (userId) => {
+    if (!userId || !userSearch) return;
+    state.selectedUserId = String(userId);
+    state.userQuery = state.selectedUserId;
+    state.customPage = 1;
+    userSearch.value = state.userQuery;
+    setActiveTab('users');
+    loadUsers();
+  };
+
   const getFunctionEventData = (event) => {
     if (!event || !event.type || event.type !== 'function') return null;
     const data = event.data || {};
@@ -542,16 +598,28 @@
       if (type && event.type !== type) return false;
       return matchesQuery(event, query);
     });
-    const recent = filtered.slice(-350);
+    const recent = filtered.slice(-350).reverse();
     eventsList.innerHTML = '';
     recent.forEach((event) => {
+      const userId = getEventUserId(event);
       const row = document.createElement('div');
       row.className = 'event-row';
       row.dataset.id = event.id;
       const typeClass = event.type === 'error' ? 'error' : (event.type === 'warn' ? 'warn' : '');
       row.innerHTML = '<div>' + formatTime(event.ts) + '</div>' +
         '<div class="event-type ' + typeClass + '">' + (event.type || '-') + '</div>' +
+        '<div class="event-user" title="' + (userId || '-') + '">' + (userId || '-') + '</div>' +
         '<div>' + (event.message || '') + '</div>';
+      if (userId) {
+        const userCell = row.querySelector('.event-user');
+        if (userCell) {
+          userCell.classList.add('is-link');
+          userCell.addEventListener('click', (clickEvent) => {
+            clickEvent.stopPropagation();
+            goToUser(userId);
+          });
+        }
+      }
       row.addEventListener('click', () => showDetail(event));
       eventsList.appendChild(row);
     });
@@ -560,7 +628,9 @@
   const showDetail = (event) => {
     state.selectedId = event.id;
     state.selectedEvent = event;
-    eventDetail.textContent = JSON.stringify(event, null, 2);
+    const text = JSON.stringify(event, null, 2) || '';
+    eventDetail.classList.add('json-highlight');
+    eventDetail.innerHTML = highlightJson(text);
     const functionData = getFunctionEventData(event);
     if (functionData && eventFunctionButton) {
       eventFunctionButton.classList.remove('is-hidden');
@@ -1011,6 +1081,17 @@
     }
   };
 
+  const updateCollectionModeView = () => {
+    const mode = collectionMode ? collectionMode.value : (state.collectionMode || 'query');
+    if (collectionIo && collectionIo.dataset) {
+      collectionIo.dataset.mode = mode;
+    }
+    document.querySelectorAll('[data-collection-mode]').forEach((panel) => {
+      const panelMode = panel.dataset ? panel.dataset.collectionMode : null;
+      panel.classList.toggle('is-hidden', panelMode !== mode);
+    });
+  };
+
   const renderCollections = (items) => {
     if (!collectionList) return;
     collectionList.innerHTML = '';
@@ -1093,6 +1174,7 @@
     if (collectionMode && entry.mode) {
       collectionMode.value = entry.mode;
       state.collectionMode = entry.mode;
+      updateCollectionModeView();
     }
     if (collectionRunMode) {
       collectionRunMode.value = entry.runAsSystem ? 'system' : 'user';
@@ -1173,8 +1255,13 @@
     if (!keepPage) {
       state.collectionPage = 1;
     }
+    const shouldRefreshTotals = !keepPage || !state.collectionTotal;
     state.collectionHasMore = false;
-    state.collectionTotal = 0;
+    if (shouldRefreshTotals) {
+      state.collectionTotal = 0;
+    }
+    state.collectionLoading = true;
+    state.collectionTotalsLoading = shouldRefreshTotals;
     updateCollectionPager();
     const runAsSystem = !collectionRunMode || collectionRunMode.value === 'system';
     const selectedUser = state.selectedCollectionUser;
@@ -1208,10 +1295,15 @@
         if (typeof data.page === 'number') {
           state.collectionPage = data.page;
         }
-        if (typeof data.total === 'number') {
-          state.collectionTotal = data.total;
-        } else if (typeof data.count === 'number') {
-          state.collectionTotal = data.count;
+        if (shouldRefreshTotals) {
+          if (typeof data.total === 'number') {
+            state.collectionTotal = data.total;
+          } else if (typeof data.count === 'number') {
+            state.collectionTotal = data.count;
+          }
+          if (typeof data.pageSize === 'number') {
+            state.collectionPageSize = data.pageSize;
+          }
         }
         updateCollectionPager();
         setCollectionTab('query');
@@ -1235,10 +1327,15 @@
         if (typeof data.page === 'number') {
           state.collectionPage = data.page;
         }
-        if (typeof data.total === 'number') {
-          state.collectionTotal = data.total;
-        } else if (typeof data.count === 'number') {
-          state.collectionTotal = data.count;
+        if (shouldRefreshTotals) {
+          if (typeof data.total === 'number') {
+            state.collectionTotal = data.total;
+          } else if (typeof data.count === 'number') {
+            state.collectionTotal = data.count;
+          }
+          if (typeof data.pageSize === 'number') {
+            state.collectionPageSize = data.pageSize;
+          }
         }
         updateCollectionPager();
         setCollectionTab('query');
@@ -1258,6 +1355,9 @@
         setCollectionResult('Error: ' + err.message, false);
       }
     } finally {
+      state.collectionLoading = false;
+      state.collectionTotalsLoading = false;
+      updateCollectionPager();
       if (recordHistory) {
         loadCollectionHistory();
       }
@@ -1282,6 +1382,7 @@
     typeFilter.value = '';
     state.events = [];
     state.selectedEvent = null;
+    eventDetail.classList.remove('json-highlight');
     eventDetail.textContent = 'select an event to inspect payload';
     if (eventFunctionButton) {
       eventFunctionButton.classList.add('is-hidden');
@@ -1379,7 +1480,9 @@
       state.collectionMode = collectionMode.value;
       state.collectionPage = 1;
       state.collectionHasMore = false;
+      state.collectionLoading = false;
       updateCollectionPager();
+      updateCollectionModeView();
     });
   }
 
@@ -1417,6 +1520,8 @@
       applyCollectionHistoryEntry(entry, index);
     });
   }
+
+  updateCollectionModeView();
 
   mergedUsers.addEventListener('click', async (event) => {
     const target = event.target;
