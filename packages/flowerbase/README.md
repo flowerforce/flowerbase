@@ -64,7 +64,7 @@ Add `tsconfig.json` file
 npx tsc --init
 ```
 
-In your `packages.json`, inside the script section add this: 
+In your `package.json`, inside the script section add this: 
 
 ```json
 {
@@ -85,46 +85,7 @@ touch src/index.ts
 ```
 
 ## 🌿 3. Environment Variables
-Ensure the following environment variables are set in your .env file or deployment environment:
-
-
-| Variable               | Description                                                                 | Example                                            |
-| ---------------------- | --------------------------------------------------------------------------- | -------------------------------------------------- |
-| `PROJECT_ID`           | A unique ID to identify your project. This value can be freely invented — it's preserved mainly for compatibility with the old Realm-style project structure.                     | `my-flowerbase-app`                                |
-| `PORT`                 | The port on which the server will run.                                      | `3000`                                             |
-| `MONGODB_URL`          | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
-| `JWT_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
-| `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
-| `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
-| `RESET_PASSWORD_TTL_SECONDS` | Time-to-live for password reset tokens (in seconds).                  | `3600`                                             |
-| `AUTH_RATE_LIMIT_WINDOW_MS`  | Rate limit window for auth endpoints (in ms).                          | `900000`                                           |
-| `AUTH_LOGIN_MAX_ATTEMPTS`    | Max login attempts per window.                                         | `10`                                               |
-| `AUTH_RESET_MAX_ATTEMPTS`    | Max reset requests per window.                                         | `5`                                                |
-| `REFRESH_TOKEN_TTL_DAYS`     | Refresh token time-to-live (in days).                                  | `60`                                               |
-| `SWAGGER_ENABLED`      | Enable Swagger UI and spec routes (disabled by default).                    | `true`                                             |
-| `SWAGGER_UI_USER`      | Basic Auth username for Swagger UI (optional).                            | `admin`                                            |
-| `SWAGGER_UI_PASSWORD`  | Basic Auth password for Swagger UI (optional).                            | `change-me`                                        |
-
-
-Example:
-```env
-PROJECT_ID=your-project-id
-PORT=3000
-MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/dbname
-JWT_SECRET=your-jwt-secret
-HOST=0.0.0.0
-HTTPS_SCHEMA=http
-RESET_PASSWORD_TTL_SECONDS=3600
-AUTH_RATE_LIMIT_WINDOW_MS=900000
-AUTH_LOGIN_MAX_ATTEMPTS=10
-AUTH_RESET_MAX_ATTEMPTS=5
-REFRESH_TOKEN_TTL_DAYS=60
-SWAGGER_ENABLED=true
-SWAGGER_UI_USER=admin
-SWAGGER_UI_PASSWORD=change-me
-```
-
-🛡️ Note: Never commit .env files to source control. Use a .gitignore file to exclude it.
+Ensure the same environment variables described in the "Environment Variables" section above are set in your .env file or deployment environment.
 
 
 ## 🧩 4. Initialize Flowerbase
@@ -258,12 +219,13 @@ The authentication modes currently re-implemented in `@flowerforce/flowerbase` a
 }
 ```
 
-You can specify the MongoDB collection used to store authentication users by configuring the `auth_collection` field inside the `auth/providers.json` file.
+You can specify the MongoDB collection used to store authentication users by setting `auth_collection` at the root of `auth/providers.json`.
 
 #### 📁 auth/providers.json
 Example
 ```json
 {
+    "auth_collection": "my-users-collection",
     "api-key": {
         "name": "api-key",
         "type": "api-key",
@@ -273,12 +235,13 @@ Example
         "name": "local-userpass",
         "type": "local-userpass",
         "disabled": false,
-        "auth_collection": "my-users-collection", //custom collection name
         "config": {
             "autoConfirm": true,
-            "resetPasswordSubject": "reset",
+            "confirmationFunctionName": "",
+            "resetFunctionName": "",
             "resetPasswordUrl": "https://my.app.url/password-reset",
-            "runConfirmationFunction": false
+            "runConfirmationFunction": false,
+            "runResetFunction": false
         }
     },
     "anon-user": {
@@ -354,49 +317,9 @@ This will download a `.zip` file containing your Realm app's full structure and 
 
 ✅ You are now ready to migrate or inspect your Realm app locally!
 
-1) In your existing project folder, initialize a new Node.js project, Run:
+1) Reuse the same project setup steps from "Creating a New Project from Scratch" (init, install, tsconfig, scripts).
 
-```bash
-npm init -y
-```
-2) Install Flowerbase
-
-```bash
-npm install @flowerforce/flowerbase
-```
-
-3) Add Typescript
-
-```bash
-npm install --save-dev typescript @types/node ts-node
-```
-
-
-4) Add `tsconfig.json` file
-
-```bash
-npx tsc --init
-```
-
-5) Create an index.ts file
-
-Inside your project, create index.ts:
-
-```bash
-touch index.ts
-```
-
-6) In your `packages.json`, inside the script section add this: 
-
-```json
-{
-  "start": "ts-node index.ts"
-}
-```
-
-Initialize the Flowerbase App
-
-In index.ts, add:
+Initialize the Flowerbase App in `index.ts`:
 
 ```ts
 import { initialize } from '@flowerforce/flowerbase';
@@ -427,15 +350,31 @@ Ensure the following environment variables are set in your .env file or deployme
 | `MONGODB_URL`          | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
 | `JWT_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
 | `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
+| `API_VERSION`          | API version used in client base path.                                       | `v2.0`                                             |
 | `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
+| `ENABLE_LOGGER`        | Enable Fastify logger (any truthy value).                                   | `true`                                             |
 | `RESET_PASSWORD_TTL_SECONDS` | Time-to-live for password reset tokens (in seconds).                  | `3600`                                             |
 | `AUTH_RATE_LIMIT_WINDOW_MS`  | Rate limit window for auth endpoints (in ms).                          | `900000`                                           |
 | `AUTH_LOGIN_MAX_ATTEMPTS`    | Max login attempts per window.                                         | `10`                                               |
+| `AUTH_REGISTER_MAX_ATTEMPTS` | Max register attempts per window.                                      | `5`                                                |
 | `AUTH_RESET_MAX_ATTEMPTS`    | Max reset requests per window.                                         | `5`                                                |
 | `REFRESH_TOKEN_TTL_DAYS`     | Refresh token time-to-live (in days).                                  | `60`                                               |
+| `ANON_USER_TTL_SECONDS` | Anonymous user time-to-live (in seconds).                                  | `10800`                                            |
 | `SWAGGER_ENABLED`      | Enable Swagger UI and spec routes (disabled by default).                    | `true`                                             |
 | `SWAGGER_UI_USER`      | Basic Auth username for Swagger UI (optional).                            | `admin`                                            |
 | `SWAGGER_UI_PASSWORD`  | Basic Auth password for Swagger UI (optional).                            | `change-me`                                        |
+| `MONIT_ENABLED`        | Enable monitoring UI at `/monit`. Must be `true` for monit to run (credentials alone are not enough). | `true` |
+| `MONIT_USER`           | Basic Auth username for `/monit`.                                         | `monit`                                            |
+| `MONIT_PASSWORD`       | Basic Auth password for `/monit`.                                         | `change-me`                                        |
+| `MONIT_CACHE_HOURS`    | Cache duration for monitoring events (hours).                             | `24`                                               |
+| `MONIT_MAX_EVENTS`     | Maximum number of cached monitoring events.                               | `5000`                                             |
+| `MONIT_CAPTURE_CONSOLE`| Capture console log/warn/error into monitoring events.                     | `true`                                             |
+| `MONIT_REDACT_ERROR_DETAILS` | Redact error message/stack in monitoring output.                      | `true`                                             |
+| `MONIT_ALLOWED_IPS`    | Comma-separated allowlist for `/monit` (uses `req.ip`). Use `0.0.0.0` or `*` to allow all. | `127.0.0.1,10.0.0.10`                              |
+| `MONIT_RATE_LIMIT_WINDOW_MS` | Rate limit window for `/monit` (ms).                                 | `60000`                                            |
+| `MONIT_RATE_LIMIT_MAX` | Max requests per window for `/monit`.                                     | `120`                                              |
+| `MONIT_ALLOW_INVOKE`   | Allow function invoke from monit UI.                                      | `true`                                             |
+| `MONIT_ALLOW_EDIT`     | Allow function code access/override from monit UI.                         | `true`                                             |
 
 
 Example:
@@ -445,18 +384,41 @@ PORT=3000
 MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/dbname
 JWT_SECRET=your-jwt-secret
 HOST=0.0.0.0
+API_VERSION=v2.0
 HTTPS_SCHEMA=http
+ENABLE_LOGGER=true
 RESET_PASSWORD_TTL_SECONDS=3600
 AUTH_RATE_LIMIT_WINDOW_MS=900000
 AUTH_LOGIN_MAX_ATTEMPTS=10
+AUTH_REGISTER_MAX_ATTEMPTS=5
 AUTH_RESET_MAX_ATTEMPTS=5
 REFRESH_TOKEN_TTL_DAYS=60
+ANON_USER_TTL_SECONDS=10800
 SWAGGER_ENABLED=true
 SWAGGER_UI_USER=admin
 SWAGGER_UI_PASSWORD=change-me
+MONIT_ENABLED=true
+MONIT_USER=monit
+MONIT_PASSWORD=change-me
+MONIT_CACHE_HOURS=24
+MONIT_MAX_EVENTS=5000
+MONIT_CAPTURE_CONSOLE=true
+MONIT_REDACT_ERROR_DETAILS=true
+MONIT_ALLOWED_IPS=127.0.0.1,10.0.0.10
+MONIT_RATE_LIMIT_WINDOW_MS=60000
+MONIT_RATE_LIMIT_MAX=120
+MONIT_ALLOW_INVOKE=true
+MONIT_ALLOW_EDIT=true
 ```
 
 🛡️ Note: Never commit .env files to source control. Use a .gitignore file to exclude it.
+
+### 🔎 Monitoring (Monit UI)
+
+- The monitoring UI lives at `/monit` and is protected by Basic Auth.
+- Monit routes are registered **only** when `MONIT_ENABLED=true` (credentials alone are not enough).
+- If `MONIT_ALLOWED_IPS` is set, only those IPs can reach `/monit` (ensure `req.ip` reflects your proxy setup / `trustProxy`).
+- You can disable **invoke** or **edit** with `MONIT_ALLOW_INVOKE=false` and/or `MONIT_ALLOW_EDIT=false`.
 
 
 <a id="build"></a>

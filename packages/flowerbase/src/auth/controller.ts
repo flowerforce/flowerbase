@@ -47,7 +47,11 @@ export async function authController(app: FastifyInstance) {
    * @param {import('fastify').FastifyRequest} req - The request object.
    * @returns {Promise<Object>} A promise resolving with the user's profile data.
    */
-  app.get(AUTH_ENDPOINTS.PROFILE, async function (req) {
+  app.get(AUTH_ENDPOINTS.PROFILE, {
+    schema: {
+      tags: ['Auth']
+    }
+  }, async function (req) {
     if (req.user.typ !== 'access') {
       throw new Error('Access token required')
     }
@@ -76,6 +80,11 @@ export async function authController(app: FastifyInstance) {
    */
   app.post<{ Reply: SessionCreatedDto }>(
     AUTH_ENDPOINTS.SESSION,
+    {
+      schema: {
+        tags: ['Auth']
+      }
+    },
     async function (req, res) {
       if (req.user.typ !== 'refresh') {
         throw new Error(AUTH_ERRORS.INVALID_TOKEN)
@@ -125,6 +134,11 @@ export async function authController(app: FastifyInstance) {
      */
   app.delete(
     AUTH_ENDPOINTS.SESSION,
+    {
+      schema: {
+        tags: ['Auth']
+      }
+    },
     async function (req, res) {
       const authHeader = req.headers.authorization
       if (!authHeader?.startsWith('Bearer ')) {

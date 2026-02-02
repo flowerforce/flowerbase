@@ -5,6 +5,7 @@ import path from 'path'
 const CHARSET =
   "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{};:,.<>?";
 export const LOGIN_SCHEMA = {
+  tags: ['Auth'],
   body: {
     type: 'object',
     properties: {
@@ -21,6 +22,7 @@ export const LOGIN_SCHEMA = {
 }
 
 export const RESET_SEND_SCHEMA = {
+  tags: ['Auth'],
   body: {
     type: 'object',
     properties: {
@@ -36,6 +38,7 @@ export const RESET_SEND_SCHEMA = {
 }
 
 export const RESET_CALL_SCHEMA = {
+  tags: ['Auth'],
   body: {
     type: 'object',
     properties: {
@@ -53,6 +56,7 @@ export const RESET_CALL_SCHEMA = {
 }
 
 export const CONFIRM_RESET_SCHEMA = {
+  tags: ['Auth'],
   body: {
     type: 'object',
     properties: {
@@ -65,6 +69,7 @@ export const CONFIRM_RESET_SCHEMA = {
 }
 
 export const CONFIRM_USER_SCHEMA = {
+  tags: ['Auth'],
   body: {
     type: 'object',
     properties: {
@@ -78,6 +83,7 @@ export const CONFIRM_USER_SCHEMA = {
 export const RESET_SCHEMA = RESET_SEND_SCHEMA
 
 export const REGISTRATION_SCHEMA = {
+  tags: ['Auth'],
   body: {
     type: 'object',
     properties: {

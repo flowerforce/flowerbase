@@ -31,6 +31,11 @@ export async function anonUserController(app: FastifyInstance) {
 
   app.post<LoginDto>(
     AUTH_ENDPOINTS.LOGIN,
+    {
+      schema: {
+        tags: ['Auth']
+      }
+    },
     async function () {
       const anonProvider = AUTH_CONFIG.authProviders?.['anon-user']
       if (!anonProvider || anonProvider.disabled) {

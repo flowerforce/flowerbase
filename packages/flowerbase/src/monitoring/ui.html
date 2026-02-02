@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flowerbase monit</title>
+  <link rel="stylesheet" href="__MONIT_BASE__/ui.css" />
+</head>
+
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">Flowerbase</div>
+      <div class="title">monit</div>
+    </div>
+    <div class="status">
+      <span id="clock" class="pill"></span>
+      <span id="ramStat" class="pill">RAM --</span>
+      <span id="cpuStat" class="pill">CPU --</span>
+      <span id="wsStatus" class="pill">WS: offline</span>
+    </div>
+  </header>
+  <main>
+    <div class="tabs">
+      <button class="tab-button active" data-tab="events">events</button>
+      <button class="tab-button" data-tab="users">users</button>
+      <button class="tab-button" data-tab="functions">functions</button>
+      <button class="tab-button" data-tab="collections">collections</button>
+    </div>
+    <div class="tab-panels">
+      <section class="panel tab-panel active" data-panel="events">
+        <div class="panel-header">
+          <span>Events</span>
+          <span class="hint">last 24h cache</span>
+        </div>
+        <div class="split-grid">
+          <div class="column-stack">
+            <div class="controls">
+              <input id="searchInput" type="text" placeholder="search events or payload" />
+              <select id="typeFilter">
+                <option value="">all types</option>
+                <option value="auth">auth</option>
+                <option value="function">function</option>
+                <option value="trigger">trigger</option>
+                <option value="http_endpoint">http_endpoint</option>
+                <option value="api">api</option>
+                <option value="aws">aws</option>
+                <option value="rules">rules</option>
+                <option value="log">log</option>
+                <option value="error">error</option>
+              </select>
+              <button id="clearEvents" class="secondary">clear view</button>
+            </div>
+            <div id="eventsList" class="events-list"></div>
+          </div>
+          <div class="subpanel detail-panel">
+            <div class="detail-header">
+              <div class="subpanel-title">event detail</div>
+              <button id="eventFunctionButton" type="button" class="secondary small is-hidden">
+                use in invoke
+              </button>
+            </div>
+            <div id="eventDetail" class="event-detail">select an event to inspect payload</div>
+          </div>
+        </div>
+      </section>
+      <section class="panel tab-panel" data-panel="users">
+        <div class="panel-header">
+          <span>Users</span>
+          <button id="refreshUsers" class="secondary">refresh</button>
+        </div>
+        <div class="controls">
+          <input id="userSearch" class="wide-input" type="text" placeholder="search users (email, id, status)" />
+        </div>
+        <div class="split-grid users-grid">
+          <div class="column-stack">
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">users</div>
+              <div id="mergedUsers" class="user-list"></div>
+              <div class="pager">
+                <div class="pager-controls">
+                  <button id="customPrev" class="secondary">prev</button>
+                  <button id="customNext" class="secondary">next</button>
+                </div>
+                <div>
+                  page <span id="customPage">1</span>/<span id="customPages">1</span>
+                </div>
+                <div class="pager-controls">
+                  <label for="customLimit">size</label>
+                  <select id="customLimit">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="right-column">
+            <div class="subpanel detail-panel">
+              <div class="subpanel-title">user detail</div>
+              <pre id="userDetail" class="event-detail">select a user to inspect</pre>
+            </div>
+            <div class="subpanel">
+              <div class="subpanel-title">create user</div>
+              <form id="createUserForm">
+                <input id="newUserEmail" type="email" placeholder="email" required />
+                <input id="newUserPassword" type="password" placeholder="password" required />
+                <button type="submit">create</button>
+              </form>
+              <div id="createUserError" class="hint error is-hidden"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="panel tab-panel" data-panel="functions">
+        <div class="panel-header">
+          <span>Functions</span>
+          <button id="refreshFunctions" class="secondary">refresh</button>
+        </div>
+        <div class="split-grid functions-grid">
+          <div class="column-stack">
+            <div class="controls">
+              <input id="functionSearch" class="wide-input" type="text" placeholder="search functions" />
+            </div>
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">functions</div>
+              <div id="functionList" class="user-list"></div>
+            </div>
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">history</div>
+              <div id="functionHistory" class="history-list"></div>
+            </div>
+          </div>
+          <div class="right-column">
+            <div class="subpanel function-panel">
+              <div class="detail-header">
+                <div class="subpanel-title">invoke</div>
+                <div class="hint" id="functionSelected">select a function</div>
+              </div>
+              <div class="function-controls">
+                <div class="control-group">
+                  <label for="functionUserInput">user</label>
+                  <input id="functionUserInput" list="functionUserList" type="text" placeholder="paste user _id" />
+                  <datalist id="functionUserList"></datalist>
+                </div>
+                <div class="control-group">
+                  <label for="functionRunMode">run as</label>
+                  <select id="functionRunMode">
+                    <option value="system" selected>system</option>
+                    <option value="user">user</option>
+                  </select>
+                </div>
+              </div>
+              <div id="functionEditor" class="function-editor">
+                <div class="code-editor">
+                  <div id="functionGutter" class="code-gutter">1</div>
+                  <div class="code-surface">
+                    <pre id="functionHighlight" class="code-highlight"></pre>
+                    <textarea id="functionCode" placeholder="// function code" spellcheck="false" wrap="off"></textarea>
+                  </div>
+                </div>
+                <div class="editor-actions">
+                  <button id="restoreFunction" class="secondary">restore original</button>
+                  <button id="invokeFunction">invoke</button>
+                </div>
+                <div class="hint" id="functionEditorStatus"></div>
+              </div>
+              <div class="function-io">
+                <div class="io-column">
+                  <label for="functionArgs">args</label>
+                  <textarea id="functionArgs" placeholder='[ "arg1", { "foo": "bar" } ]'></textarea>
+                </div>
+                <div class="io-column">
+                  <label for="functionResult">result</label>
+                  <pre id="functionResult" class="event-detail function-result"></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="panel tab-panel" data-panel="collections">
+        <div class="panel-header">
+          <span>Collections</span>
+          <button id="refreshCollections" class="secondary">refresh</button>
+        </div>
+        <div class="split-grid collections-grid">
+          <div class="column-stack">
+            <div class="controls">
+              <input id="collectionSearch" class="wide-input" type="text" placeholder="search collections" />
+            </div>
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">collections</div>
+              <div id="collectionList" class="user-list"></div>
+            </div>
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">history</div>
+              <div id="collectionHistory" class="history-list"></div>
+            </div>
+          </div>
+          <div class="right-column">
+            <div class="subpanel collection-detail">
+              <div class="detail-header">
+                <div class="subpanel-title">collection detail</div>
+                <div class="hint" id="collectionSelected">select a collection</div>
+              </div>
+              <div class="mini-tabs">
+                <button class="mini-tab active" data-collection-tab="query">query</button>
+                <button class="mini-tab" data-collection-tab="rules">rules</button>
+              </div>
+              <div class="mini-panels">
+                <div class="mini-panel active" data-collection-panel="query">
+                  <div class="collection-controls">
+                    <div class="control-group">
+                      <label for="collectionUserInput">user</label>
+                      <input id="collectionUserInput" list="collectionUserList" placeholder="select user" />
+                      <datalist id="collectionUserList"></datalist>
+                    </div>
+                    <div class="control-group">
+                      <label for="collectionRunMode">run as</label>
+                      <select id="collectionRunMode">
+                        <option value="system" selected>system</option>
+                        <option value="user">user</option>
+                      </select>
+                    </div>
+                    <div class="control-group">
+                      <label for="collectionMode">mode</label>
+                      <select id="collectionMode">
+                        <option value="query" selected>query</option>
+                        <option value="aggregate">aggregate</option>
+                      </select>
+                    </div>
+                    <div class="control-group">
+                      <label for="collectionSort">sort</label>
+                      <input id="collectionSort" type="text" placeholder='{"createdAt": -1}' />
+                    </div>
+                  </div>
+                <div class="collection-io">
+                  <div class="io-column">
+                    <label for="collectionQuery">query</label>
+                    <div class="json-editor">
+                      <pre id="collectionQueryHighlight" class="json-highlight"></pre>
+                      <textarea id="collectionQuery" placeholder='{"field": "value"}'></textarea>
+                    </div>
+                  </div>
+                  <div class="io-column">
+                    <label for="collectionAggregate">aggregate</label>
+                    <div class="json-editor">
+                      <pre id="collectionAggregateHighlight" class="json-highlight"></pre>
+                      <textarea id="collectionAggregate" placeholder='[{ "$match": { "field": "value" } }]'></textarea>
+                    </div>
+                  </div>
+                </div>
+                  <div class="editor-actions">
+                    <button id="runCollectionQuery">run</button>
+                    <div class="pager">
+                      <div class="pager-controls">
+                        <button id="collectionPrev" class="secondary">prev</button>
+                        <button id="collectionNext" class="secondary">next</button>
+                      </div>
+                      <div>page <span id="collectionPage">1</span> · total <span id="collectionTotal">0</span></div>
+                    </div>
+                  </div>
+                  <div class="result-toolbar">
+                    <div class="toggle-buttons">
+                      <button id="collectionViewJson" class="secondary active">json</button>
+                      <button id="collectionViewTable" class="secondary">table</button>
+                    </div>
+                  </div>
+                  <div id="collectionResult" class="event-detail function-result"></div>
+                </div>
+                <div class="mini-panel" data-collection-panel="rules">
+                  <pre id="collectionRules" class="event-detail">select a collection</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script src="__MONIT_BASE__/ui.js"></script>
+
+</body>
+
+</html>

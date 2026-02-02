@@ -13,7 +13,11 @@ import { hashPassword } from '../crypto'
  */
 export const exposeRoutes = async (fastify: FastifyInstance) => {
   try {
-    fastify.get(`${API_VERSION}/app/:appId/location`, async (req) => {
+    fastify.get(`${API_VERSION}/app/:appId/location`, {
+      schema: {
+        tags: ['System']
+      }
+    }, async (req) => {
       const schema = DEFAULT_CONFIG?.HTTPS_SCHEMA ?? 'http'
       const headerHost = req.headers.host ?? 'localhost:3000'
       const hostname = headerHost.split(':')[0]
@@ -29,7 +33,11 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
       }
     })
 
-    fastify.get('/health', async () => ({
+    fastify.get('/health', {
+      schema: {
+        tags: ['System']
+      }
+    }, async () => ({
       status: 'ok',
       uptime: uptime()
     }))

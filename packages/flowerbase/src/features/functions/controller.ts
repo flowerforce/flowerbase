@@ -62,7 +62,11 @@ export const functionsController: FunctionController = async (
 
   const streams = {} as Record<string, ChangeStream<Document, Document>>
 
-  app.post<{ Body: FunctionCallDto }>('/call', async (req, res) => {
+  app.post<{ Body: FunctionCallDto }>('/call', {
+    schema: {
+      tags: ['Functions']
+    }
+  }, async (req, res) => {
     const user = getRequestUser(req)
     if (!user || user.typ !== 'access') {
       throw new Error('Access token required')
@@ -148,7 +152,11 @@ export const functionsController: FunctionController = async (
   })
   app.get<{
     Querystring: FunctionCallBase64Dto
-  }>('/call', async (req, res) => {
+  }>('/call', {
+    schema: {
+      tags: ['Functions']
+    }
+  }, async (req, res) => {
     const { query } = req
     const user = getRequestUser(req)
     if (!user || user.typ !== 'access') {
