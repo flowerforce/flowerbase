@@ -46,7 +46,7 @@
                 <option value="http_endpoint">http_endpoint</option>
                 <option value="api">api</option>
                 <option value="aws">aws</option>
-                <option value="rules">rules</option>
+                <option value="mongo">mongo</option>
                 <option value="log">log</option>
                 <option value="error">error</option>
               </select>
@@ -213,61 +213,65 @@
               </div>
               <div class="mini-panels">
                 <div class="mini-panel active" data-collection-panel="query">
-                  <div class="collection-controls">
-                    <div class="control-group">
-                      <label for="collectionUserInput">user</label>
-                      <input id="collectionUserInput" list="collectionUserList" placeholder="select user" />
-                      <datalist id="collectionUserList"></datalist>
-                    </div>
-                    <div class="control-group">
-                      <label for="collectionRunMode">run as</label>
-                      <select id="collectionRunMode">
-                        <option value="system" selected>system</option>
-                        <option value="user">user</option>
-                      </select>
-                    </div>
-                    <div class="control-group">
-                      <label for="collectionMode">mode</label>
-                      <select id="collectionMode">
-                        <option value="query" selected>query</option>
-                        <option value="aggregate">aggregate</option>
-                      </select>
-                    </div>
-                    <div class="control-group">
-                      <label for="collectionSort">sort</label>
-                      <input id="collectionSort" type="text" placeholder='{"createdAt": -1}' />
-                    </div>
-                  </div>
-                <div class="collection-io">
-                  <div class="io-column">
-                    <label for="collectionQuery">query</label>
-                    <div class="json-editor">
-                      <pre id="collectionQueryHighlight" class="json-highlight"></pre>
-                      <textarea id="collectionQuery" placeholder='{"field": "value"}'></textarea>
-                    </div>
-                  </div>
-                  <div class="io-column">
-                    <label for="collectionAggregate">aggregate</label>
-                    <div class="json-editor">
-                      <pre id="collectionAggregateHighlight" class="json-highlight"></pre>
-                      <textarea id="collectionAggregate" placeholder='[{ "$match": { "field": "value" } }]'></textarea>
-                    </div>
-                  </div>
-                </div>
-                  <div class="editor-actions">
-                    <button id="runCollectionQuery">run</button>
-                    <div class="pager">
-                      <div class="pager-controls">
-                        <button id="collectionPrev" class="secondary">prev</button>
-                        <button id="collectionNext" class="secondary">next</button>
+                  <div class="collection-layout">
+                    <div class="collection-controls">
+                      <div class="control-group">
+                        <label for="collectionUserInput">user</label>
+                        <input id="collectionUserInput" list="collectionUserList" placeholder="select user" />
+                        <datalist id="collectionUserList"></datalist>
                       </div>
-                      <div>page <span id="collectionPage">1</span> · total <span id="collectionTotal">0</span></div>
+                      <div class="control-group">
+                        <label for="collectionRunMode">run as</label>
+                        <select id="collectionRunMode">
+                          <option value="system" selected>system</option>
+                          <option value="user">user</option>
+                        </select>
+                      </div>
+                      <div class="control-group">
+                        <label for="collectionMode">mode</label>
+                        <select id="collectionMode">
+                          <option value="query" selected>query</option>
+                          <option value="aggregate">aggregate</option>
+                        </select>
+                      </div>
+                      <div class="control-group">
+                        <label for="collectionSort">sort</label>
+                        <input id="collectionSort" type="text" placeholder='{"createdAt": -1}' />
+                      </div>
+                    </div>
+                    <div id="collectionIo" class="collection-io" data-mode="query">
+                      <div class="io-column" data-collection-mode="query">
+                        <label for="collectionQuery">query</label>
+                        <div class="json-editor">
+                          <pre id="collectionQueryHighlight" class="json-highlight"></pre>
+                          <textarea id="collectionQuery" placeholder='{"field": "value"}'></textarea>
+                        </div>
+                      </div>
+                      <div class="io-column" data-collection-mode="aggregate">
+                        <label for="collectionAggregate">aggregate</label>
+                        <div class="json-editor">
+                          <pre id="collectionAggregateHighlight" class="json-highlight"></pre>
+                          <textarea id="collectionAggregate" placeholder='[{ "$match": { "field": "value" } }]'></textarea>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div class="result-toolbar">
-                    <div class="toggle-buttons">
-                      <button id="collectionViewJson" class="secondary active">json</button>
-                      <button id="collectionViewTable" class="secondary">table</button>
+                  <div class="collection-actions">
+                    <div class="editor-actions">
+                      <button id="runCollectionQuery">run</button>
+                      <div class="pager">
+                        <div class="pager-controls">
+                          <button id="collectionPrev" class="secondary">prev</button>
+                          <button id="collectionNext" class="secondary">next</button>
+                        </div>
+                        <div>page <span id="collectionPage">1</span>/<span id="collectionPages">1</span> · total <span id="collectionTotal">0</span></div>
+                      </div>
+                    </div>
+                    <div class="result-toolbar">
+                      <div class="toggle-buttons">
+                        <button id="collectionViewJson" class="secondary active">json</button>
+                        <button id="collectionViewTable" class="secondary">table</button>
+                      </div>
                     </div>
                   </div>
                   <div id="collectionResult" class="event-detail function-result"></div>

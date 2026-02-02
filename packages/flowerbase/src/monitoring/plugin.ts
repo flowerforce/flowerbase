@@ -339,34 +339,7 @@ const buildCollectionRulesSnapshot = (
   runAsSystem?: boolean
 ) => {
   const collectionRules = rules?.[collection]
-  if (!collectionRules) {
-    return {
-      collection,
-      rules: null,
-      filters: [],
-      matchedFilters: [],
-      roles: [],
-      matchedRoles: [],
-      runAsSystem: !!runAsSystem
-    }
-  }
-  const filters = collectionRules.filters ?? []
-  const roles = collectionRules.roles ?? []
-  const safeUser = (user ?? {}) as Parameters<typeof getValidRule>[0]['user']
-  const matchedFilters = getValidRule({ filters, user: safeUser })
-  const matchedFilterNames = matchedFilters.map((filter) => filter.name)
-  const matchedRoles = roles
-    .filter((role) => checkApplyWhen(role.apply_when, safeUser as never, null))
-    .map((role) => role.name)
-  return {
-    collection,
-    rules: sanitize(collectionRules),
-    filters: filters.map((filter) => filter.name),
-    matchedFilters: matchedFilterNames,
-    roles: roles.map((role) => role.name),
-    matchedRoles,
-    runAsSystem: !!runAsSystem
-  }
+  return collectionRules ?? null
 }
 
 const resolveAssetCandidates = (filename: string, prefix: string) => {
@@ -490,11 +463,11 @@ const wrapServicesForMonitoring = (addEvent: (event: MonitorEvent) => void) => {
     api: 'api',
     aws: 'aws',
     auth: 'auth',
-    'mongodb-atlas': 'rules'
+    'mongodb-atlas': 'mongo'
   }
   const initMethodMap: Record<string, Set<string>> = {
     aws: new Set(['lambda', 's3']),
-    'mongodb-atlas': new Set(['db', 'collection'])
+    'mongodb-atlas': new Set(['db', 'collection', 'limit', 'skip', 'toArray'])
   }
 
   const cache = new WeakMap<object, unknown>()
