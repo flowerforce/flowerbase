@@ -1,457 +1,36 @@
-import fp from 'fastify-plugin'
 import fastifyWebsocket from '@fastify/websocket'
-import '@fastify/websocket'
-import fs from 'node:fs'
-import path from 'node:path'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import { ObjectId } from 'mongodb'
-import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../constants'
-import { services as coreServices } from '../services'
-import { StateManager } from '../state'
-import handleUserRegistration from '../shared/handleUserRegistration'
-import { PROVIDER } from '../shared/models/handleUserRegistration.model'
-import { hashPassword } from '../utils/crypto'
-import { GenerateContext } from '../utils/context'
+import fp from 'fastify-plugin'
+import '@fastify/websocket'
+import { DEFAULT_CONFIG } from '../constants'
 import type { Rules } from '../features/rules/interface'
-import { getValidRule } from '../services/mongodb-atlas/utils'
-import { checkApplyWhen } from '../utils/roles/machines/utils'
+import { services as coreServices } from '../services'
+import { registerCollectionRoutes } from './routes/collections'
+import { registerEventsRoutes } from './routes/events'
+import { registerFunctionRoutes } from './routes/functions'
+import { registerTriggerRoutes } from './routes/triggers'
+import { registerUserRoutes } from './routes/users'
+import {
+  buildRulesMeta,
+  classifyRequest,
+  CollectionHistoryItem,
+  createEventId,
+  createEventStore,
+  DAY_MS,
+  EventStore,
+  FunctionHistoryItem,
+  isPromiseLike,
+  isTestEnv,
+  MonitMeta,
+  MonitorEvent,
+  pickHeaders,
+  readAsset,
+  resolveAssetCandidates,
+  safeStringify,
+  sanitize
+} from './utils'
 
-type MonitorEvent = {
-  id: string
-  ts: number
-  type: string
-  source?: string
-  message: string
-  data?: unknown
-}
-
-type FunctionHistoryItem = {
-  ts: number
-  name: string
-  args: unknown[]
-  runAsSystem: boolean
-  user?: { id?: string; email?: string }
-  code?: string
-  codeModified?: boolean
-}
-
-type CollectionHistoryItem = {
-  ts: number
-  collection: string
-  mode: 'query' | 'aggregate'
-  query?: unknown
-  pipeline?: unknown
-  sort?: Record<string, unknown>
-  runAsSystem: boolean
-  user?: { id?: string; email?: string }
-  page?: number
-}
-
-type EventQuery = {
-  q?: string
-  type?: string
-  limit?: number
-}
-
-type EventStore = {
-  add: (event: MonitorEvent) => void
-  list: (query?: EventQuery) => MonitorEvent[]
-  clear: () => void
-}
-
-const DAY_MS = 24 * 60 * 60 * 1000
-const MAX_DEPTH = 15
-const MAX_ARRAY = 50
-const MAX_STRING = 500
-const COLLECTION_PAGE_SIZE = 50
 const MONIT_REALM = 'Flowerbase Monitor'
-
-const isTestEnv = () =>
-  process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined
-
-const isPromiseLike = (value: unknown): value is Promise<unknown> =>
-  !!value && typeof value === 'object' && typeof (value as { then?: unknown }).then === 'function'
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  !!value && typeof value === 'object' && !Array.isArray(value)
-
-const safeStringify = (value: unknown) => {
-  const seen = new WeakSet<object>()
-  try {
-    return JSON.stringify(value, (key, val) => {
-      if (typeof val === 'bigint') return val.toString()
-      if (val && typeof val === 'object') {
-        if (seen.has(val)) return '[Circular]'
-        seen.add(val)
-      }
-      return val
-    })
-  } catch {
-    return String(value)
-  }
-}
-
-const SENSITIVE_KEYS = [
-  /pass(word)?/i,
-  /secret/i,
-  /token/i,
-  /authorization/i,
-  /cookie/i,
-  /api[-_]?key/i,
-  /access[-_]?key/i,
-  /refresh[-_]?token/i,
-  /signature/i,
-  /private/i
-]
-
-const redactString = (value: string) => {
-  let result = value
-  result = result.replace(/(Bearer|Basic)\s+[A-Za-z0-9._+\\/=-]+/gi, '$1 [redacted]')
-  result = result.replace(
-    /(password|pass|pwd|secret|token|api[_-]?key|access[_-]?key|refresh[_-]?token)\s*[=:]\s*[^\\s,;]+/gi,
-    '$1=[redacted]'
-  )
-  if (result.length > MAX_STRING) {
-    result = result.slice(0, MAX_STRING) + '...[truncated]'
-  }
-  return result
-}
-
-const stripSensitiveFields = (value: Record<string, unknown>) => {
-  const out: Record<string, unknown> = {}
-  Object.keys(value).forEach((key) => {
-    if (SENSITIVE_KEYS.some((re) => re.test(key))) return
-    out[key] = value[key]
-  })
-  return out
-}
-
-const isErrorLike = (value: unknown): value is Record<string, unknown> => {
-  if (!value || typeof value !== 'object') return false
-  if (value instanceof Error) return true
-  const record = value as Record<string, unknown>
-  return (
-    typeof record.message === 'string' ||
-    typeof record.stack === 'string' ||
-    typeof record.name === 'string'
-  )
-}
-
-const sanitizeErrorLike = (value: Record<string, unknown>, depth: number): Record<string, unknown> => {
-  const out: Record<string, unknown> = {}
-  const names = new Set<string>(Object.getOwnPropertyNames(value))
-    ;['name', 'message', 'stack', 'code', 'statusCode', 'cause'].forEach((key) => names.add(key))
-
-  names.forEach((key) => {
-    if (SENSITIVE_KEYS.some((re) => re.test(key))) {
-      out[key] = '[redacted]'
-      return
-    }
-    const raw = value[key]
-    if (raw === value) {
-      out[key] = '[Circular]'
-      return
-    }
-    if ((key === 'message' || key === 'stack') && typeof raw === 'string') {
-      out[key] = DEFAULT_CONFIG.MONIT_REDACT_ERROR_DETAILS ? redactString(raw) : raw
-      return
-    }
-    if (typeof raw === 'string') {
-      out[key] = redactString(raw)
-      return
-    }
-    if (raw !== undefined) {
-      out[key] = sanitize(raw, depth + 1)
-    }
-  })
-
-  if (value instanceof Error) {
-    if (!out.name) out.name = value.name
-    if (!out.message) {
-      out.message = DEFAULT_CONFIG.MONIT_REDACT_ERROR_DETAILS ? redactString(value.message) : value.message
-    }
-    if (!out.stack && value.stack) {
-      out.stack = DEFAULT_CONFIG.MONIT_REDACT_ERROR_DETAILS ? redactString(value.stack) : value.stack
-    }
-  }
-
-  return out
-}
-
-const getErrorDetails = (error: unknown) => {
-  if (isErrorLike(error)) {
-    const sanitized = sanitizeErrorLike(error as Record<string, unknown>, 0)
-    const message =
-      typeof sanitized.message === 'string' && sanitized.message
-        ? sanitized.message
-        : typeof sanitized.name === 'string' && sanitized.name
-          ? sanitized.name
-          : safeStringify(error)
-    const stack = typeof sanitized.stack === 'string' ? sanitized.stack : undefined
-    return { message, stack }
-  }
-  if (typeof error === 'string') return { message: error }
-  return { message: safeStringify(error) }
-}
-
-const sanitize = (value: unknown, depth = 0): unknown => {
-  if (depth > MAX_DEPTH) return '[max-depth]'
-  if (value === null || value === undefined) return value
-  if (value instanceof Date) return value.toISOString()
-  if (Buffer.isBuffer(value)) return `[buffer ${value.length} bytes]`
-  if (isErrorLike(value)) {
-    return sanitizeErrorLike(value as Record<string, unknown>, depth)
-  }
-  if (typeof value === 'object') {
-    const maybeObjectId = value as { _bsontype?: string; toString?: () => string }
-    if (maybeObjectId?._bsontype === 'ObjectId' && typeof maybeObjectId.toString === 'function') {
-      return maybeObjectId.toString()
-    }
-  }
-  if (typeof value === 'string') return redactString(value)
-  if (typeof value === 'number' || typeof value === 'boolean') return value
-  if (typeof value === 'bigint') return value.toString()
-  if (Array.isArray(value)) {
-    const items = value.slice(0, MAX_ARRAY).map((item) => sanitize(item, depth + 1))
-    if (value.length > MAX_ARRAY) {
-      items.push(`[+${value.length - MAX_ARRAY} items]`)
-    }
-    return items
-  }
-  if (typeof value === 'object') {
-    const obj = value as Record<string, unknown>
-    const out: Record<string, unknown> = {}
-    Object.keys(obj).forEach((key) => {
-      if (SENSITIVE_KEYS.some((re) => re.test(key))) {
-        out[key] = '[redacted]'
-        return
-      }
-      out[key] = sanitize(obj[key], depth + 1)
-    })
-    return out
-  }
-  return value
-}
-
-const pickHeaders = (headers: FastifyRequest['headers']) => {
-  const keys = ['user-agent', 'content-type', 'x-forwarded-for', 'host', 'origin', 'referer']
-  const picked: Record<string, unknown> = {}
-  keys.forEach((key) => {
-    const value = headers[key]
-    if (value) picked[key] = value
-  })
-  return sanitize(picked)
-}
-
-const createEventStore = (maxAgeMs: number, maxEvents: number): EventStore => {
-  const events: MonitorEvent[] = []
-
-  const trim = () => {
-    const cutoff = Date.now() - maxAgeMs
-    while (events.length && events[0].ts < cutoff) {
-      events.shift()
-    }
-    if (events.length > maxEvents) {
-      events.splice(0, events.length - maxEvents)
-    }
-  }
-
-  return {
-    add(event) {
-      events.push(event)
-      trim()
-    },
-    list(query) {
-      trim()
-      let result = events.slice()
-      if (query?.type) {
-        result = result.filter((event) => event.type === query.type)
-      }
-      if (query?.q) {
-        const q = query.q.toLowerCase()
-        result = result.filter((event) => safeStringify(event).toLowerCase().includes(q))
-      }
-      if (query?.limit && query.limit > 0) {
-        result = result.slice(-query.limit)
-      }
-      return result
-    },
-    clear() {
-      events.length = 0
-    }
-  }
-}
-
-const classifyRequest = (url: string) => {
-  if (url.includes('/auth') || url.includes('/login') || url.includes('/register') || url.includes('/logout')) {
-    return 'auth'
-  }
-  if (url.includes('/functions')) return 'function'
-  if (url.includes('/endpoint/')) return 'http_endpoint'
-  if (url.includes('/triggers')) return 'trigger'
-  if (url.includes('/api/')) return 'api'
-  return 'http'
-}
-
-const createEventId = () =>
-  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-
-type MonitMeta = {
-  serviceName: string
-  rules?: Rules
-  user?: unknown
-  runAsSystem?: boolean
-  dbName?: string
-  collection?: string
-}
-
-const buildRulesMeta = (meta?: MonitMeta) => {
-  if (!meta || meta.serviceName !== 'mongodb-atlas' || !meta.collection || !meta.rules) {
-    return undefined
-  }
-  const collectionRules = meta.rules[meta.collection]
-  if (!collectionRules) {
-    return { collection: meta.collection, roles: [], filters: [] }
-  }
-  const filters = collectionRules.filters ?? []
-  const roles = collectionRules.roles ?? []
-  const user = (meta.user ?? {}) as Parameters<typeof getValidRule>[0]['user']
-  const matchedFilters = getValidRule({ filters, user })
-  const matchedFilterNames = matchedFilters.map((filter) => filter.name)
-  const matchedFilterQueries = matchedFilters.map((filter) => filter.query)
-  const roleCandidates = roles
-    .filter((role) => checkApplyWhen(role.apply_when, user as never, null))
-    .map((role) => role.name)
-
-  return {
-    collection: meta.collection,
-    roles: roles.map((role) => role.name),
-    roleCandidates,
-    filters: filters.map((filter) => filter.name),
-    matchedFilters: matchedFilterNames,
-    matchedFilterQueries,
-    runAsSystem: !!meta.runAsSystem
-  }
-}
-
-const buildCollectionRulesSnapshot = (
-  rules: Rules | undefined,
-  collection: string,
-  user?: unknown,
-  runAsSystem?: boolean
-) => {
-  const collectionRules = rules?.[collection]
-  return collectionRules ?? null
-}
-
-const resolveAssetCandidates = (filename: string, prefix: string) => {
-  const rootDir = process.cwd()
-  const cleanPrefix = prefix.replace(/^\/+/, '').replace(/\/+$/, '')
-  const candidates: string[] = []
-  const addCandidate = (candidate: string) => {
-    if (!candidates.includes(candidate)) candidates.push(candidate)
-  }
-
-  if (cleanPrefix) {
-    addCandidate(path.join(rootDir, cleanPrefix, filename))
-  }
-  addCandidate(path.join(rootDir, 'monitoring', filename))
-
-  // Fallbacks: try package-local assets (works in dev and when bundled).
-  addCandidate(path.join(__dirname, filename))
-  addCandidate(path.join(__dirname, '..', '..', 'src', 'monitoring', filename))
-
-  return candidates
-}
-
-const resolveUserContext = async (
-  app: FastifyInstance,
-  userId?: string,
-  userPayload?: Record<string, unknown>
-) => {
-  if (userPayload && typeof userPayload === 'object') {
-    return stripSensitiveFields(userPayload)
-  }
-  if (!userId) return undefined
-  const normalizedUserId = userId.trim()
-
-  const db = app.mongo.client.db(DB_NAME)
-  const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
-  const userCollection = AUTH_CONFIG.userCollection
-  const userIdField = AUTH_CONFIG.user_id_field ?? 'id'
-  const isObjectId = ObjectId.isValid(normalizedUserId)
-  const authSelector = isObjectId
-    ? { _id: new ObjectId(normalizedUserId) }
-    : { id: normalizedUserId }
-  const authUser = await db.collection(authCollection).findOne(authSelector)
-
-  let customUser: Record<string, unknown> | null = null
-  if (userCollection) {
-    const customSelector = { [userIdField]: normalizedUserId }
-    customUser = await db.collection(userCollection).findOne(customSelector)
-    if (!customUser && isObjectId) {
-      customUser = await db.collection(userCollection).findOne({ _id: new ObjectId(normalizedUserId) })
-    }
-  }
-
-  const id =
-    authUser && typeof (authUser as { _id?: unknown })._id !== 'undefined'
-      ? String((authUser as { _id?: ObjectId })._id)
-      : (customUser && typeof customUser[userIdField] !== 'undefined'
-        ? String(customUser[userIdField])
-        : normalizedUserId)
-
-  const user_data = {
-    ...(customUser ? stripSensitiveFields(customUser) : {}),
-    id,
-    _id: id,
-    email: authUser && typeof (authUser as { email?: unknown }).email === 'string'
-      ? (authUser as { email?: string }).email
-      : undefined
-  }
-
-  const user: Record<string, unknown> = {
-    id,
-    user_data,
-    data: user_data,
-    custom_data: user_data
-  }
-
-  if (isObjectId) {
-    user._id = new ObjectId(id)
-  }
-
-  return user
-}
-
-const getUserInfo = (resolvedUser?: Record<string, unknown>) => {
-  if (!resolvedUser || typeof resolvedUser !== 'object') return undefined
-  const record = resolvedUser as {
-    id?: unknown
-    email?: unknown
-    user_data?: { email?: unknown }
-  }
-  const id = typeof record.id === 'string' ? record.id : undefined
-  const email = typeof record.email === 'string'
-    ? record.email
-    : (typeof record.user_data?.email === 'string' ? record.user_data.email : undefined)
-  if (!id && !email) return undefined
-  return { id, email }
-}
-
-const readAsset = (filename: string, prefix: string) => {
-  const candidates = resolveAssetCandidates(filename, prefix)
-  for (const candidate of candidates) {
-    try {
-      if (fs.existsSync(candidate)) {
-        return fs.readFileSync(candidate, 'utf8')
-      }
-    } catch {
-      // ignore and try next
-    }
-  }
-  return ''
-}
 
 const wrapServicesForMonitoring = (addEvent: (event: MonitorEvent) => void) => {
   const wrapped = coreServices as unknown as Record<
@@ -536,7 +115,7 @@ const wrapServicesForMonitoring = (addEvent: (event: MonitorEvent) => void) => {
               throw error
             }
             if (isPromiseLike(result)) {
-              return result.catch((error) => {
+              return (result as Promise<unknown>).catch((error) => {
                 addEvent({
                   id: createEventId(),
                   ts: Date.now(),
@@ -564,7 +143,7 @@ const wrapServicesForMonitoring = (addEvent: (event: MonitorEvent) => void) => {
   Object.keys(coreServices).forEach((serviceName) => {
     const original = wrapped[serviceName]
     wrapped[serviceName] = (app: FastifyInstance, options: Record<string, unknown>) => {
-      const instance = original(app, options)
+      const instance = (original as typeof original)(app, options)
       const meta: MonitMeta = {
         serviceName,
         rules: options.rules as Rules | undefined,
@@ -598,7 +177,7 @@ const createMonitoringPlugin = fp(async (
   const allowInvoke = DEFAULT_CONFIG.MONIT_ALLOW_INVOKE
   const allowEdit = DEFAULT_CONFIG.MONIT_ALLOW_EDIT
 
-  const eventStore = createEventStore(maxAgeMs || DAY_MS, maxEvents)
+  const eventStore: EventStore = createEventStore(maxAgeMs || DAY_MS, maxEvents)
   const functionHistory: FunctionHistoryItem[] = []
   const maxHistory = 30
   const collectionHistory: CollectionHistoryItem[] = []
@@ -616,7 +195,6 @@ const createMonitoringPlugin = fp(async (
       functionHistory.splice(maxHistory)
     }
   }
-
   const addCollectionHistory = (entry: CollectionHistoryItem) => {
     collectionHistory.unshift(entry)
     if (collectionHistory.length > maxCollectionHistory) {
@@ -675,7 +253,7 @@ const createMonitoringPlugin = fp(async (
     const sanitizedEvent: MonitorEvent = {
       ...event,
       data: sanitize(event.data),
-      message: redactString(event.message)
+      message: event.message
     }
     eventStore.add(sanitizedEvent)
     const payload = JSON.stringify({ type: 'event', event: sanitizedEvent })
@@ -736,7 +314,7 @@ const createMonitoringPlugin = fp(async (
   }
 
   const hasCredentials = () =>
-    DEFAULT_CONFIG.MONIT_USER && DEFAULT_CONFIG.MONIT_PASSWORD
+    Boolean(DEFAULT_CONFIG.MONIT_USER && DEFAULT_CONFIG.MONIT_PASSWORD)
 
   const isAuthorized = (req: FastifyRequest) => {
     if (!hasCredentials()) return false
@@ -797,7 +375,7 @@ const createMonitoringPlugin = fp(async (
         return
       }
     }
-    ; (req as { __monitStart?: number }).__monitStart = Date.now()
+    (req as { __monitStart?: number }).__monitStart = Date.now()
     done()
   })
 
@@ -900,8 +478,9 @@ const createMonitoringPlugin = fp(async (
 
   app.get(`${prefix}/ws`, { websocket: true }, (connection) => {
     const socket =
-      (connection as { socket?: { send: (data: string) => void; readyState: number; on: Function } })
-        .socket ?? (connection as { send: (data: string) => void; readyState: number; on: Function })
+      (connection as {
+        socket?: { send: (data: string) => void; readyState: number; on: Function }
+      }).socket ?? (connection as { send: (data: string) => void; readyState: number; on: Function })
     clients.add(socket)
     socket.send(JSON.stringify({ type: 'init', events: eventStore.list({ limit: maxEvents }) }))
     addEvent({
@@ -923,588 +502,23 @@ const createMonitoringPlugin = fp(async (
     })
   })
 
-  app.get(`${prefix}/api/events`, async (req) => {
-    const query = req.query as { q?: string; type?: string; limit?: string }
-    const limit = query.limit ? Number(query.limit) : undefined
-    return {
-      items: eventStore.list({
-        q: query.q,
-        type: query.type,
-        limit
-      })
-    }
+  registerEventsRoutes(app, { prefix, eventStore, getStats })
+  registerTriggerRoutes(app, { prefix })
+  registerFunctionRoutes(app, {
+    prefix,
+    allowEdit,
+    allowInvoke,
+    maxHistory,
+    addFunctionHistory,
+    functionHistory,
+    addEvent
   })
-
-  app.get(`${prefix}/api/stats`, async () => getStats())
-
-  app.get(`${prefix}/api/functions`, async () => {
-    const functionsList = StateManager.select('functions') as Record<string, { private?: boolean }>
-    const items = Object.keys(functionsList || {}).map((name) => ({
-      name,
-      private: !!functionsList[name]?.private,
-      run_as_system: !!(functionsList[name] as { run_as_system?: boolean })?.run_as_system
-    }))
-    return { items }
-  })
-
-  app.get(`${prefix}/api/triggers`, async () => {
-    const triggersList = StateManager.select('triggers') as { fileName: string; content: unknown }[] | undefined
-    return { items: triggersList || [] }
-  })
-
-  app.get(`${prefix}/api/functions/:name`, async (req, reply) => {
-    if (!allowEdit) {
-      reply.code(403)
-      return { error: 'Function code access disabled' }
-    }
-    const params = req.params as { name: string }
-    const name = params.name
-    const functionsList = StateManager.select('functions') as Record<
-      string,
-      { code?: string; private?: boolean; run_as_system?: boolean; disable_arg_logs?: boolean }
-    >
-    const currentFunction = functionsList?.[name]
-    if (!currentFunction) {
-      reply.code(404)
-      return { error: `Function "${name}" not found` }
-    }
-    return {
-      name,
-      code: currentFunction.code ?? '',
-      private: !!currentFunction.private,
-      run_as_system: !!currentFunction.run_as_system,
-      disable_arg_logs: !!currentFunction.disable_arg_logs
-    }
-  })
-
-  app.get(`${prefix}/api/functions/history`, async () => ({
-    items: functionHistory.slice(0, maxHistory)
-  }))
-
-  app.post(`${prefix}/api/functions/invoke`, async (req, reply) => {
-    if (!allowInvoke) {
-      reply.code(403)
-      return { error: 'Function invocation disabled' }
-    }
-    const body = req.body as {
-      name?: string
-      arguments?: unknown[]
-      runAsSystem?: boolean
-      userId?: string
-      user?: Record<string, unknown>
-      code?: string
-    }
-    const name = body?.name
-    const args = Array.isArray(body?.arguments) ? body.arguments : []
-    if (!name) {
-      reply.code(400)
-      return { error: 'Missing function name' }
-    }
-    const functionsList = StateManager.select('functions') as Record<string, { code: string }>
-    const rules = StateManager.select('rules') as Rules
-    const appRef = StateManager.select('app') as FastifyInstance
-    const services = StateManager.select('services') as typeof coreServices
-    const currentFunction = functionsList?.[name]
-    if (!currentFunction) {
-      reply.code(404)
-      return { error: `Function "${name}" not found` }
-    }
-    if (!allowEdit && typeof body?.code === 'string' && body.code.trim()) {
-      reply.code(403)
-      return { error: 'Function override disabled' }
-    }
-    const overrideCode =
-      typeof body?.code === 'string' && body.code.trim()
-        ? body.code
-        : undefined
-    const effectiveRunAsSystem = body?.runAsSystem !== false
-    const effectiveFunction = overrideCode
-      ? { ...currentFunction, code: overrideCode, run_as_system: effectiveRunAsSystem }
-      : { ...currentFunction, run_as_system: effectiveRunAsSystem }
-
-    const resolvedUser = await resolveUserContext(app, body?.userId, body?.user)
-    const safeArgs = (Array.isArray(args) ? sanitize(args) : sanitize([args])) as unknown[]
-    const resolvedUserRecord = resolvedUser as {
-      id?: unknown
-      email?: unknown
-      user_data?: { email?: unknown }
-    } | undefined
-    const userInfo = resolvedUserRecord
-      ? {
-        id: typeof resolvedUserRecord.id === 'string' ? resolvedUserRecord.id : undefined,
-        email: typeof resolvedUserRecord.email === 'string'
-          ? resolvedUserRecord.email
-          : (typeof resolvedUserRecord.user_data?.email === 'string'
-            ? resolvedUserRecord.user_data?.email
-            : undefined)
-      }
-      : undefined
-    const codeModified = typeof overrideCode === 'string' && overrideCode !== currentFunction.code
-    addFunctionHistory({
-      ts: Date.now(),
-      name,
-      args: safeArgs,
-      runAsSystem: effectiveRunAsSystem,
-      user: userInfo,
-      code: codeModified ? overrideCode : undefined,
-      codeModified
-    })
-
-    addEvent({
-      id: createEventId(),
-      ts: Date.now(),
-      type: 'function',
-      source: 'monit',
-      message: `invoke ${name}`,
-      data: sanitize({
-        args,
-        user: userInfo,
-        runAsSystem: effectiveRunAsSystem,
-        override: Boolean(overrideCode)
-      })
-    })
-
-    try {
-      const result = await GenerateContext({
-        args,
-        app: appRef,
-        rules,
-        user: resolvedUser ?? { id: 'monitor', role: 'system' },
-        currentFunction: effectiveFunction,
-        functionsList,
-        services,
-        runAsSystem: effectiveRunAsSystem
-      })
-      return { result: sanitize(result) }
-    } catch (error) {
-      addEvent({
-        id: createEventId(),
-        ts: Date.now(),
-        type: 'error',
-        source: 'monit',
-        message: `invoke ${name} failed`,
-        data: sanitize({ error })
-      })
-      reply.code(500)
-      const details = getErrorDetails(error)
-      return { error: details.message, stack: details.stack }
-    }
-  })
-
-  app.get(`${prefix}/api/users`, async (req) => {
-    const query = req.query as {
-      scope?: string
-      limit?: string
-      authLimit?: string
-      customLimit?: string
-      customPage?: string
-      page?: string
-      q?: string
-    }
-    const scope = query.scope ?? 'all'
-    const rawSearch = typeof query.q === 'string' ? query.q.trim() : ''
-    const hasSearch = rawSearch.length > 0
-    const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const searchRegex = hasSearch ? new RegExp(escapeRegex(rawSearch), 'i') : null
-    const searchObjectId = hasSearch && ObjectId.isValid(rawSearch) ? new ObjectId(rawSearch) : null
-    const parsedAuthLimit = Number(query.authLimit ?? query.limit ?? 100)
-    const parsedCustomLimit = Number(query.customLimit ?? query.limit ?? 25)
-    const parsedPage = Number(query.customPage ?? query.page ?? 1)
-    const resolvedAuthLimit = Math.min(Number.isFinite(parsedAuthLimit) && parsedAuthLimit > 0 ? parsedAuthLimit : 100, 500)
-    const resolvedCustomLimit = Math.min(Number.isFinite(parsedCustomLimit) && parsedCustomLimit > 0 ? parsedCustomLimit : 25, 500)
-    const resolvedCustomPage = Math.max(Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1, 1)
-    const db = app.mongo.client.db(DB_NAME)
-    const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
-    const userCollection = AUTH_CONFIG.userCollection
-
-    const response: Record<string, unknown> = {
-      meta: {
-        userIdField: AUTH_CONFIG.user_id_field,
-        authCollection,
-        customCollection: userCollection
-      }
-    }
-
-    if (scope === 'all' || scope === 'auth') {
-      const authFilter = hasSearch
-        ? {
-          $or: [
-            ...(searchObjectId ? [{ _id: searchObjectId }] : []),
-            { email: searchRegex },
-            { status: searchRegex }
-          ]
-        }
-        : {}
-      const authItems = await db
-        .collection(authCollection)
-        .find(authFilter)
-        .sort({ createdAt: -1, _id: -1 })
-        .limit(resolvedAuthLimit)
-        .toArray()
-      response.auth = {
-        collection: authCollection,
-        items: authItems.map((doc) => sanitize(doc))
-      }
-    }
-
-    if ((scope === 'all' || scope === 'custom') && userCollection) {
-      const userIdField = AUTH_CONFIG.user_id_field ?? 'id'
-      const customFilter = hasSearch
-        ? {
-          $or: [
-            ...(searchObjectId ? [{ _id: searchObjectId }] : []),
-            { [userIdField]: searchRegex },
-            { email: searchRegex },
-            { name: searchRegex },
-            { username: searchRegex }
-          ]
-        }
-        : {}
-      const total = await db.collection(userCollection).countDocuments(customFilter)
-      const totalPages = Math.max(1, Math.ceil(total / Math.max(resolvedCustomLimit, 1)))
-      const page = Math.min(resolvedCustomPage, totalPages)
-      const skip = Math.max(0, (page - 1) * resolvedCustomLimit)
-      const customItems = await db
-        .collection(userCollection)
-        .find(customFilter)
-        .sort({ createdAt: -1, _id: -1 })
-        .skip(skip)
-        .limit(resolvedCustomLimit)
-        .toArray()
-      response.custom = {
-        collection: userCollection,
-        items: customItems.map((doc) => sanitize(doc)),
-        pagination: {
-          page,
-          pages: totalPages,
-          total,
-          pageSize: resolvedCustomLimit
-        }
-      }
-    }
-
-    return response
-  })
-
-  app.post(`${prefix}/api/users`, async (req, reply) => {
-    const body = req.body as { email?: string; password?: string; customData?: Record<string, unknown> }
-    const email = body?.email?.toLowerCase()
-    const password = body?.password
-    if (!email || !password) {
-      reply.code(400)
-      return { error: 'Missing email or password' }
-    }
-
-    const result = await handleUserRegistration(app, {
-      run_as_system: true,
-      provider: PROVIDER.LOCAL_USERPASS
-    })({ email, password })
-
-    const userId = result?.insertedId?.toString()
-
-    if (userId && AUTH_CONFIG.userCollection && AUTH_CONFIG.user_id_field) {
-      const db = app.mongo.client.db(DB_NAME)
-      const customData = body?.customData ?? {}
-      await db.collection(AUTH_CONFIG.userCollection).updateOne(
-        { [AUTH_CONFIG.user_id_field]: userId },
-        {
-          $set: {
-            ...customData,
-            [AUTH_CONFIG.user_id_field]: userId
-          }
-        },
-        { upsert: true }
-      )
-    }
-
-    addEvent({
-      id: createEventId(),
-      ts: Date.now(),
-      type: 'auth',
-      source: 'monit',
-      message: 'user created',
-      data: sanitize({ email, userId })
-    })
-
-    reply.code(201)
-    return { userId }
-  })
-
-  app.patch(`${prefix}/api/users/:id/password`, async (req, reply) => {
-    const params = req.params as { id: string }
-    const body = req.body as { password?: string; email?: string }
-    const password = body?.password
-    if (!password) {
-      reply.code(400)
-      return { error: 'Missing password' }
-    }
-
-    const db = app.mongo.client.db(DB_NAME)
-    const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
-    const selector: Record<string, unknown> = {}
-
-    if (params.id && ObjectId.isValid(params.id)) {
-      selector._id = new ObjectId(params.id)
-    } else if (body?.email) {
-      selector.email = body.email.toLowerCase()
-    } else {
-      reply.code(400)
-      return { error: 'Invalid user identifier' }
-    }
-
-    const hashedPassword = await hashPassword(password)
-    const result = await db.collection(authCollection).updateOne(selector, {
-      $set: { password: hashedPassword }
-    })
-
-    if (!result.matchedCount) {
-      reply.code(404)
-      return { error: 'User not found' }
-    }
-
-    addEvent({
-      id: createEventId(),
-      ts: Date.now(),
-      type: 'auth',
-      source: 'monit',
-      message: 'password updated',
-      data: sanitize({ selector })
-    })
-
-    return { status: 'ok' }
-  })
-
-  app.patch(`${prefix}/api/users/:id/status`, async (req, reply) => {
-    const params = req.params as { id: string }
-    const body = req.body as { disabled?: boolean; status?: string; email?: string }
-    const db = app.mongo.client.db(DB_NAME)
-    const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
-    const selector: Record<string, unknown> = {}
-
-    if (params.id && ObjectId.isValid(params.id)) {
-      selector._id = new ObjectId(params.id)
-    } else if (body?.email) {
-      selector.email = body.email.toLowerCase()
-    } else {
-      reply.code(400)
-      return { error: 'Invalid user identifier' }
-    }
-
-    const status = typeof body?.disabled === 'boolean'
-      ? (body.disabled ? 'disabled' : 'confirmed')
-      : (body?.status ?? 'disabled')
-
-    const result = await db.collection(authCollection).updateOne(selector, {
-      $set: { status }
-    })
-
-    if (!result.matchedCount) {
-      reply.code(404)
-      return { error: 'User not found' }
-    }
-
-    addEvent({
-      id: createEventId(),
-      ts: Date.now(),
-      type: 'auth',
-      source: 'monit',
-      message: `user status ${status}`,
-      data: sanitize({ selector, status })
-    })
-
-    return { status: 'ok' }
-  })
-
-  app.get(`${prefix}/api/collections`, async () => {
-    const db = app.mongo.client.db(DB_NAME)
-    const collections = await db.listCollections().toArray()
-    const items = collections
-      .filter((entry) => !entry.name.startsWith('system.'))
-      .map((entry) => ({
-        name: entry.name,
-        type: entry.type
-      }))
-    return { items }
-  })
-
-  app.get(`${prefix}/api/collections/:name/rules`, async (req) => {
-    const params = req.params as { name: string }
-    const query = req.query as { userId?: string; runAsSystem?: string }
-    const rules = StateManager.select('rules') as Rules
-    const runAsSystem = query?.runAsSystem === 'true'
-    const resolvedUser = await resolveUserContext(app, query?.userId)
-    return buildCollectionRulesSnapshot(rules, params.name, resolvedUser, runAsSystem)
-  })
-
-  app.get(`${prefix}/api/collections/history`, async () => ({
-    items: collectionHistory.slice(0, maxCollectionHistory)
-  }))
-
-  app.post(`${prefix}/api/collections/query`, async (req, reply) => {
-    const body = req.body as {
-      collection?: string
-      query?: unknown
-      sort?: unknown
-      page?: number
-      recordHistory?: boolean
-      runAsSystem?: boolean
-      userId?: string
-    }
-    const collection = body?.collection
-    if (!collection) {
-      reply.code(400)
-      return { error: 'Missing collection name' }
-    }
-    const rawQuery = body?.query ?? {}
-    if (Array.isArray(rawQuery) || typeof rawQuery !== 'object' || rawQuery === null) {
-      reply.code(400)
-      return { error: 'Query must be an object' }
-    }
-    const sort = body?.sort
-    if (sort !== undefined && !isPlainObject(sort)) {
-      reply.code(400)
-      return { error: 'Sort must be an object' }
-    }
-    const page = Math.max(1, Math.floor(Number(body?.page ?? 1) || 1))
-    const skip = (page - 1) * COLLECTION_PAGE_SIZE
-    const rules = StateManager.select('rules') as Rules
-    const services = StateManager.select('services') as typeof coreServices
-    const resolvedUser = await resolveUserContext(app, body?.userId)
-    const runAsSystem = body?.runAsSystem !== false
-    const recordHistory = body?.recordHistory !== false
-
-    try {
-      const mongoService = services['mongodb-atlas'](app, {
-        rules,
-        user: resolvedUser ?? {},
-        run_as_system: runAsSystem
-      })
-      const options: Record<string, unknown> = {}
-      if (isPlainObject(sort)) options.sort = sort
-      const cursor = mongoService
-        .db(DB_NAME)
-        .collection(collection)
-        .find(rawQuery, undefined, Object.keys(options).length ? options : undefined)
-        .skip(skip)
-        .limit(COLLECTION_PAGE_SIZE + 1)
-      const countPromise = mongoService
-        .db(DB_NAME)
-        .collection(collection)
-        .count(rawQuery)
-      const [items, total] = await Promise.all([cursor.toArray(), countPromise])
-      const hasMore = page * COLLECTION_PAGE_SIZE < total
-      const pageItems = items.length > COLLECTION_PAGE_SIZE
-        ? items.slice(0, COLLECTION_PAGE_SIZE)
-        : items
-      if (recordHistory) {
-        addCollectionHistory({
-          ts: Date.now(),
-          collection,
-          mode: 'query',
-          query: sanitize(rawQuery),
-          sort: sort ? (sanitize(sort) as Record<string, unknown>) : undefined,
-          runAsSystem,
-          user: getUserInfo(resolvedUser as Record<string, unknown> | undefined),
-          page
-        })
-      }
-      return {
-        items: sanitize(pageItems),
-        count: pageItems.length,
-        total,
-        page,
-        pageSize: COLLECTION_PAGE_SIZE,
-        hasMore
-      }
-    } catch (error) {
-      const details = getErrorDetails(error)
-      reply.code(500)
-      return { error: details.message, stack: details.stack }
-    }
-  })
-
-  app.post(`${prefix}/api/collections/aggregate`, async (req, reply) => {
-    const body = req.body as {
-      collection?: string
-      pipeline?: unknown
-      sort?: unknown
-      page?: number
-      recordHistory?: boolean
-      runAsSystem?: boolean
-      userId?: string
-    }
-    const collection = body?.collection
-    if (!collection) {
-      reply.code(400)
-      return { error: 'Missing collection name' }
-    }
-    const rawPipeline = body?.pipeline ?? []
-    if (!Array.isArray(rawPipeline)) {
-      reply.code(400)
-      return { error: 'Aggregate pipeline must be an array' }
-    }
-    const sort = body?.sort
-    if (sort !== undefined && !isPlainObject(sort)) {
-      reply.code(400)
-      return { error: 'Sort must be an object' }
-    }
-    const page = Math.max(1, Math.floor(Number(body?.page ?? 1) || 1))
-    const skip = (page - 1) * COLLECTION_PAGE_SIZE
-    const rules = StateManager.select('rules') as Rules
-    const services = StateManager.select('services') as typeof coreServices
-    const resolvedUser = await resolveUserContext(app, body?.userId)
-    const runAsSystem = body?.runAsSystem !== false
-    const recordHistory = body?.recordHistory !== false
-
-    try {
-      const pipeline = [...rawPipeline]
-      if (sort) pipeline.push({ $sort: sort })
-      if (skip > 0) pipeline.push({ $skip: skip })
-      pipeline.push({ $limit: COLLECTION_PAGE_SIZE + 1 })
-      const mongoService = services['mongodb-atlas'](app, {
-        rules,
-        user: resolvedUser ?? {},
-        run_as_system: runAsSystem
-      })
-      const cursor = mongoService
-        .db(DB_NAME)
-        .collection(collection)
-        .aggregate(pipeline, undefined, true)
-      const countCursor = mongoService
-        .db(DB_NAME)
-        .collection(collection)
-        .aggregate([...rawPipeline, { $count: 'total' }], undefined, true)
-      const [items, totalResult] = await Promise.all([cursor.toArray(), countCursor.toArray()])
-      const total = totalResult?.[0]?.total ?? 0
-      const hasMore = page * COLLECTION_PAGE_SIZE < total
-      const pageItems = items.length > COLLECTION_PAGE_SIZE
-        ? items.slice(0, COLLECTION_PAGE_SIZE)
-        : items
-      if (recordHistory) {
-        addCollectionHistory({
-          ts: Date.now(),
-          collection,
-          mode: 'aggregate',
-          pipeline: sanitize(rawPipeline),
-          sort: sort ? (sanitize(sort) as Record<string, unknown>) : undefined,
-          runAsSystem,
-          user: getUserInfo(resolvedUser as Record<string, unknown> | undefined),
-          page
-        })
-      }
-      return {
-        items: sanitize(pageItems),
-        count: pageItems.length,
-        total,
-        page,
-        pageSize: COLLECTION_PAGE_SIZE,
-        hasMore
-      }
-    } catch (error) {
-      const details = getErrorDetails(error)
-      reply.code(500)
-      return { error: details.message, stack: details.stack }
-    }
+  registerUserRoutes(app, { prefix, addEvent })
+  registerCollectionRoutes(app, {
+    prefix,
+    collectionHistory,
+    maxCollectionHistory,
+    addCollectionHistory
   })
 }, { name: 'monitoring' })
 
