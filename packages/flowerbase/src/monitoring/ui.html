@@ -26,6 +26,7 @@
       <button class="tab-button active" data-tab="events">events</button>
       <button class="tab-button" data-tab="users">users</button>
       <button class="tab-button" data-tab="functions">functions</button>
+      <button class="tab-button" data-tab="triggers">triggers</button>
       <button class="tab-button" data-tab="collections">collections</button>
     </div>
     <div class="tab-panels">
@@ -73,7 +74,7 @@
         <div class="controls">
           <input id="userSearch" class="wide-input" type="text" placeholder="search users (email, id, status)" />
         </div>
-        <div class="split-grid users-grid">
+        <div class="split-grid users-grid functions-grid">
           <div class="column-stack">
             <div class="subpanel list-panel">
               <div class="subpanel-title">users</div>
@@ -166,7 +167,6 @@
                   <button id="restoreFunction" class="secondary">restore original</button>
                   <button id="invokeFunction">invoke</button>
                 </div>
-                <div class="hint" id="functionEditorStatus"></div>
               </div>
               <div class="function-io">
                 <div class="io-column">
@@ -182,6 +182,29 @@
           </div>
         </div>
       </section>
+      <section class="panel tab-panel" data-panel="triggers">
+        <div class="panel-header">
+          <span>Triggers</span>
+          <button id="refreshTriggers" class="secondary">refresh</button>
+        </div>
+          <div class="split-grid triggers-grid">
+            <div class="column-stack">
+              <div class="subpanel list-panel">
+                <div class="subpanel-title">triggers</div>
+                <div id="triggerList" class="user-list"></div>
+              </div>
+            </div>
+            <div class="subpanel detail-panel">
+              <div class="detail-header">
+                <div class="subpanel-title">trigger detail</div>
+                <button id="triggerFunctionButton" type="button" class="secondary small is-hidden">
+                  go to function
+                </button>
+              </div>
+              <pre id="triggerDetail" class="event-detail">select a trigger to inspect</pre>
+            </div>
+          </div>
+        </section>
       <section class="panel tab-panel" data-panel="collections">
         <div class="panel-header">
           <span>Collections</span>
