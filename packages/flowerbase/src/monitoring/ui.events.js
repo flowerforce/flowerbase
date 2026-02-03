@@ -29,6 +29,19 @@
   const { formatTime, highlightJson } = utils;
   const { setActiveTab } = helpers;
 
+  const isOptionsEvent = (event) => {
+    if (!event || typeof event !== 'object') return false;
+    const data = event.data;
+    if (data && typeof data === 'object') {
+      const method = data.method;
+      if (typeof method === 'string' && method.toUpperCase() === 'OPTIONS') return true;
+    }
+    if (typeof event.message === 'string') {
+      return event.message.toUpperCase().startsWith('OPTIONS ');
+    }
+    return false;
+  };
+
   const getEventUserId = (event) => {
     if (!event || typeof event !== 'object') return '';
     if (typeof event.userId === 'string') return event.userId;
@@ -49,6 +62,19 @@
     if (data.user_data && typeof data.user_data === 'object') {
       if (typeof data.user_data.id === 'string') return data.user_data.id;
       if (typeof data.user_data._id === 'string') return data.user_data._id;
+    }
+    return '';
+  };
+
+  const getEventRunMode = (event) => {
+    if (!event || typeof event !== 'object') return '';
+    if (event.source === 'monit') return 'monit';
+    const data = event.data;
+    if (!data || typeof data !== 'object') return '';
+    if (typeof data.runAsSystem === 'boolean') return data.runAsSystem ? 'system' : 'user';
+    if (typeof data.run_as_system === 'boolean') return data.run_as_system ? 'system' : 'user';
+    if (data.rules && typeof data.rules === 'object' && typeof data.rules.runAsSystem === 'boolean') {
+      return data.rules.runAsSystem ? 'system' : 'user';
     }
     return '';
   };
@@ -90,19 +116,30 @@
     const query = searchInput.value.trim().toLowerCase();
     const type = typeFilter.value;
     const filtered = state.events.filter((event) => {
+      if (isOptionsEvent(event)) return false;
       if (type && event.type !== type) return false;
       return matchesQuery(event, query);
     });
     const recent = filtered.slice(-350).reverse();
     eventsList.innerHTML = '';
+    const header = document.createElement('div');
+    header.className = 'event-row event-header';
+    header.innerHTML = '<div>time</div>' +
+      '<div>type</div>' +
+      '<div>run</div>' +
+      '<div>user</div>' +
+      '<div>message</div>';
+    eventsList.appendChild(header);
     recent.forEach((event) => {
       const userId = getEventUserId(event);
+      const runMode = getEventRunMode(event);
       const row = document.createElement('div');
       row.className = 'event-row';
       row.dataset.id = event.id;
       const typeClass = event.type === 'error' ? 'error' : (event.type === 'warn' ? 'warn' : '');
       row.innerHTML = '<div>' + formatTime(event.ts) + '</div>' +
         '<div class="event-type ' + typeClass + '">' + (event.type || '-') + '</div>' +
+        '<div class="event-run" title="' + (runMode || '-') + '">' + (runMode || '-') + '</div>' +
         '<div class="event-user" title="' + (userId || '-') + '">' + (userId || '-') + '</div>' +
         '<div>' + (event.message || '') + '</div>';
       if (userId) {

@@ -331,7 +331,8 @@ const createMonitoringPlugin = fp(async (
     const path = url.split('?')[0]
     return path === prefix || path.startsWith(`${prefix}/`)
   }
-  const shouldSkipLog = (req: FastifyRequest) => isMonitRoute(req.url)
+  const shouldSkipLog = (req: FastifyRequest) =>
+    isMonitRoute(req.url) || req.method === 'OPTIONS'
 
   app.addHook('onRequest', (req, reply, done) => {
     if (isMonitRoute(req.url)) {

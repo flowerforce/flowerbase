@@ -32,6 +32,8 @@
   dom.functionResult = document.getElementById('functionResult');
   dom.refreshFunctions = document.getElementById('refreshFunctions');
   dom.functionHistory = document.getElementById('functionHistory');
+  dom.functionEndpointButton = document.getElementById('functionEndpointButton');
+  dom.functionTriggerButton = document.getElementById('functionTriggerButton');
 
   const {
     functionList,
@@ -49,7 +51,9 @@
     invokeFunction,
     functionResult,
     refreshFunctions,
-    functionHistory
+    functionHistory,
+    functionEndpointButton,
+    functionTriggerButton
   } = dom;
   const { api, formatTime, highlightCode, escapeHtml } = utils;
   const { setActiveTab } = helpers;
@@ -158,6 +162,30 @@
         escapeHtml(name) + ' <span class="modified-pill">modified</span>';
     } else {
       functionSelected.textContent = name;
+    }
+  };
+
+  const updateFunctionLinkButtons = (name) => {
+    const fnName = name || state.selectedFunction || '';
+    if (functionEndpointButton) {
+      const routes = fnName && state.endpointFunctionMap ? state.endpointFunctionMap[fnName] : null;
+      if (fnName && Array.isArray(routes) && routes.length) {
+        functionEndpointButton.classList.remove('is-hidden');
+        functionEndpointButton.dataset.functionName = fnName;
+      } else {
+        functionEndpointButton.classList.add('is-hidden');
+        functionEndpointButton.dataset.functionName = '';
+      }
+    }
+    if (functionTriggerButton) {
+      const triggerName = fnName && state.triggerFunctionMap ? state.triggerFunctionMap[fnName] : null;
+      if (fnName && triggerName) {
+        functionTriggerButton.classList.remove('is-hidden');
+        functionTriggerButton.dataset.triggerName = triggerName;
+      } else {
+        functionTriggerButton.classList.add('is-hidden');
+        functionTriggerButton.dataset.triggerName = '';
+      }
     }
   };
 
@@ -328,6 +356,7 @@
         '<div class="hint">' + metaParts.join(' · ') + triggerTag + endpointTag + '</div>';
       functionList.appendChild(row);
     });
+    updateFunctionLinkButtons(state.selectedFunction);
   };
 
   const loadFunctions = async () => {
@@ -346,6 +375,7 @@
     state.selectedFunction = name;
     state.selectedHistoryIndex = null;
     setFunctionSelectedLabel(name, false);
+    updateFunctionLinkButtons(name);
     if (options.args !== undefined && functionArgs) {
       functionArgs.value = JSON.stringify(options.args || [], null, 2);
     }
@@ -462,6 +492,7 @@
         setFunctionSelectedLabel(name, false);
         if (functionResult) functionResult.textContent = '';
         setRunModeForFunction(name);
+        updateFunctionLinkButtons(name);
         loadFunctionCode();
         functionList.querySelectorAll('.function-row').forEach((row) => {
           row.classList.toggle('active', row.dataset.name === name);
@@ -513,6 +544,7 @@
         state.selectedFunction = entry.name;
         state.selectedHistoryIndex = index;
         setFunctionSelectedLabel(entry.name, false);
+        updateFunctionLinkButtons(entry.name);
         if (functionArgs) {
           functionArgs.value = JSON.stringify(entry.args || [], null, 2);
         }
@@ -603,8 +635,36 @@
       });
     }
 
+    if (functionEndpointButton) {
+      functionEndpointButton.addEventListener('click', async () => {
+        const fnName = functionEndpointButton.dataset.functionName || state.selectedFunction;
+        if (!fnName) return;
+        if (root.endpoints && root.endpoints.openEndpointForFunction) {
+          await root.endpoints.openEndpointForFunction(fnName);
+        } else {
+          setActiveTab('endpoints');
+        }
+      });
+    }
+
+    if (functionTriggerButton) {
+      functionTriggerButton.addEventListener('click', async () => {
+        const triggerName = functionTriggerButton.dataset.triggerName
+          || (state.selectedFunction && state.triggerFunctionMap
+            ? state.triggerFunctionMap[state.selectedFunction]
+            : null);
+        if (!triggerName) return;
+        if (root.triggers && root.triggers.openTriggerByName) {
+          await root.triggers.openTriggerByName(triggerName);
+        } else {
+          setActiveTab('triggers');
+        }
+      });
+    }
+
     updateFunctionEditor();
     updateFunctionModifiedState();
+    updateFunctionLinkButtons(state.selectedFunction);
   };
 
   root.functions = {

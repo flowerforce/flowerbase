@@ -317,11 +317,28 @@ button.danger {
 
 .event-row {
   display: grid;
-  grid-template-columns: 86px 90px 160px 1fr;
+  grid-template-columns: 86px 90px 70px 160px 1fr;
   gap: 8px;
   padding: 4px 6px;
   border-bottom: 1px dashed rgba(26, 47, 34, 0.6);
   cursor: pointer;
+}
+
+.event-row.event-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+  color: var(--muted);
+  cursor: default;
+}
+
+.event-row.event-header:hover {
+  background: var(--panel);
 }
 
 .event-row:last-child {
@@ -346,6 +363,14 @@ button.danger {
 
 .event-user {
   color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-run {
+  color: var(--muted);
+  text-transform: lowercase;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -548,6 +573,7 @@ button.small {
   gap: 2px;
 }
 
+
 /* Functions Page */
 .function-row {
   display: flex;
@@ -606,6 +632,18 @@ button.small {
   flex: 1;
   min-height: 0;
   gap: 10px;
+}
+
+.endpoint-panel .mini-panels {
+  flex: 0 0 auto;
+}
+
+.endpoint-response {
+  gap: 6px;
+}
+
+.endpoint-response .event-detail {
+  margin-top: 0;
 }
 
 .function-row.active {
@@ -718,17 +756,36 @@ button.small {
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--muted);
-  padding: 6px 10px;
+  padding: 6px 16px;
   font-size: 11px;
   letter-spacing: 1px;
   text-transform: uppercase;
   cursor: pointer;
+  position: relative;
 }
 
 .mini-tab.active {
   color: var(--accent);
   border-color: rgba(49, 233, 129, 0.35);
   background: rgba(49, 233, 129, 0.08);
+}
+
+.mini-tab.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.mini-tab[data-endpoint-tab].has-content::after {
+  content: '';
+  position: absolute;
+  top: 9px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(18, 26, 20, 0.9);
 }
 
 .mini-panels {
