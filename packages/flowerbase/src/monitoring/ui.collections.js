@@ -24,6 +24,7 @@
   if (state.collectionUserMap === undefined) state.collectionUserMap = {};
   if (state.collectionUserQuery === undefined) state.collectionUserQuery = '';
   if (state.__collectionUserTimer === undefined) state.__collectionUserTimer = null;
+  if (state.collectionRulesMap === undefined) state.collectionRulesMap = {};
 
   dom.refreshCollections = document.getElementById('refreshCollections');
   dom.collectionSearch = document.getElementById('collectionSearch');
@@ -85,6 +86,24 @@
   const { api, parseJsonObject, highlightJson, safeStringify } = utils;
 
   const TABLE_TRUNCATE_LIMIT = 200;
+
+  const getRulesTabButton = () => {
+    if (!collectionTabButtons || !collectionTabButtons.forEach) return null;
+    let rulesButton = null;
+    collectionTabButtons.forEach((button) => {
+      if (button.dataset && button.dataset.collectionTab === 'rules') {
+        rulesButton = button;
+      }
+    });
+    return rulesButton;
+  };
+
+  const setRulesTabEnabled = (enabled) => {
+    const rulesButton = getRulesTabButton();
+    if (!rulesButton) return;
+    rulesButton.disabled = !enabled;
+    rulesButton.classList.toggle('is-disabled', !enabled);
+  };
 
   const updateCollectionPager = () => {
     if (state.collectionLoading) {
@@ -188,6 +207,12 @@
 
   const setCollectionTab = (tab) => {
     const value = tab || 'query';
+    if (value === 'rules') {
+      const rulesButton = getRulesTabButton();
+      if (rulesButton && rulesButton.disabled) {
+        return setCollectionTab('query');
+      }
+    }
     collectionTabButtons.forEach((item) => {
       item.classList.toggle('active', item.dataset.collectionTab === value);
     });
@@ -343,17 +368,34 @@
       const name = typeof item === 'string' ? item : item.name;
       if (!name) return;
       if (query && !name.toLowerCase().includes(query)) return;
-      const type = typeof item === 'object' && item && item.type ? item.type : 'collection';
+      const hasRules = state.collectionRulesMap ? state.collectionRulesMap[name] : undefined;
+      const noRulesTag = hasRules === false ? 'no-rules' : '';
       const row = document.createElement('div');
       row.className = 'collection-row' + (state.selectedCollection === name ? ' active' : '');
       row.dataset.name = name;
       row.innerHTML = '<div class="collection-meta">' +
         '<div class="code">' + name + '</div>' +
-        '<div class="hint">' + type + '</div>' +
         '</div>' +
-        '<div class="hint"></div>';
+        '<div class="hint">' + noRulesTag + '</div>';
       collectionList.appendChild(row);
     });
+  };
+
+  const loadCollectionRulesMap = async (items) => {
+    const map = {};
+    const names = (items || [])
+      .map((item) => (typeof item === 'string' ? item : item && item.name))
+      .filter((name) => typeof name === 'string' && name.length);
+    await Promise.all(names.map(async (name) => {
+      try {
+        const data = await api('/collections/' + encodeURIComponent(name) + '/rules');
+        map[name] = !(data === null || data === undefined);
+      } catch {
+        map[name] = undefined;
+      }
+    }));
+    state.collectionRulesMap = map;
+    renderCollections(state.collections);
   };
 
   const loadCollections = async () => {
@@ -361,6 +403,7 @@
       const data = await api('/collections');
       state.collections = data.items || [];
       renderCollections(state.collections);
+      loadCollectionRulesMap(state.collections);
     } catch (err) {
       console.error(err);
     }
@@ -466,6 +509,8 @@
     if (!name) {
       setCollectionRules('select a collection', false);
       setCollectionResult('', false);
+      setRulesTabEnabled(false);
+      setCollectionTab('query');
       return;
     }
     try {
@@ -480,9 +525,20 @@
       if (collectionRunMode) params.push('runAsSystem=' + (runAsSystem ? 'true' : 'false'));
       const query = params.length ? ('?' + params.join('&')) : '';
       const data = await api('/collections/' + encodeURIComponent(name) + '/rules' + query);
-      setCollectionRules(data, true);
+      if (data === null || data === undefined) {
+        setCollectionRules('no rules configured', false);
+        if (state.collectionRulesMap) state.collectionRulesMap[name] = false;
+        setRulesTabEnabled(false);
+        setCollectionTab('query');
+      } else {
+        setCollectionRules(data, true);
+        if (state.collectionRulesMap) state.collectionRulesMap[name] = true;
+        setRulesTabEnabled(true);
+      }
+      renderCollections(state.collections);
     } catch (err) {
       setCollectionRules('Error: ' + err.message, false);
+      setRulesTabEnabled(true);
     }
   };
 
@@ -860,6 +916,7 @@
     setCollectionResultView('json');
     updateCollectionQueryHighlight();
     updateCollectionAggregateHighlight();
+    setRulesTabEnabled(false);
   };
 
   root.collections = {

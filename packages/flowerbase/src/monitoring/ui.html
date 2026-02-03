@@ -140,7 +140,15 @@
             <div class="subpanel function-panel">
               <div class="detail-header">
                 <div class="subpanel-title">invoke</div>
-                <div class="hint" id="functionSelected">select a function</div>
+                <div class="detail-actions">
+                  <span class="hint" id="functionSelected">select a function</span>
+                  <button id="functionEndpointButton" type="button" class="small is-hidden">
+                    go to endpoint
+                  </button>
+                  <button id="functionTriggerButton" type="button" class="small is-hidden">
+                    go to trigger
+                  </button>
+                </div>
               </div>
               <div class="function-controls">
                 <div class="control-group">
@@ -198,7 +206,7 @@
             <div class="subpanel detail-panel">
               <div class="detail-header">
                 <div class="subpanel-title">trigger detail</div>
-                <button id="triggerFunctionButton" type="button" class="secondary small is-hidden">
+                <button id="triggerFunctionButton" type="button" class="small is-hidden">
                   go to function
                 </button>
               </div>
@@ -220,6 +228,10 @@
               <div class="subpanel-title">endpoints</div>
               <div id="endpointList" class="user-list"></div>
             </div>
+            <div class="subpanel list-panel">
+              <div class="subpanel-title">history</div>
+              <div id="endpointHistory" class="history-list"></div>
+            </div>
           </div>
           <div class="right-column">
             <div class="subpanel endpoint-panel">
@@ -227,7 +239,7 @@
                 <div class="subpanel-title">endpoint detail</div>
                 <div class="detail-actions">
                   <span id="endpointHint" class="hint">select an endpoint</span>
-                  <button id="endpointFunctionButton" type="button" class="secondary small is-hidden">
+                  <button id="endpointFunctionButton" type="button" class="small is-hidden">
                     go to function
                   </button>
                 </div>
@@ -246,28 +258,37 @@
                   </select>
                 </div>
               </div>
-              <div class="function-io">
-                <div class="io-column">
-                  <label for="endpointQuery">query</label>
-                  <textarea id="endpointQuery" placeholder='{"foo":"bar"}'></textarea>
-                </div>
-                <div class="io-column">
-                  <label for="endpointHeaders">headers</label>
-                  <textarea id="endpointHeaders" placeholder='{"x-api-key":"value"}'></textarea>
-                </div>
+              <div class="mini-tabs">
+                <button class="mini-tab active" data-endpoint-tab="query">query</button>
+                <button class="mini-tab" data-endpoint-tab="headers">headers</button>
+                <button class="mini-tab" data-endpoint-tab="body">body</button>
               </div>
-              <div class="function-io">
-                <div class="io-column">
-                  <label for="endpointBody">body</label>
-                  <textarea id="endpointBody" placeholder='{"some":"data"}'></textarea>
+              <div class="mini-panels">
+                <div class="mini-panel active" data-endpoint-panel="query">
+                  <div class="io-column">
+                    <label for="endpointQuery">query</label>
+                    <textarea id="endpointQuery" placeholder='{"foo":"bar"}'></textarea>
+                  </div>
                 </div>
-                <div class="io-column">
-                  <label for="endpointResult">result</label>
-                  <pre id="endpointResult" class="event-detail function-result">invoke an endpoint to see the response</pre>
+                <div class="mini-panel" data-endpoint-panel="headers">
+                  <div class="io-column">
+                    <label for="endpointHeaders">headers</label>
+                    <textarea id="endpointHeaders" placeholder='{"x-api-key":"value"}'></textarea>
+                  </div>
+                </div>
+                <div class="mini-panel" data-endpoint-panel="body">
+                  <div class="io-column">
+                    <label for="endpointBody">body</label>
+                    <textarea id="endpointBody" placeholder='{"some":"data"}'></textarea>
+                  </div>
                 </div>
               </div>
               <div class="editor-actions">
                 <button id="invokeEndpoint">invoke</button>
+              </div>
+              <div class="io-column endpoint-response">
+                <label for="endpointResult">response</label>
+                <pre id="endpointResult" class="event-detail function-result">invoke an endpoint to see the response</pre>
               </div>
             </div>
           </div>
