@@ -15,7 +15,7 @@ Monitor Key capabilities:
 - Functions panel: list functions, view code (if allowed), invoke functions with custom args, and review recent invocation history.
 - Endpoints panel: list HTTP endpoints and invoke them with custom method, headers, query, and payload.
 - Users panel: search auth/custom users, create users, reset passwords, and enable/disable accounts.
-- Collections panel: list collections, inspect rules snapshot for a given user/system context, and run query/aggregate with pagination + history.
+- Collections panel: list collections, inspect rules snapshot for a given user/system context, and run queries/aggregations with pagination + history.
 
 #### 🧠 Features Summary
 | Feature                  | Status                                  |
