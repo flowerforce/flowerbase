@@ -5,6 +5,7 @@ import '@fastify/websocket'
 import { DEFAULT_CONFIG } from '../constants'
 import type { Rules } from '../features/rules/interface'
 import { services as coreServices } from '../services'
+import { StateManager } from '../state'
 import { registerCollectionRoutes } from './routes/collections'
 import { registerEndpointRoutes } from './routes/endpoints'
 import { registerEventsRoutes } from './routes/events'
@@ -267,6 +268,8 @@ const createMonitoringPlugin = fp(async (
       }
     })
   }
+
+  StateManager.setData('monitoring', { addEvent })
 
   wrapServicesForMonitoring(addEvent)
 

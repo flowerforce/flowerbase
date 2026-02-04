@@ -4,6 +4,7 @@ import { Functions } from './features/functions/interface'
 import { FunctionsQueue } from './features/functions/queue'
 import { Rules } from './features/rules/interface'
 import { Triggers } from './features/triggers/interface'
+import type { MonitorEvent } from './monitoring/utils'
 import { Services } from './services/interface'
 
 type State = {
@@ -15,6 +16,9 @@ type State = {
   projectId: string
   app?: FastifyInstance
   functionsQueue: FunctionsQueue
+  monitoring: {
+    addEvent?: (event: MonitorEvent) => void
+  }
 }
 
 export class StateManager {
@@ -24,7 +28,8 @@ export class StateManager {
     endpoints: [],
     projectId: '',
     rules: {},
-    functionsQueue: new FunctionsQueue()
+    functionsQueue: new FunctionsQueue(),
+    monitoring: {}
   }
   static select<K extends keyof typeof this._state>(
     key: K
