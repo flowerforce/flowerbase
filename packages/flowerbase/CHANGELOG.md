@@ -1,3 +1,10 @@
+## 1.7.1 (2026-02-04)
+
+
+### 🩹 Fixes
+
+- add missing deps ([b7a0f42](https://github.com/flowerforce/flowerbase/commit/b7a0f42))
+
 ## 1.7.0 (2026-02-04)
 
 
