@@ -8,6 +8,7 @@ export interface GenerateContextParams {
   app: FastifyInstance
   currentFunction: Function
   functionsList: Functions
+  functionName?: string
   rules: Rules
   user: User
   services: Services

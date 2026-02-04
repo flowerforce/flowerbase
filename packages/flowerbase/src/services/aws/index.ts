@@ -34,7 +34,8 @@ const decodePayload = (payload?: Uint8Array): string | undefined => {
   return Buffer.from(payload).toString('utf-8')
 }
 
-const Aws = () => {
+const Aws = (_app?: unknown, opt?: { monitoring?: { invokedFrom?: string } }) => {
+  const origin = opt?.monitoring?.invokedFrom
   const credentials =
     S3_CONFIG.ACCESS_KEY_ID && S3_CONFIG.SECRET_ACCESS_KEY
       ? {
@@ -67,7 +68,8 @@ const Aws = () => {
           type: 'aws',
           source: 'service:aws',
           message: 'aws lambda Invoke',
-          data: meta
+          data: meta,
+          origin
         })
         try {
           const res = await lambda.send(new InvokeCommand(params))
@@ -83,7 +85,8 @@ const Aws = () => {
             source: 'service:aws',
             message: 'aws lambda Invoke failed',
             data: meta,
-            error
+            error,
+            origin
           })
           throw error
         }
@@ -97,7 +100,8 @@ const Aws = () => {
           type: 'aws',
           source: 'service:aws',
           message: 'aws lambda InvokeAsync',
-          data: meta
+          data: meta,
+          origin
         })
         try {
           return await lambda.send(new InvokeAsyncCommand(params))
@@ -107,7 +111,8 @@ const Aws = () => {
             source: 'service:aws',
             message: 'aws lambda InvokeAsync failed',
             data: meta,
-            error
+            error,
+            origin
           })
           throw error
         }
@@ -140,7 +145,8 @@ const Aws = () => {
           type: 'aws',
           source: 'service:aws',
           message: 'aws s3 PutObject',
-          data: meta
+          data: meta,
+          origin
         })
         try {
           return await client.send(new PutObjectCommand(params))
@@ -150,7 +156,8 @@ const Aws = () => {
             source: 'service:aws',
             message: 'aws s3 PutObject failed',
             data: meta,
-            error
+            error,
+            origin
           })
           throw error
         }
@@ -162,7 +169,8 @@ const Aws = () => {
           type: 'aws',
           source: 'service:aws',
           message: 'aws s3 GetObject',
-          data: meta
+          data: meta,
+          origin
         })
         try {
           return await client.send(new GetObjectCommand(params))
@@ -172,7 +180,8 @@ const Aws = () => {
             source: 'service:aws',
             message: 'aws s3 GetObject failed',
             data: meta,
-            error
+            error,
+            origin
           })
           throw error
         }
@@ -196,7 +205,8 @@ const Aws = () => {
           type: 'aws',
           source: 'service:aws',
           message: 'aws s3 getSignedUrl',
-          data: meta
+          data: meta,
+          origin
         })
 
         if (operation === 'putObject') {
@@ -212,7 +222,8 @@ const Aws = () => {
               source: 'service:aws',
               message: 'aws s3 getSignedUrl failed',
               data: meta,
-              error
+              error,
+              origin
             })
             throw error
           }
@@ -230,7 +241,8 @@ const Aws = () => {
             source: 'service:aws',
             message: 'aws s3 getSignedUrl failed',
             data: meta,
-            error
+            error,
+            origin
           })
           throw error
         }
@@ -255,7 +267,8 @@ const Aws = () => {
           type: 'aws',
           source: 'service:aws',
           message: 'aws s3 PresignURL',
-          data: meta
+          data: meta,
+          origin
         })
         try {
           return await client.getSignedUrl(operation, rest as PresignParams, options)
@@ -265,7 +278,8 @@ const Aws = () => {
             source: 'service:aws',
             message: 'aws s3 PresignURL failed',
             data: meta,
-            error
+            error,
+            origin
           })
           throw error
         }

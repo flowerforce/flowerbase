@@ -14,12 +14,14 @@ import { HandleUserRegistration } from "./models/handleUserRegistration.model"
  */
 const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ email, password }) => {
     const { run_as_system, skipUserCheck, provider } = opt ?? {}
+    const origin = opt?.monitoring?.invokedFrom
     const meta = { action: 'registerUser', email, provider }
     emitServiceEvent({
         type: 'auth',
         source: 'service:auth',
         message: 'auth registerUser',
-        data: meta
+        data: meta,
+        origin
     })
 
     try {
@@ -117,6 +119,7 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
                 rules: {},
                 user: {},
                 currentFunction: confirmationFunction,
+                functionName: confirmationFunctionName,
                 functionsList,
                 services,
                 runAsSystem: true
@@ -155,7 +158,8 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
             source: 'service:auth',
             message: 'auth registerUser failed',
             data: meta,
-            error
+            error,
+            origin
         })
         throw error
     }

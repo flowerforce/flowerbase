@@ -12,6 +12,7 @@ export type GenerateEndpointsParams = {
 export type GenerateHandlerParams = {
   app: FastifyInstance
   currentFunction: Function
+  functionName?: string
   functionsList: Functions
   http_method: string
   rulesList: Rules

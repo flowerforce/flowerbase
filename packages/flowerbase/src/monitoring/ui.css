@@ -317,7 +317,7 @@ button.danger {
 
 .event-row {
   display: grid;
-  grid-template-columns: 86px 90px 70px 160px 1fr;
+  grid-template-columns: 86px 90px 70px 160px 160px 1fr;
   gap: 8px;
   padding: 4px 6px;
   border-bottom: 1px dashed rgba(26, 47, 34, 0.6);
@@ -368,6 +368,13 @@ button.danger {
   white-space: nowrap;
 }
 
+.event-invoked {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .event-run {
   color: var(--muted);
   text-transform: lowercase;
@@ -382,6 +389,15 @@ button.danger {
 }
 
 .event-user.is-link:hover {
+  text-decoration: underline;
+}
+
+.event-invoked.is-link {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.event-invoked.is-link:hover {
   text-decoration: underline;
 }
 

@@ -148,6 +148,7 @@ const handleCronTrigger = async ({
         rules: {},
         user: {},
         currentFunction: triggerHandler,
+        functionName,
         functionsList,
         services
       })
@@ -377,6 +378,7 @@ const handleAuthenticationTrigger = async ({
           rules: StateManager.select("rules"),
           user: {},  // TODO from currentUser ??
           currentFunction: triggerHandler,
+          functionName,
           functionsList,
           services,
           runAsSystem: true
@@ -428,6 +430,7 @@ const handleAuthenticationTrigger = async ({
           rules: StateManager.select("rules"),
           user: {},  // TODO from currentUser ??
           currentFunction: triggerHandler,
+          functionName,
           functionsList,
           services,
           runAsSystem: true
@@ -481,6 +484,7 @@ const handleAuthenticationTrigger = async ({
           rules: StateManager.select("rules"),
           user: {},  // TODO from currentUser ??
           currentFunction: triggerHandler,
+          functionName,
           functionsList,
           services,
           runAsSystem: true
@@ -584,6 +588,7 @@ const handleAuthenticationTrigger = async ({
         rules: StateManager.select("rules"),
         user: {},  // TODO from currentUser ??
         currentFunction: triggerHandler,
+        functionName,
         functionsList,
         services,
         runAsSystem: true
@@ -695,6 +700,7 @@ const handleDataBaseTrigger = async ({
         rules: StateManager.select("rules"),
         user: {}, // TODO add from?
         currentFunction: triggerHandler,
+        functionName,
         functionsList,
         services
       })

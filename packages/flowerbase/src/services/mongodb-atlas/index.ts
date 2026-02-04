@@ -75,7 +75,7 @@ const areUpdatedFieldsAllowed = (
 
 const getOperators: GetOperatorsFunction = (
   collection,
-  { rules, collName, user, run_as_system }
+  { rules, collName, user, run_as_system, monitoringOrigin }
 ) => {
   const normalizedRules: Rules = rules ?? ({} as Rules)
   const collectionRules = normalizedRules[collName]
@@ -108,7 +108,8 @@ const getOperators: GetOperatorsFunction = (
         rules: rulesMeta,
         ...(meta ?? {})
       },
-      error
+      error,
+      origin: monitoringOrigin
     })
   }
 
@@ -981,7 +982,7 @@ const getOperators: GetOperatorsFunction = (
 
 const MongodbAtlas: MongodbAtlasFunction = (
   app,
-  { rules, user, run_as_system } = {}
+  { rules, user, run_as_system, monitoring } = {}
 ) => ({
   db: (dbName: string) => {
     return {
@@ -996,7 +997,8 @@ const MongodbAtlas: MongodbAtlasFunction = (
           rules,
           collName,
           user,
-          run_as_system
+          run_as_system,
+          monitoringOrigin: monitoring?.invokedFrom
         })
       }
     }

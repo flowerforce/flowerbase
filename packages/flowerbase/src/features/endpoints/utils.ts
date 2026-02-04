@@ -116,6 +116,7 @@ export const getMethodsConfig = (
 export const generateHandler = ({
   app,
   currentFunction,
+  functionName,
   functionsList,
   rulesList
 }: GenerateHandlerParams) => {
@@ -151,6 +152,7 @@ export const generateHandler = ({
         rules: rulesList,
         user: req.user,
         currentFunction,
+        functionName,
         functionsList,
         services,
         deserializeArgs: false

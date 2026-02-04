@@ -136,7 +136,8 @@ export const registerFunctionRoutes = (app: FastifyInstance, deps: FunctionRoute
         args,
         user: userInfo,
         runAsSystem: effectiveRunAsSystem,
-        override: Boolean(overrideCode)
+        override: Boolean(overrideCode),
+        invokedFrom: name
       })
     })
 
@@ -147,6 +148,7 @@ export const registerFunctionRoutes = (app: FastifyInstance, deps: FunctionRoute
         rules,
         user: resolvedUser ?? { id: 'monitor', role: 'system' },
         currentFunction: effectiveFunction,
+        functionName: name,
         functionsList,
         services,
         runAsSystem: effectiveRunAsSystem

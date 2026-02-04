@@ -7,6 +7,7 @@ type EmitServiceEventParams = {
   message: string
   data?: Record<string, unknown>
   error?: unknown
+  origin?: string
 }
 
 export const emitServiceEvent = ({
@@ -14,17 +15,21 @@ export const emitServiceEvent = ({
   source,
   message,
   data,
-  error
+  error,
+  origin
 }: EmitServiceEventParams) => {
   const monitoring = StateManager.select('monitoring')
   const addEvent = monitoring?.addEvent
   if (typeof addEvent !== 'function') return
+  const withContext = origin
+    ? { ...(data ?? {}), invokedFrom: origin }
+    : data
   addEvent({
     id: createEventId(),
     ts: Date.now(),
     type: error ? 'error' : type,
     source,
     message,
-    data: error ? { ...(data ?? {}), error } : data
+    data: error ? { ...(withContext ?? {}), error } : withContext
   })
 }

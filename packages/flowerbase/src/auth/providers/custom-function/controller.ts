@@ -63,6 +63,7 @@ export async function customFunctionController(app: FastifyInstance) {
         rules: {},
         user: {},
         currentFunction: functionsList[authFunctionName],
+        functionName: authFunctionName,
         functionsList,
         services,
         request: {

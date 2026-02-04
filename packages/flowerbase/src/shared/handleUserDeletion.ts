@@ -12,12 +12,14 @@ import { HandleUserDeletion } from "./models/handleUserDeletion.model"
  */
 const handleUserDeletion: HandleUserDeletion = (app, opt) => async ({ id, email }) => {
     const { run_as_system } = opt ?? {}
+    const origin = opt?.monitoring?.invokedFrom
     const meta = { action: 'deleteUser', id, email }
     emitServiceEvent({
         type: 'auth',
         source: 'service:auth',
         message: 'auth deleteUser',
-        data: meta
+        data: meta,
+        origin
     })
 
     try {
@@ -54,7 +56,8 @@ const handleUserDeletion: HandleUserDeletion = (app, opt) => async ({ id, email 
             source: 'service:auth',
             message: 'auth deleteUser failed',
             data: meta,
-            error
+            error,
+            origin
         })
         throw error
     }

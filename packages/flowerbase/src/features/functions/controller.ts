@@ -132,6 +132,7 @@ export const functionsController: FunctionController = async (
         rules,
         user: { ...user, _id: new ObjectId(user.id) },
         currentFunction,
+        functionName: String(method),
         functionsList,
         services
       })
