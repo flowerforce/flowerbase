@@ -5,6 +5,8 @@
   const dom = root.dom;
   const { utils, helpers } = root;
 
+  const DEFAULT_PASSWORD_RULES = { minLength: 6, maxLength: 128 };
+
   if (state.authUsers === undefined) state.authUsers = [];
   if (state.customUsers === undefined) state.customUsers = [];
   if (state.mergedUsers === undefined) state.mergedUsers = [];
@@ -16,6 +18,8 @@
   if (state.customPage === undefined) state.customPage = 1;
   if (state.customPages === undefined) state.customPages = 1;
   if (state.customLimit === undefined) state.customLimit = 25;
+  if (state.userConfig === undefined) state.userConfig = null;
+  if (state.passwordRules === undefined) state.passwordRules = { ...DEFAULT_PASSWORD_RULES };
 
   dom.mergedUsers = document.getElementById('mergedUsers');
   dom.userDetail = document.getElementById('userDetail');
@@ -30,6 +34,14 @@
   dom.newUserEmail = document.getElementById('newUserEmail');
   dom.newUserPassword = document.getElementById('newUserPassword');
   dom.createUserError = document.getElementById('createUserError');
+  dom.userProviders = document.getElementById('userProviders');
+  dom.userCustomData = document.getElementById('userCustomData');
+  dom.userConfigModal = document.getElementById('userConfigModal');
+  dom.openUserConfig = document.getElementById('openUserConfig');
+  dom.closeUserConfig = document.getElementById('closeUserConfig');
+  dom.createUserModal = document.getElementById('createUserModal');
+  dom.openCreateUser = document.getElementById('openCreateUser');
+  dom.closeCreateUser = document.getElementById('closeCreateUser');
 
   const {
     mergedUsers,
@@ -44,10 +56,100 @@
     createUserForm,
     newUserEmail,
     newUserPassword,
-    createUserError
+    createUserError,
+    userProviders,
+    userCustomData,
+    userConfigModal,
+    openUserConfig,
+    closeUserConfig,
+    createUserModal,
+    openCreateUser,
+    closeCreateUser
   } = dom;
   const { api, formatDateTime, highlightJson } = utils;
   const { setActiveTab } = helpers;
+
+  const USER_DETAIL_PLACEHOLDER = 'select a user to inspect';
+  const USER_CONFIG_PLACEHOLDER = {
+    providers: 'providers.json not available',
+    custom: 'custom_user_data.json not available'
+  };
+
+  const getPasswordRules = () => state.passwordRules || DEFAULT_PASSWORD_RULES;
+
+  const validatePassword = (password) => {
+    if (!password) return 'Password is required';
+    const rules = getPasswordRules();
+    if (password.length < rules.minLength) {
+      return 'Password must be at least ' + rules.minLength + ' characters';
+    }
+    if (password.length > rules.maxLength) {
+      return 'Password must be at most ' + rules.maxLength + ' characters';
+    }
+    return '';
+  };
+
+  const setUserDetailContent = (entry) => {
+    if (!userDetail) return;
+    if (!entry) {
+      userDetail.classList.remove('json-highlight');
+      userDetail.textContent = USER_DETAIL_PLACEHOLDER;
+      return;
+    }
+    userDetail.classList.add('json-highlight');
+    userDetail.innerHTML = highlightJson(JSON.stringify(entry, null, 2) || '');
+  };
+
+  const setUserConfigContent = (element, value, placeholder) => {
+    if (!element) return;
+    if (!value) {
+      element.classList.remove('json-highlight');
+      element.textContent = placeholder;
+      return;
+    }
+    element.classList.add('json-highlight');
+    element.innerHTML = highlightJson(JSON.stringify(value, null, 2) || '');
+  };
+
+  const renderUserConfig = () => {
+    const config = state.userConfig;
+    if (!config) {
+      setUserConfigContent(userProviders, null, USER_CONFIG_PLACEHOLDER.providers);
+      setUserConfigContent(userCustomData, null, USER_CONFIG_PLACEHOLDER.custom);
+      return;
+    }
+    setUserConfigContent(userProviders, config.providers, USER_CONFIG_PLACEHOLDER.providers);
+    setUserConfigContent(userCustomData, config.customUserData, USER_CONFIG_PLACEHOLDER.custom);
+  };
+
+  const loadUserConfig = async () => {
+    if (!userProviders && !userCustomData) return;
+    try {
+      const data = await api('/users/config');
+      state.userConfig = data;
+      if (data && data.passwordRules) {
+        const { minLength, maxLength } = data.passwordRules;
+        if (typeof minLength === 'number' && typeof maxLength === 'number') {
+          state.passwordRules = { minLength, maxLength };
+        }
+      }
+      renderUserConfig();
+    } catch (err) {
+      console.error(err);
+      state.userConfig = null;
+      renderUserConfig();
+    }
+  };
+
+  const openModal = (modal) => {
+    if (!modal) return;
+    modal.classList.add('active');
+  };
+
+  const closeModal = (modal) => {
+    if (!modal) return;
+    modal.classList.remove('active');
+  };
 
   const buildMergedUsers = (authItems, customItems) => {
     const idField = state.userIdField || 'id';
@@ -109,13 +211,18 @@
     const merged = buildMergedUsers(authItems, customItems);
 
     state.mergedUserMap = {};
-    userDetail.textContent = 'select a user to inspect';
     merged.forEach((entry) => {
       const userId = String(entry.id || '');
       if (userId) {
         state.mergedUserMap[userId] = entry;
       }
     });
+    let selectedId = state.selectedUserId;
+    if (!selectedId || !state.mergedUserMap[selectedId]) {
+      selectedId = merged.length ? String(merged[0].id || '') : null;
+      state.selectedUserId = selectedId;
+    }
+    setUserDetailContent(selectedId ? state.mergedUserMap[selectedId] : null);
 
     merged.forEach((entry) => {
       const auth = entry.auth || null;
@@ -227,10 +334,17 @@
           }
           if (action === 'password') {
             const password = prompt('New password for user ' + id);
-            if (!password) return;
+            if (password === null) return;
+            const trimmedPassword = password.trim();
+            if (!trimmedPassword) return;
+            const passwordError = validatePassword(trimmedPassword);
+            if (passwordError) {
+              alert(passwordError);
+              return;
+            }
             await api('/users/' + id + '/password', {
               method: 'PATCH',
-              body: JSON.stringify({ password })
+              body: JSON.stringify({ password: trimmedPassword })
             });
             loadUsers();
           }
@@ -246,8 +360,7 @@
         });
         const entry = state.mergedUserMap[id];
         if (entry) {
-          userDetail.classList.add('json-highlight');
-          userDetail.innerHTML = highlightJson(JSON.stringify(entry, null, 2) || '');
+          setUserDetailContent(entry);
         } else {
           userDetail.classList.remove('json-highlight');
           userDetail.textContent = 'User not found in cache';
@@ -272,7 +385,55 @@
     }
 
     if (refreshUsers) {
-      refreshUsers.addEventListener('click', loadUsers);
+      refreshUsers.addEventListener('click', () => {
+        loadUsers();
+        loadUserConfig();
+      });
+    }
+
+    if (openUserConfig) {
+      openUserConfig.addEventListener('click', () => {
+        openModal(userConfigModal);
+        loadUserConfig();
+      });
+    }
+
+    if (closeUserConfig) {
+      closeUserConfig.addEventListener('click', () => {
+        closeModal(userConfigModal);
+      });
+    }
+
+    if (userConfigModal) {
+      userConfigModal.addEventListener('click', (event) => {
+        if (event.target === userConfigModal) {
+          closeModal(userConfigModal);
+        }
+      });
+    }
+
+    if (openCreateUser) {
+      openCreateUser.addEventListener('click', () => {
+        if (createUserError) {
+          createUserError.textContent = '';
+          createUserError.classList.add('is-hidden');
+        }
+        openModal(createUserModal);
+      });
+    }
+
+    if (closeCreateUser) {
+      closeCreateUser.addEventListener('click', () => {
+        closeModal(createUserModal);
+      });
+    }
+
+    if (createUserModal) {
+      createUserModal.addEventListener('click', (event) => {
+        if (event.target === createUserModal) {
+          closeModal(createUserModal);
+        }
+      });
     }
 
     if (createUserForm) {
@@ -284,7 +445,21 @@
           createUserError.textContent = '';
           createUserError.classList.add('is-hidden');
         }
-        if (!email || !password) return;
+        if (!email || !password) {
+          if (createUserError) {
+            createUserError.textContent = 'Missing email or password';
+            createUserError.classList.remove('is-hidden');
+          }
+          return;
+        }
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+          if (createUserError) {
+            createUserError.textContent = passwordError;
+            createUserError.classList.remove('is-hidden');
+          }
+          return;
+        }
         try {
           await api('/users', {
             method: 'POST',
@@ -292,6 +467,7 @@
           });
           newUserEmail.value = '';
           newUserPassword.value = '';
+          closeModal(createUserModal);
           loadUsers();
         } catch (error) {
           if (!createUserError) return;
@@ -328,6 +504,8 @@
         }, 250);
       });
     }
+
+    loadUserConfig();
   };
 
   root.users = {

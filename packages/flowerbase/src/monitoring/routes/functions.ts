@@ -161,7 +161,12 @@ export const registerFunctionRoutes = (app: FastifyInstance, deps: FunctionRoute
         type: 'error',
         source: 'monit',
         message: `invoke ${name} failed`,
-        data: sanitize({ error })
+        data: sanitize({
+          error,
+          user: userInfo,
+          invokedFrom: name,
+          runAsSystem: effectiveRunAsSystem
+        })
       })
       reply.code(500)
       const details = getErrorDetails(error)

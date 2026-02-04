@@ -1,10 +1,12 @@
-import { anonUserController } from '../controller'
 import { PROVIDER } from '../../../../shared/models/handleUserRegistration.model'
 
 jest.mock('../../../../constants', () => ({
   AUTH_CONFIG: {
     authCollection: 'auth_users',
     refreshTokensCollection: 'refresh_tokens',
+    authProviders: {
+      'anon-user': { disabled: false }
+    },
     providers: {
       'anon-user': { disabled: false }
     }
@@ -18,6 +20,7 @@ jest.mock('../../../../constants', () => ({
 
 describe('anonUserController', () => {
   it('inserts anon users with a generated email', async () => {
+    const { anonUserController } = await import('../controller')
     let insertedDoc: Record<string, unknown> | undefined
     const authCollection = {
       createIndex: jest.fn().mockResolvedValue('ok'),
@@ -44,7 +47,7 @@ describe('anonUserController', () => {
     let loginHandler: ((...args: unknown[]) => unknown) | undefined
     const app = {
       mongo: { client: { db: jest.fn().mockReturnValue(db) } },
-      post: jest.fn((path: string, handler: (...args: unknown[]) => unknown) => {
+      post: jest.fn((path: string, _opts: unknown, handler: (...args: unknown[]) => unknown) => {
         loginHandler = handler
       })
     }

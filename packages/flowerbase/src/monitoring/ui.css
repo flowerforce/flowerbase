@@ -236,6 +236,54 @@ main {
   color: var(--muted);
 }
 
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 10, 8, 0.75);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 60;
+}
+
+.modal.active {
+  display: flex;
+}
+
+.modal-body {
+  width: min(760px, 92vw);
+  max-height: min(85vh, 720px);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;
@@ -706,9 +754,41 @@ button.small {
 }
 
 .user-actions {
-  display: flex;
+  display: none;
   flex-direction: row;
   gap: 4px;
+}
+
+.user-row.active .user-actions {
+  display: flex;
+}
+
+.detail-panel .mini-tabs {
+  margin-bottom: 6px;
+}
+
+.user-config {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.user-config-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.user-config-block .subpanel-title {
+  margin-bottom: 0;
+}
+
+.user-config-block .event-detail {
+  flex: 1;
+  min-height: 120px;
 }
 
 .list-panel .user-list,

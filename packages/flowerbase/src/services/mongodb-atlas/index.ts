@@ -11,9 +11,9 @@ import {
 } from 'mongodb'
 import { Rules } from '../../features/rules/interface'
 import { buildRulesMeta } from '../../monitoring/utils'
-import { emitServiceEvent } from '../monitoring'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
+import { emitServiceEvent } from '../monitoring'
 import { CRUD_OPERATIONS, GetOperatorsFunction, MongodbAtlasFunction } from './model'
 import {
   applyAccessControlToPipeline,
@@ -97,6 +97,7 @@ const getOperators: GetOperatorsFunction = (
     meta?: Record<string, unknown>,
     error?: unknown
   ) => {
+    const userId = getUserId(user)
     emitServiceEvent({
       type: 'mongo',
       source: 'service:mongodb-atlas',
@@ -105,6 +106,7 @@ const getOperators: GetOperatorsFunction = (
         operation,
         collection: collName,
         runAsSystem: !!run_as_system,
+        ...(userId ? { userId } : {}),
         rules: rulesMeta,
         ...(meta ?? {})
       },
@@ -132,7 +134,6 @@ const getOperators: GetOperatorsFunction = (
    *  - If validation fails, returns an empty object; otherwise returns the validated document.
    */
     findOne: async (query = {}, projection, options) => {
-      emitMongoEvent('findOne')
       try {
         const resolvedOptions =
           projection || options
@@ -189,10 +190,14 @@ const getOperators: GetOperatorsFunction = (
             : fallbackAccess(result)
 
           // Return validated document or empty object if not permitted
-          return Promise.resolve(status ? document : {})
+          const response = status ? document : {}
+          emitMongoEvent('findOne')
+          return Promise.resolve(response)
         }
         // System mode: no validation applied
-        return collection.findOne(resolvedQuery, resolvedOptions)
+        const response = await collection.findOne(resolvedQuery, resolvedOptions)
+        emitMongoEvent('findOne')
+        return response
       } catch (error) {
         emitMongoEvent('findOne', undefined, error)
         throw error
@@ -217,7 +222,6 @@ const getOperators: GetOperatorsFunction = (
      *  - If validation passes, deletes the document using the filtered query.
      */
     deleteOne: async (query = {}, options) => {
-      emitMongoEvent('deleteOne')
       try {
         if (!run_as_system) {
           checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
@@ -250,10 +254,14 @@ const getOperators: GetOperatorsFunction = (
             throw new Error('Delete not permitted')
           }
 
-          return collection.deleteOne({ $and: formattedQuery }, options)
+          const res = await collection.deleteOne({ $and: formattedQuery }, options)
+          emitMongoEvent('deleteOne')
+          return res
         }
         // System mode: bypass access control
-        return collection.deleteOne(query, options)
+        const result = await collection.deleteOne(query, options)
+        emitMongoEvent('deleteOne')
+        return result
       } catch (error) {
         emitMongoEvent('deleteOne', undefined, error)
         throw error
@@ -279,7 +287,6 @@ const getOperators: GetOperatorsFunction = (
      * This ensures that only users with the correct permissions can insert data into the collection.
      */
     insertOne: async (data, options) => {
-      emitMongoEvent('insertOne')
       try {
         if (!run_as_system) {
           checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.CREATE)
@@ -308,10 +315,13 @@ const getOperators: GetOperatorsFunction = (
             insertedId: insertResult.insertedId.toString(),
             document: data
           })
+          emitMongoEvent('insertOne')
           return insertResult
         }
         // System mode: insert without validation
-        return collection.insertOne(data, options)
+        const insertResult = await collection.insertOne(data, options)
+        emitMongoEvent('insertOne')
+        return insertResult
       } catch (error) {
         emitMongoEvent('insertOne', undefined, error)
         throw error
@@ -339,7 +349,6 @@ const getOperators: GetOperatorsFunction = (
      *  - If validation fails, throws an error; otherwise, updates the document.
      */
     updateOne: async (query, data, options) => {
-      emitMongoEvent('updateOne')
       try {
         if (!run_as_system) {
 
@@ -399,9 +408,13 @@ const getOperators: GetOperatorsFunction = (
           if (!status || !areDocumentsEqual) {
             throw new Error('Update not permitted')
           }
-          return collection.updateOne({ $and: safeQuery }, data, options)
+          const res = await collection.updateOne({ $and: safeQuery }, data, options)
+          emitMongoEvent('updateOne')
+          return res
         }
-        return collection.updateOne(query, data, options)
+        const result = await collection.updateOne(query, data, options)
+        emitMongoEvent('updateOne')
+        return result
       } catch (error) {
         emitMongoEvent('updateOne', undefined, error)
         throw error
@@ -422,7 +435,6 @@ const getOperators: GetOperatorsFunction = (
       data: UpdateFilter<Document> | Document[],
       options?: FindOneAndUpdateOptions
     ) => {
-      emitMongoEvent('findOneAndUpdate')
       try {
         if (!run_as_system) {
           checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
@@ -437,68 +449,72 @@ const getOperators: GetOperatorsFunction = (
             throw new Error('Update not permitted')
           }
 
-        const winningRole = getWinningRole(result, user, roles)
-        const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
-        const updatedPaths = Array.isArray(data) ? [] : getUpdatedPaths(data as Document)
-        const pipeline = [
-          {
-            $match: { $and: safeQuery }
-          },
-          {
-            $limit: 1
-          },
-          ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
-        ]
-        const [docToCheck] = hasOperators
-          ? await collection.aggregate(pipeline).toArray()
-          : ([data] as [Document])
-
-        const { status, document } = winningRole
-          ? await checkValidation(
-            winningRole,
+          const winningRole = getWinningRole(result, user, roles)
+          const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
+          const updatedPaths = Array.isArray(data) ? [] : getUpdatedPaths(data as Document)
+          const pipeline = [
             {
-              type: 'write',
-              roles,
-              cursor: docToCheck,
-              expansions: {}
+              $match: { $and: safeQuery }
             },
-            user
-          )
-          : fallbackAccess(docToCheck)
-
-        const areDocumentsEqual = areUpdatedFieldsAllowed(document, docToCheck, updatedPaths)
-        if (!status || !areDocumentsEqual) {
-          throw new Error('Update not permitted')
-        }
-
-        const updateResult = options
-          ? await collection.findOneAndUpdate({ $and: safeQuery }, data, options)
-          : await collection.findOneAndUpdate({ $and: safeQuery }, data)
-        if (!updateResult) {
-          return updateResult
-        }
-
-        const readRole = getWinningRole(updateResult, user, roles)
-        const readResult = readRole
-          ? await checkValidation(
-            readRole,
             {
-              type: 'read',
-              roles,
-              cursor: updateResult,
-              expansions: {}
+              $limit: 1
             },
-            user
-          )
-          : fallbackAccess(updateResult)
+            ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
+          ]
+          const [docToCheck] = hasOperators
+            ? await collection.aggregate(pipeline).toArray()
+            : ([data] as [Document])
+
+          const { status, document } = winningRole
+            ? await checkValidation(
+              winningRole,
+              {
+                type: 'write',
+                roles,
+                cursor: docToCheck,
+                expansions: {}
+              },
+              user
+            )
+            : fallbackAccess(docToCheck)
+
+          const areDocumentsEqual = areUpdatedFieldsAllowed(document, docToCheck, updatedPaths)
+          if (!status || !areDocumentsEqual) {
+            throw new Error('Update not permitted')
+          }
+
+          const updateResult = options
+            ? await collection.findOneAndUpdate({ $and: safeQuery }, data, options)
+            : await collection.findOneAndUpdate({ $and: safeQuery }, data)
+          if (!updateResult) {
+            emitMongoEvent('findOneAndUpdate')
+            return updateResult
+          }
+
+          const readRole = getWinningRole(updateResult, user, roles)
+          const readResult = readRole
+            ? await checkValidation(
+              readRole,
+              {
+                type: 'read',
+                roles,
+                cursor: updateResult,
+                expansions: {}
+              },
+              user
+            )
+            : fallbackAccess(updateResult)
 
           const sanitizedDoc = readResult.status ? (readResult.document ?? updateResult) : {}
+          emitMongoEvent('findOneAndUpdate')
           return sanitizedDoc
         }
 
-        return options
-          ? collection.findOneAndUpdate(query, data, options)
-          : collection.findOneAndUpdate(query, data)
+        const updateResult = options
+          ? await collection.findOneAndUpdate(query, data, options)
+          : await collection.findOneAndUpdate(query, data)
+        emitMongoEvent('findOneAndUpdate')
+        return updateResult
       } catch (error) {
         emitMongoEvent('findOneAndUpdate', undefined, error)
         throw error
@@ -525,7 +541,6 @@ const getOperators: GetOperatorsFunction = (
      * This ensures that both pre-query filtering and post-query validation are applied consistently.
      */
     find: (query = {}, projection, options) => {
-      emitMongoEvent('find')
       try {
         const resolvedOptions =
           projection || options
@@ -581,27 +596,33 @@ const getOperators: GetOperatorsFunction = (
             return filteredResponse.filter(Boolean) as WithId<Document>[]
           }
 
+          emitMongoEvent('find')
           return cursor
         }
         // System mode: return original unfiltered cursor
-        return collection.find(query, resolvedOptions)
+        const cursor = collection.find(query, resolvedOptions)
+        emitMongoEvent('find')
+        return cursor
       } catch (error) {
         emitMongoEvent('find', undefined, error)
         throw error
       }
     },
-    count: (query, options) => {
-      emitMongoEvent('count')
+    count: async (query, options) => {
       try {
         if (!run_as_system) {
           checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
           const formattedQuery = getFormattedQuery(filters, query, user)
           const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
           logService('count query', { collName, currentQuery })
-          return collection.countDocuments(currentQuery, options)
+          const result = await collection.countDocuments(currentQuery, options)
+          emitMongoEvent('count')
+          return result
         }
 
-        return collection.countDocuments(query, options)
+        const result = await collection.countDocuments(query, options)
+        emitMongoEvent('count')
+        return result
       } catch (error) {
         emitMongoEvent('count', undefined, error)
         throw error
@@ -627,7 +648,6 @@ const getOperators: GetOperatorsFunction = (
      * This allows fine-grained control over what change events a user can observe, based on roles and filters.
      */
     watch: (pipeline = [], options) => {
-      emitMongoEvent('watch')
       try {
         if (!run_as_system) {
           checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
@@ -708,11 +728,14 @@ const getOperators: GetOperatorsFunction = (
               listener(filteredChange)
             })
           }
+          emitMongoEvent('watch')
           return result
         }
 
         // System mode: no filtering applied
-        return collection.watch(pipeline, options)
+        const result = collection.watch(pipeline, options)
+        emitMongoEvent('watch')
+        return result
       } catch (error) {
         emitMongoEvent('watch', undefined, error)
         throw error
@@ -720,10 +743,11 @@ const getOperators: GetOperatorsFunction = (
     },
     //TODO -> add filter & rules in aggregate
     aggregate: (pipeline = [], options, isClient) => {
-      emitMongoEvent('aggregate')
       try {
         if (run_as_system || !isClient) {
-          return collection.aggregate(pipeline, options)
+          const cursor = collection.aggregate(pipeline, options)
+          emitMongoEvent('aggregate')
+          return cursor
         }
 
         checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
@@ -765,6 +789,7 @@ const getOperators: GetOperatorsFunction = (
 
         newCursor.toArray = async () => originalCursor.toArray()
 
+        emitMongoEvent('aggregate')
         return newCursor
       } catch (error) {
         emitMongoEvent('aggregate', undefined, error)
@@ -789,7 +814,6 @@ const getOperators: GetOperatorsFunction = (
      * Only documents passing validation will be inserted.
      */
     insertMany: async (documents, options) => {
-      emitMongoEvent('insertMany')
       try {
         if (!run_as_system) {
           checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.CREATE)
@@ -821,17 +845,20 @@ const getOperators: GetOperatorsFunction = (
             throw new Error('Insert not permitted')
           }
 
-          return collection.insertMany(documents, options)
+          const result = await collection.insertMany(documents, options)
+          emitMongoEvent('insertMany')
+          return result
         }
         // If system mode is active, insert all documents without validation
-        return collection.insertMany(documents, options)
+        const result = await collection.insertMany(documents, options)
+        emitMongoEvent('insertMany')
+        return result
       } catch (error) {
         emitMongoEvent('insertMany', undefined, error)
         throw error
       }
     },
     updateMany: async (query, data, options) => {
-      emitMongoEvent('updateMany')
       try {
         if (!run_as_system) {
           checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
@@ -897,9 +924,13 @@ const getOperators: GetOperatorsFunction = (
             throw new Error('Update not permitted')
           }
 
-          return collection.updateMany({ $and: formattedQuery }, data, options)
+          const res = await collection.updateMany({ $and: formattedQuery }, data, options)
+          emitMongoEvent('updateMany')
+          return res
         }
-        return collection.updateMany(query, data, options)
+        const result = await collection.updateMany(query, data, options)
+        emitMongoEvent('updateMany')
+        return result
       } catch (error) {
         emitMongoEvent('updateMany', undefined, error)
         throw error
@@ -921,7 +952,6 @@ const getOperators: GetOperatorsFunction = (
      *  - Deletes only the documents that the current user has permission to delete.
      */
     deleteMany: async (query = {}, options) => {
-      emitMongoEvent('deleteMany')
       try {
         if (!run_as_system) {
           checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
@@ -959,19 +989,25 @@ const getOperators: GetOperatorsFunction = (
           )
 
           if (!elementsToDelete.length) {
-            return Promise.resolve({
+            const result = {
               acknowledged: true,
               deletedCount: 0
-            })
+            }
+            emitMongoEvent('deleteMany')
+            return Promise.resolve(result)
           }
           // Build final delete query with access control and ID filter
           const deleteQuery = {
             $and: [...formattedQuery, { _id: { $in: elementsToDelete } }]
           }
-          return collection.deleteMany(deleteQuery, options)
+          const result = await collection.deleteMany(deleteQuery, options)
+          emitMongoEvent('deleteMany')
+          return result
         }
         // If running as system, bypass access control and delete directly
-        return collection.deleteMany(query, options)
+        const result = await collection.deleteMany(query, options)
+        emitMongoEvent('deleteMany')
+        return result
       } catch (error) {
         emitMongoEvent('deleteMany', undefined, error)
         throw error

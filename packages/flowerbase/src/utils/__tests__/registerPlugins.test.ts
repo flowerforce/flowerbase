@@ -1,8 +1,8 @@
 import cors from '@fastify/cors'
 import fastifyMongodb from '@fastify/mongodb'
+import fastifyRawBody from 'fastify-raw-body'
 import { authController } from '../../auth/controller'
 import jwtAuthPlugin from '../../auth/plugins/jwt'
-import fastifyRawBody from 'fastify-raw-body'
 import { anonUserController } from '../../auth/providers/anon-user/controller'
 import { customFunctionController } from '../../auth/providers/custom-function/controller'
 import { localUserPassController } from '../../auth/providers/local-userpass/controller'
@@ -12,7 +12,10 @@ import { registerPlugins } from '../initializer/registerPlugins'
 const MOCKED_API_VERSION = '/api/client/v2'
 
 jest.mock('../../constants', () => ({
-  API_VERSION: '/api/client/v2'
+  API_VERSION: '/api/client/v2',
+  DEFAULT_CONFIG: {
+    MONIT_ENABLED: false
+  }
 }))
 
 const mockDbUrl = 'mongodb://localhost:27017/testdb'
@@ -70,8 +73,8 @@ describe('registerPlugins', () => {
   })
 
   it('should handle errors in the catch block', async () => {
-    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {})
-    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => { })
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => { })
 
     await registerPlugins({
       register: errorMock,

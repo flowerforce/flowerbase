@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import * as jwt from 'jsonwebtoken'
 import { User } from '../../auth/dtos'
 import { Functions } from '../../features/functions/interface'
 import { Rules } from '../../features/rules/interface'
@@ -63,20 +64,37 @@ describe('generateContextData', () => {
 
     expect(context.user).toEqual(mockUser)
 
-    const mockedLog = jest.spyOn(console, 'log').mockImplementation(() => {})
+    const mockedLog = jest.spyOn(console, 'log').mockImplementation(() => { })
     contextConsole.log('Test', 'generateContextData')
     expect(mockedLog).toHaveBeenCalledWith('Test', 'generateContextData')
     mockedLog.mockRestore()
 
     context.services.get('api')
     expect(services.api).toHaveBeenCalled()
-    const mockErrorLog = jest.spyOn(console, 'error').mockImplementation(() => {})
+    const mockErrorLog = jest.spyOn(console, 'error').mockImplementation(() => { })
     context.services.get('notfound' as keyof typeof services)
     expect(mockErrorLog).toHaveBeenCalled()
     mockErrorLog.mockRestore()
 
     context.functions.execute('test')
     expect(GenerateContextMock).toHaveBeenCalled()
+
+    const token = jwt.sign(
+      { sub: 'user', role: 'admin' },
+      'secret',
+      { algorithm: 'HS256', header: { alg: 'HS256', typ: 'JWT' }, noTimestamp: true }
+    )
+    const decoded = context.utils.jwt.decode(token, 'secret')
+    expect(decoded).toEqual({ sub: 'user', role: 'admin' })
+
+    const decodedWithHeader = context.utils.jwt.decode(token, 'secret', true, ['HS256']) as {
+      header: jwt.JwtHeader
+      payload: unknown
+    }
+    expect(decodedWithHeader.payload).toEqual({ sub: 'user', role: 'admin' })
+    expect(decodedWithHeader.header).toEqual(
+      expect.objectContaining({ alg: 'HS256', typ: 'JWT' })
+    )
 
     const base64 = Buffer.from('test').toString('base64')
     const Binary = BSON.Binary as typeof BSON.Binary & {

@@ -4,6 +4,7 @@ import path from 'path'
 
 const CHARSET =
   "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{};:,.<>?";
+export const PASSWORD_RULES = { minLength: 6, maxLength: 128 } as const;
 export const LOGIN_SCHEMA = {
   tags: ['Auth'],
   body: {
@@ -15,7 +16,7 @@ export const LOGIN_SCHEMA = {
         minLength: 5,
         maxLength: 254
       },
-      password: { type: 'string', minLength: 6, maxLength: 128 }
+      password: { type: 'string', ...PASSWORD_RULES }
     },
     required: ['username', 'password']
   }
@@ -48,7 +49,7 @@ export const RESET_CALL_SCHEMA = {
         minLength: 5,
         maxLength: 254
       },
-      password: { type: 'string', minLength: 6, maxLength: 128 },
+      password: { type: 'string', ...PASSWORD_RULES },
       arguments: { type: 'array' }
     },
     required: ['email', 'password']
@@ -60,7 +61,7 @@ export const CONFIRM_RESET_SCHEMA = {
   body: {
     type: 'object',
     properties: {
-      password: { type: 'string', minLength: 6, maxLength: 128 },
+      password: { type: 'string', ...PASSWORD_RULES },
       token: { type: 'string' },
       tokenId: { type: 'string' }
     },
@@ -93,7 +94,7 @@ export const REGISTRATION_SCHEMA = {
         minLength: 5,
         maxLength: 254
       },
-      password: { type: 'string', minLength: 6, maxLength: 128 }
+      password: { type: 'string', ...PASSWORD_RULES }
     },
     required: ['email', 'password']
   }

@@ -70,7 +70,11 @@
       <section class="panel tab-panel" data-panel="users">
         <div class="panel-header">
           <span>Users</span>
-          <button id="refreshUsers" class="secondary">refresh</button>
+          <div class="panel-actions">
+            <button id="openUserConfig" class="secondary">config</button>
+            <button id="openCreateUser" class="secondary">create user</button>
+            <button id="refreshUsers" class="secondary">refresh</button>
+          </div>
         </div>
         <div class="controls">
           <input id="userSearch" class="wide-input" type="text" placeholder="search users (email, id, status)" />
@@ -105,15 +109,38 @@
               <div class="subpanel-title">user detail</div>
               <pre id="userDetail" class="event-detail">select a user to inspect</pre>
             </div>
-            <div class="subpanel">
-              <div class="subpanel-title">create user</div>
-              <form id="createUserForm">
-                <input id="newUserEmail" type="email" placeholder="email" required />
-                <input id="newUserPassword" type="password" placeholder="password" required />
-                <button type="submit">create</button>
-              </form>
-              <div id="createUserError" class="hint error is-hidden"></div>
+          </div>
+        </div>
+        <div id="userConfigModal" class="modal">
+          <div class="modal-body">
+            <div class="modal-header">
+              <div class="subpanel-title">user config</div>
+              <button id="closeUserConfig" class="secondary small">close</button>
             </div>
+            <div class="user-config">
+              <div class="user-config-block">
+                <div class="subpanel-title">providers.json</div>
+                <pre id="userProviders" class="event-detail">loading providers.json</pre>
+              </div>
+              <div class="user-config-block">
+                <div class="subpanel-title">custom_user_data.json</div>
+                <pre id="userCustomData" class="event-detail">loading custom_user_data.json</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="createUserModal" class="modal">
+          <div class="modal-body">
+            <div class="modal-header">
+              <div class="subpanel-title">create user</div>
+              <button id="closeCreateUser" class="secondary small">close</button>
+            </div>
+            <form id="createUserForm" class="modal-form">
+              <input id="newUserEmail" type="email" placeholder="email" required />
+              <input id="newUserPassword" type="password" placeholder="password" required />
+              <button type="submit">create</button>
+            </form>
+            <div id="createUserError" class="hint error is-hidden"></div>
           </div>
         </div>
       </section>
