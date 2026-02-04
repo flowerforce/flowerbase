@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { ObjectId } from 'mongodb'
+import { loadAuthConfig, loadCustomUserData, PASSWORD_RULES } from '../../auth/utils'
 import { AUTH_CONFIG, DB_NAME } from '../../constants'
 import handleUserRegistration from '../../shared/handleUserRegistration'
 import { PROVIDER } from '../../shared/models/handleUserRegistration.model'
@@ -9,6 +10,16 @@ import { createEventId, MonitorEvent, sanitize } from '../utils'
 export type UserRoutesDeps = {
   prefix: string
   addEvent: (event: MonitorEvent) => void
+}
+
+const validatePassword = (password: string) => {
+  if (password.length < PASSWORD_RULES.minLength) {
+    return `Password must be at least ${PASSWORD_RULES.minLength} characters`
+  }
+  if (password.length > PASSWORD_RULES.maxLength) {
+    return `Password must be at most ${PASSWORD_RULES.maxLength} characters`
+  }
+  return ''
 }
 
 export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) => {
@@ -109,6 +120,14 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
     return response
   })
 
+  app.get(`${prefix}/api/users/config`, async () => {
+    return {
+      providers: loadAuthConfig(),
+      customUserData: loadCustomUserData(),
+      passwordRules: PASSWORD_RULES
+    }
+  })
+
   app.post(`${prefix}/api/users`, async (req, reply) => {
     const body = req.body as { email?: string; password?: string; customData?: Record<string, unknown> }
     const email = body?.email?.toLowerCase()
@@ -116,6 +135,11 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
     if (!email || !password) {
       reply.code(400)
       return { error: 'Missing email or password' }
+    }
+    const passwordError = validatePassword(password)
+    if (passwordError) {
+      reply.code(400)
+      return { error: passwordError }
     }
 
     const result = await handleUserRegistration(app, {
@@ -160,6 +184,11 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
     if (!password) {
       reply.code(400)
       return { error: 'Missing password' }
+    }
+    const passwordError = validatePassword(password)
+    if (passwordError) {
+      reply.code(400)
+      return { error: passwordError }
     }
 
     const db = app.mongo.client.db(DB_NAME)
