@@ -344,6 +344,7 @@ This ensures isolation and allows access to useful resources during execution.
 - `context.user`: Information about the authenticated user  
 - `context.http`: Ability to make outgoing HTTP requests  
 - `context.values`: Read application-wide configuration variables
+- `context.utils.jwt`: JWT encode/decode helpers
 
 ---
 

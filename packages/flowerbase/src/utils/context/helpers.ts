@@ -1,7 +1,101 @@
 import { mongodb } from '@fastify/mongodb'
+import * as jwt from 'jsonwebtoken'
 import { Arguments } from '../../auth/dtos'
 import { Function } from '../../features/functions/interface'
 import { GenerateContextDataParams } from './interface'
+
+type JwtUtils = {
+  encode: (
+    signingMethod: string,
+    payload: unknown,
+    secret: string | Buffer,
+    customHeaderFields?: Record<string, unknown>
+  ) => string
+  decode: (
+    jwtString: string,
+    key: string | Buffer,
+    returnHeader?: boolean,
+    acceptedSigningMethods?: string[]
+  ) => unknown
+}
+
+const normalizePayload = (payload: unknown) => {
+  if (typeof payload !== 'string') return payload
+  try {
+    return JSON.parse(payload)
+  } catch {
+    return payload
+  }
+}
+
+const createJwtUtils = (): JwtUtils => {
+  return {
+    encode: (signingMethod, payload, secret, customHeaderFields) => {
+      if (typeof signingMethod !== 'string' || signingMethod.length === 0) {
+        throw new Error('Missing signing method')
+      }
+
+      if (typeof secret !== 'string' && !Buffer.isBuffer(secret)) {
+        throw new Error('Missing secret')
+      }
+
+      if (typeof secret === 'string' && secret.length === 0) {
+        throw new Error('Missing secret')
+      }
+
+      const options: jwt.SignOptions = {
+        algorithm: signingMethod as jwt.Algorithm
+      }
+
+      if (customHeaderFields && Object.keys(customHeaderFields).length > 0) {
+        options.header = customHeaderFields as unknown as jwt.JwtHeader
+      }
+
+      const normalizedPayload = normalizePayload(payload)
+      if (
+        typeof normalizedPayload !== 'string' &&
+        !Buffer.isBuffer(normalizedPayload) &&
+        (typeof normalizedPayload !== 'object' || normalizedPayload === null)
+      ) {
+        throw new Error('Invalid JWT payload')
+      }
+
+      return jwt.sign(
+        normalizedPayload as jwt.JwtPayload | string | Buffer,
+        secret,
+        options
+      )
+    },
+    decode: (jwtString, key, returnHeader = false, acceptedSigningMethods) => {
+      if (typeof jwtString !== 'string' || jwtString.length === 0) {
+        throw new Error('Invalid JWT string')
+      }
+
+      if (typeof key !== 'string' && !Buffer.isBuffer(key)) {
+        throw new Error('Missing JWT key')
+      }
+
+      if (typeof key === 'string' && key.length === 0) {
+        throw new Error('Missing JWT key')
+      }
+
+      const options: jwt.VerifyOptions = {}
+
+      if (acceptedSigningMethods && acceptedSigningMethods.length > 0) {
+        options.algorithms = acceptedSigningMethods as jwt.Algorithm[]
+      }
+
+      if (returnHeader) {
+        const decoded = jwt.verify(jwtString, key, { ...options, complete: true })
+        if (typeof decoded === 'string') return decoded
+        const { header, payload } = decoded as jwt.Jwt
+        return { header, payload }
+      }
+
+      return jwt.verify(jwtString, key, options)
+    }
+  }
+}
 
 /**
  * > Used to generate the current context data
@@ -73,9 +167,14 @@ export const generateContextData = ({
     }
   }
 
+  const utils = {
+    jwt: createJwtUtils()
+  }
+
   return {
     BSON,
     Buffer,
+    utils,
     console: {
       log: (...args: Arguments) => {
         console.log(...args)
@@ -96,6 +195,7 @@ export const generateContextData = ({
       values: {
         get: (key: string) => process.env[key]
       },
+      utils,
       services: {
         get: getService
       },
