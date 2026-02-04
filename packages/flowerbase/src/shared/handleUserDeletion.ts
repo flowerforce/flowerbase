@@ -1,5 +1,6 @@
 import { ObjectId } from "bson"
 import { AUTH_CONFIG, DB_NAME } from "../constants"
+import { emitServiceEvent } from "../services/monitoring"
 import { HandleUserDeletion } from "./models/handleUserDeletion.model"
 
 /**
@@ -11,34 +12,52 @@ import { HandleUserDeletion } from "./models/handleUserDeletion.model"
  */
 const handleUserDeletion: HandleUserDeletion = (app, opt) => async ({ id, email }) => {
     const { run_as_system } = opt ?? {}
+    const meta = { action: 'deleteUser', id, email }
+    emitServiceEvent({
+        type: 'auth',
+        source: 'service:auth',
+        message: 'auth deleteUser',
+        data: meta
+    })
 
-    if (!run_as_system) {
-        throw new Error('only run_as_system')
-    }
-
-    if (!id && !email) {
-        throw new Error('Missing user identifier')
-    }
-
-    const { authCollection } = AUTH_CONFIG
-    const mongo = app?.mongo
-    const db = mongo.client.db(DB_NAME)
-    const collection = db.collection<Record<string, unknown>>(authCollection!)
-    let query: Record<string, unknown>
-
-    if (id) {
-        let parsedId: ObjectId | string = id
-        try {
-            parsedId = new ObjectId(id)
-        } catch {
-            parsedId = id
+    try {
+        if (!run_as_system) {
+            throw new Error('only run_as_system')
         }
-        query = { _id: parsedId }
-    } else {
-        query = { email }
-    }
 
-    return collection.deleteOne(query)
+        if (!id && !email) {
+            throw new Error('Missing user identifier')
+        }
+
+        const { authCollection } = AUTH_CONFIG
+        const mongo = app?.mongo
+        const db = mongo.client.db(DB_NAME)
+        const collection = db.collection<Record<string, unknown>>(authCollection!)
+        let query: Record<string, unknown>
+
+        if (id) {
+            let parsedId: ObjectId | string = id
+            try {
+                parsedId = new ObjectId(id)
+            } catch {
+                parsedId = id
+            }
+            query = { _id: parsedId }
+        } else {
+            query = { email }
+        }
+
+        return await collection.deleteOne(query)
+    } catch (error) {
+        emitServiceEvent({
+            type: 'auth',
+            source: 'service:auth',
+            message: 'auth deleteUser failed',
+            data: meta,
+            error
+        })
+        throw error
+    }
 }
 
 export default handleUserDeletion

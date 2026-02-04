@@ -10,6 +10,8 @@ import {
   WithId
 } from 'mongodb'
 import { Rules } from '../../features/rules/interface'
+import { buildRulesMeta } from '../../monitoring/utils'
+import { emitServiceEvent } from '../monitoring'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
 import { CRUD_OPERATIONS, GetOperatorsFunction, MongodbAtlasFunction } from './model'
@@ -83,6 +85,32 @@ const getOperators: GetOperatorsFunction = (
     status: false,
     document: doc
   })
+  const rulesMeta = buildRulesMeta({
+    serviceName: 'mongodb-atlas',
+    rules: normalizedRules,
+    user,
+    runAsSystem: run_as_system,
+    collection: collName
+  })
+  const emitMongoEvent = (
+    operation: string,
+    meta?: Record<string, unknown>,
+    error?: unknown
+  ) => {
+    emitServiceEvent({
+      type: 'mongo',
+      source: 'service:mongodb-atlas',
+      message: error ? `mongo ${operation} failed` : `mongo ${operation}`,
+      data: {
+        operation,
+        collection: collName,
+        runAsSystem: !!run_as_system,
+        rules: rulesMeta,
+        ...(meta ?? {})
+      },
+      error
+    })
+  }
 
   return {
     /**
@@ -103,65 +131,71 @@ const getOperators: GetOperatorsFunction = (
    *  - If validation fails, returns an empty object; otherwise returns the validated document.
    */
     findOne: async (query = {}, projection, options) => {
-      const resolvedOptions =
-        projection || options
-          ? {
-            ...(options ?? {}),
-            ...(projection ? { projection } : {})
-          }
-          : undefined
-      const resolvedQuery = query ?? {}
-      if (!run_as_system) {
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
-        // Apply access control filters to the query
-        const formattedQuery = getFormattedQuery(filters, resolvedQuery, user)
-        logDebug('update formattedQuery', {
-          collection: collName,
-          query,
-          formattedQuery
-        })
-        logDebug('find formattedQuery', {
-          collection: collName,
-          query,
-          formattedQuery,
-          rolesLength: roles.length
-        })
+      emitMongoEvent('findOne')
+      try {
+        const resolvedOptions =
+          projection || options
+            ? {
+              ...(options ?? {}),
+              ...(projection ? { projection } : {})
+            }
+            : undefined
+        const resolvedQuery = query ?? {}
+        if (!run_as_system) {
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+          // Apply access control filters to the query
+          const formattedQuery = getFormattedQuery(filters, resolvedQuery, user)
+          logDebug('update formattedQuery', {
+            collection: collName,
+            query,
+            formattedQuery
+          })
+          logDebug('find formattedQuery', {
+            collection: collName,
+            query,
+            formattedQuery,
+            rolesLength: roles.length
+          })
 
-        logService('findOne query', { collName, formattedQuery })
-        const safeQuery = normalizeQuery(formattedQuery)
-        logService('findOne normalizedQuery', { collName, safeQuery })
-        const result = await collection.findOne({ $and: safeQuery }, resolvedOptions)
-        logDebug('findOne result', {
-          collection: collName,
-          result
-        })
-        logService('findOne result', { collName, result })
+          logService('findOne query', { collName, formattedQuery })
+          const safeQuery = normalizeQuery(formattedQuery)
+          logService('findOne normalizedQuery', { collName, safeQuery })
+          const result = await collection.findOne({ $and: safeQuery }, resolvedOptions)
+          logDebug('findOne result', {
+            collection: collName,
+            result
+          })
+          logService('findOne result', { collName, result })
 
-        const winningRole = getWinningRole(result, user, roles)
+          const winningRole = getWinningRole(result, user, roles)
 
-        logDebug('findOne winningRole', {
-          collection: collName,
-          winningRoleName: winningRole?.name ?? null,
-          userId: getUserId(user)
-        })
-        const { status, document } = winningRole
-          ? await checkValidation(
-            winningRole,
-            {
-              type: 'read',
-              roles,
-              cursor: result,
-              expansions: {}
-            },
-            user
-          )
-          : fallbackAccess(result)
+          logDebug('findOne winningRole', {
+            collection: collName,
+            winningRoleName: winningRole?.name ?? null,
+            userId: getUserId(user)
+          })
+          const { status, document } = winningRole
+            ? await checkValidation(
+              winningRole,
+              {
+                type: 'read',
+                roles,
+                cursor: result,
+                expansions: {}
+              },
+              user
+            )
+            : fallbackAccess(result)
 
-        // Return validated document or empty object if not permitted
-        return Promise.resolve(status ? document : {})
+          // Return validated document or empty object if not permitted
+          return Promise.resolve(status ? document : {})
+        }
+        // System mode: no validation applied
+        return collection.findOne(resolvedQuery, resolvedOptions)
+      } catch (error) {
+        emitMongoEvent('findOne', undefined, error)
+        throw error
       }
-      // System mode: no validation applied
-      return collection.findOne(resolvedQuery, resolvedOptions)
     },
     /**
      * Deletes a single document from a MongoDB collection with optional role-based validation.
@@ -182,41 +216,47 @@ const getOperators: GetOperatorsFunction = (
      *  - If validation passes, deletes the document using the filtered query.
      */
     deleteOne: async (query = {}, options) => {
-      if (!run_as_system) {
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
-        // Apply access control filters
-        const formattedQuery = getFormattedQuery(filters, query, user)
+      emitMongoEvent('deleteOne')
+      try {
+        if (!run_as_system) {
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
+          // Apply access control filters
+          const formattedQuery = getFormattedQuery(filters, query, user)
 
-        // Retrieve the document to check permissions before deleting
-        const result = await collection.findOne({ $and: formattedQuery })
-        const winningRole = getWinningRole(result, user, roles)
+          // Retrieve the document to check permissions before deleting
+          const result = await collection.findOne({ $and: formattedQuery })
+          const winningRole = getWinningRole(result, user, roles)
 
-        logDebug('delete winningRole', {
-          collection: collName,
-          userId: getUserId(user),
-          winningRoleName: winningRole?.name ?? null
-        })
-        const { status } = winningRole
-          ? await checkValidation(
-            winningRole,
-            {
-              type: 'delete',
-              roles,
-              cursor: result,
-              expansions: {}
-            },
-            user
-          )
-          : fallbackAccess(result)
+          logDebug('delete winningRole', {
+            collection: collName,
+            userId: getUserId(user),
+            winningRoleName: winningRole?.name ?? null
+          })
+          const { status } = winningRole
+            ? await checkValidation(
+              winningRole,
+              {
+                type: 'delete',
+                roles,
+                cursor: result,
+                expansions: {}
+              },
+              user
+            )
+            : fallbackAccess(result)
 
-        if (!status) {
-          throw new Error('Delete not permitted')
+          if (!status) {
+            throw new Error('Delete not permitted')
+          }
+
+          return collection.deleteOne({ $and: formattedQuery }, options)
         }
-
-        return collection.deleteOne({ $and: formattedQuery }, options)
+        // System mode: bypass access control
+        return collection.deleteOne(query, options)
+      } catch (error) {
+        emitMongoEvent('deleteOne', undefined, error)
+        throw error
       }
-      // System mode: bypass access control
-      return collection.deleteOne(query, options)
     },
     /**
      * Inserts a single document into a MongoDB collection with optional role-based validation.
@@ -238,37 +278,43 @@ const getOperators: GetOperatorsFunction = (
      * This ensures that only users with the correct permissions can insert data into the collection.
      */
     insertOne: async (data, options) => {
-      if (!run_as_system) {
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.CREATE)
-        const winningRole = getWinningRole(data, user, roles)
+      emitMongoEvent('insertOne')
+      try {
+        if (!run_as_system) {
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.CREATE)
+          const winningRole = getWinningRole(data, user, roles)
 
-        const { status, document } = winningRole
-          ? await checkValidation(
-            winningRole,
-            {
-              type: 'insert',
-              roles,
-              cursor: data,
-              expansions: {}
-            },
-            user
-          )
-          : fallbackAccess(data)
+          const { status, document } = winningRole
+            ? await checkValidation(
+              winningRole,
+              {
+                type: 'insert',
+                roles,
+                cursor: data,
+                expansions: {}
+              },
+              user
+            )
+            : fallbackAccess(data)
 
-        if (!status || !isEqual(data, document)) {
-          throw new Error('Insert not permitted')
+          if (!status || !isEqual(data, document)) {
+            throw new Error('Insert not permitted')
+          }
+          logService('insertOne payload', { collName, data })
+          const insertResult = await collection.insertOne(data, options)
+          logService('insertOne result', {
+            collName,
+            insertedId: insertResult.insertedId.toString(),
+            document: data
+          })
+          return insertResult
         }
-        logService('insertOne payload', { collName, data })
-        const insertResult = await collection.insertOne(data, options)
-        logService('insertOne result', {
-          collName,
-          insertedId: insertResult.insertedId.toString(),
-          document: data
-        })
-        return insertResult
+        // System mode: insert without validation
+        return collection.insertOne(data, options)
+      } catch (error) {
+        emitMongoEvent('insertOne', undefined, error)
+        throw error
       }
-      // System mode: insert without validation
-      return collection.insertOne(data, options)
     },
     /**
      * Updates a single document in a MongoDB collection with optional role-based validation.
@@ -292,67 +338,73 @@ const getOperators: GetOperatorsFunction = (
      *  - If validation fails, throws an error; otherwise, updates the document.
      */
     updateOne: async (query, data, options) => {
-      if (!run_as_system) {
+      emitMongoEvent('updateOne')
+      try {
+        if (!run_as_system) {
 
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
-        // Apply access control filters
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
+          // Apply access control filters
 
-        // Normalize _id
-        const formattedQuery = getFormattedQuery(filters, query, user)
-        const safeQuery = Array.isArray(formattedQuery)
-          ? normalizeQuery(formattedQuery)
-          : formattedQuery
+          // Normalize _id
+          const formattedQuery = getFormattedQuery(filters, query, user)
+          const safeQuery = Array.isArray(formattedQuery)
+            ? normalizeQuery(formattedQuery)
+            : formattedQuery
 
-        const result = await collection.findOne({ $and: safeQuery })
+          const result = await collection.findOne({ $and: safeQuery })
 
-        if (!result) {
-          throw new Error('Update not permitted')
-        }
+          if (!result) {
+            throw new Error('Update not permitted')
+          }
 
-        const winningRole = getWinningRole(result, user, roles)
+          const winningRole = getWinningRole(result, user, roles)
 
-        // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
-        const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
-        const updatedPaths = getUpdatedPaths(data as Document)
+          // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
+          const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
+          const updatedPaths = getUpdatedPaths(data as Document)
 
-        // Flatten the update object to extract the actual fields being modified
-        // const docToCheck = hasOperators
-        //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
-        //   : data
-        const pipeline = [
-          {
-            $match: { $and: safeQuery }
-          },
-          {
-            $limit: 1
-          },
-          ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
-        ]
-        const [docToCheck] = hasOperators
-          ? await collection.aggregate(pipeline).toArray()
-          : ([data] as [Document])
-        // Validate update permissions
-        const { status, document } = winningRole
-          ? await checkValidation(
-            winningRole,
+          // Flatten the update object to extract the actual fields being modified
+          // const docToCheck = hasOperators
+          //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
+          //   : data
+          const pipeline = [
             {
-              type: 'write',
-              roles,
-              cursor: docToCheck,
-              expansions: {}
+              $match: { $and: safeQuery }
             },
-            user
-          )
-          : fallbackAccess(docToCheck)
-        // Ensure no unauthorized changes are made
-        const areDocumentsEqual = areUpdatedFieldsAllowed(document, docToCheck, updatedPaths)
+            {
+              $limit: 1
+            },
+            ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
+          ]
+          const [docToCheck] = hasOperators
+            ? await collection.aggregate(pipeline).toArray()
+            : ([data] as [Document])
+          // Validate update permissions
+          const { status, document } = winningRole
+            ? await checkValidation(
+              winningRole,
+              {
+                type: 'write',
+                roles,
+                cursor: docToCheck,
+                expansions: {}
+              },
+              user
+            )
+            : fallbackAccess(docToCheck)
+          // Ensure no unauthorized changes are made
+          const areDocumentsEqual = areUpdatedFieldsAllowed(document, docToCheck, updatedPaths)
 
-        if (!status || !areDocumentsEqual) {
-          throw new Error('Update not permitted')
+          if (!status || !areDocumentsEqual) {
+            throw new Error('Update not permitted')
+          }
+          return collection.updateOne({ $and: safeQuery }, data, options)
         }
-        return collection.updateOne({ $and: safeQuery }, data, options)
+        return collection.updateOne(query, data, options)
+      } catch (error) {
+        emitMongoEvent('updateOne', undefined, error)
+        throw error
       }
-      return collection.updateOne(query, data, options)
     },
     /**
      * Finds and updates a single document with role-based validation and access control.
@@ -369,18 +421,20 @@ const getOperators: GetOperatorsFunction = (
       data: UpdateFilter<Document> | Document[],
       options?: FindOneAndUpdateOptions
     ) => {
-      if (!run_as_system) {
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
-        const formattedQuery = getFormattedQuery(filters, query, user)
-        const safeQuery = Array.isArray(formattedQuery)
-          ? normalizeQuery(formattedQuery)
-          : formattedQuery
+      emitMongoEvent('findOneAndUpdate')
+      try {
+        if (!run_as_system) {
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
+          const formattedQuery = getFormattedQuery(filters, query, user)
+          const safeQuery = Array.isArray(formattedQuery)
+            ? normalizeQuery(formattedQuery)
+            : formattedQuery
 
-        const result = await collection.findOne({ $and: safeQuery })
+          const result = await collection.findOne({ $and: safeQuery })
 
-        if (!result) {
-          throw new Error('Update not permitted')
-        }
+          if (!result) {
+            throw new Error('Update not permitted')
+          }
 
         const winningRole = getWinningRole(result, user, roles)
         const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
@@ -437,13 +491,17 @@ const getOperators: GetOperatorsFunction = (
           )
           : fallbackAccess(updateResult)
 
-        const sanitizedDoc = readResult.status ? (readResult.document ?? updateResult) : {}
-        return sanitizedDoc
-      }
+          const sanitizedDoc = readResult.status ? (readResult.document ?? updateResult) : {}
+          return sanitizedDoc
+        }
 
-      return options
-        ? collection.findOneAndUpdate(query, data, options)
-        : collection.findOneAndUpdate(query, data)
+        return options
+          ? collection.findOneAndUpdate(query, data, options)
+          : collection.findOneAndUpdate(query, data)
+      } catch (error) {
+        emitMongoEvent('findOneAndUpdate', undefined, error)
+        throw error
+      }
     },
     /**
      * Finds documents in a MongoDB collection with optional role-based access control and post-query validation.
@@ -466,75 +524,87 @@ const getOperators: GetOperatorsFunction = (
      * This ensures that both pre-query filtering and post-query validation are applied consistently.
      */
     find: (query = {}, projection, options) => {
-      const resolvedOptions =
-        projection || options
-          ? {
-            ...(options ?? {}),
-            ...(projection ? { projection } : {})
-          }
-          : undefined
-      if (!run_as_system) {
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
-        // Pre-query filtering based on access control rules
-        const formattedQuery = getFormattedQuery(filters, query, user)
-        const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
-        // aggiunto filter per evitare questo errore: $and argument's entries must be objects
-        const cursor = collection.find(currentQuery, resolvedOptions)
-        const originalToArray = cursor.toArray.bind(cursor)
+      emitMongoEvent('find')
+      try {
+        const resolvedOptions =
+          projection || options
+            ? {
+              ...(options ?? {}),
+              ...(projection ? { projection } : {})
+            }
+            : undefined
+        if (!run_as_system) {
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+          // Pre-query filtering based on access control rules
+          const formattedQuery = getFormattedQuery(filters, query, user)
+          const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
+          // aggiunto filter per evitare questo errore: $and argument's entries must be objects
+          const cursor = collection.find(currentQuery, resolvedOptions)
+          const originalToArray = cursor.toArray.bind(cursor)
 
-        /**
-         * Overridden `toArray` method that validates each document for read access.
-         *
-         * @returns {Promise<Document[]>} An array of documents the user is authorized to read.
-         */
-        cursor.toArray = async () => {
-          const response = await originalToArray()
+          /**
+           * Overridden `toArray` method that validates each document for read access.
+           *
+           * @returns {Promise<Document[]>} An array of documents the user is authorized to read.
+           */
+          cursor.toArray = async () => {
+            const response = await originalToArray()
 
-          const filteredResponse = await Promise.all(
-            response.map(async (currentDoc) => {
-              const winningRole = getWinningRole(currentDoc, user, roles)
+            const filteredResponse = await Promise.all(
+              response.map(async (currentDoc) => {
+                const winningRole = getWinningRole(currentDoc, user, roles)
 
-              logDebug('find winningRole', {
-                collection: collName,
-                userId: getUserId(user),
-                winningRoleName: winningRole?.name ?? null,
-                rolesLength: roles.length
+                logDebug('find winningRole', {
+                  collection: collName,
+                  userId: getUserId(user),
+                  winningRoleName: winningRole?.name ?? null,
+                  rolesLength: roles.length
+                })
+                const { status, document } = winningRole
+                  ? await checkValidation(
+                    winningRole,
+                    {
+                      type: 'read',
+                      roles,
+                      cursor: currentDoc,
+                      expansions: {}
+                    },
+                    user
+                  )
+                  : fallbackAccess(currentDoc)
+
+                return status ? document : undefined
               })
-              const { status, document } = winningRole
-                ? await checkValidation(
-                  winningRole,
-                  {
-                    type: 'read',
-                    roles,
-                    cursor: currentDoc,
-                    expansions: {}
-                  },
-                  user
-                )
-                : fallbackAccess(currentDoc)
+            )
 
-              return status ? document : undefined
-            })
-          )
+            return filteredResponse.filter(Boolean) as WithId<Document>[]
+          }
 
-          return filteredResponse.filter(Boolean) as WithId<Document>[]
+          return cursor
         }
-
-        return cursor
+        // System mode: return original unfiltered cursor
+        return collection.find(query, resolvedOptions)
+      } catch (error) {
+        emitMongoEvent('find', undefined, error)
+        throw error
       }
-      // System mode: return original unfiltered cursor
-      return collection.find(query, resolvedOptions)
     },
     count: (query, options) => {
-      if (!run_as_system) {
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
-        const formattedQuery = getFormattedQuery(filters, query, user)
-        const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
-        logService('count query', { collName, currentQuery })
-        return collection.countDocuments(currentQuery, options)
-      }
+      emitMongoEvent('count')
+      try {
+        if (!run_as_system) {
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+          const formattedQuery = getFormattedQuery(filters, query, user)
+          const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
+          logService('count query', { collName, currentQuery })
+          return collection.countDocuments(currentQuery, options)
+        }
 
-      return collection.countDocuments(query, options)
+        return collection.countDocuments(query, options)
+      } catch (error) {
+        emitMongoEvent('count', undefined, error)
+        throw error
+      }
     },
     /**
      * Watches changes on a MongoDB collection with optional role-based filtering of change events.
@@ -556,137 +626,149 @@ const getOperators: GetOperatorsFunction = (
      * This allows fine-grained control over what change events a user can observe, based on roles and filters.
      */
     watch: (pipeline = [], options) => {
-      if (!run_as_system) {
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
-        // Apply access filters to initial change stream pipeline
-        const formattedQuery = getFormattedQuery(filters, {}, user)
+      emitMongoEvent('watch')
+      try {
+        if (!run_as_system) {
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+          // Apply access filters to initial change stream pipeline
+          const formattedQuery = getFormattedQuery(filters, {}, user)
 
-        const firstStep = formattedQuery.length ? {
-          $match: {
-            $and: formattedQuery
-          }
-        } : undefined
-
-        const formattedPipeline = [
-          firstStep,
-          ...pipeline
-        ].filter(Boolean) as Document[]
-
-        const result = collection.watch(formattedPipeline, options)
-        const originalOn = result.on.bind(result)
-
-        /**
-         * Validates a change event against the user's roles.
-         *
-         * @param {Document} change - A change event from the ChangeStream.
-         * @returns {Promise<{ status: boolean, document: Document, updatedFieldsStatus: boolean, updatedFields: Document }>}
-         */
-        const isValidChange = async ({ fullDocument, updateDescription }: Document) => {
-          const winningRole = getWinningRole(fullDocument, user, roles)
-
-          const { status, document } = winningRole
-            ? await checkValidation(
-              winningRole,
-              {
-                type: 'read',
-                roles,
-                cursor: fullDocument,
-                expansions: {}
-              },
-              user
-            )
-            : fallbackAccess(fullDocument)
-
-          const { status: updatedFieldsStatus, document: updatedFields } = winningRole
-            ? await checkValidation(
-              winningRole,
-              {
-                type: 'read',
-                roles,
-                cursor: updateDescription?.updatedFields,
-                expansions: {}
-              },
-              user
-            )
-            : fallbackAccess(updateDescription?.updatedFields)
-
-          return { status, document, updatedFieldsStatus, updatedFields }
-        }
-
-        // Override the .on() method to apply validation before emitting events
-        result.on = <EventKey extends keyof EventsDescription>(
-          eventType: EventKey,
-          listener: EventsDescription[EventKey]
-        ) => {
-          return originalOn(eventType, async (change: Document) => {
-            const { status, document, updatedFieldsStatus, updatedFields } =
-              await isValidChange(change)
-            if (!status) return
-
-            const filteredChange = {
-              ...change,
-              fullDocument: document,
-              updateDescription: {
-                ...change.updateDescription,
-                updatedFields: updatedFieldsStatus ? updatedFields : {}
-              }
+          const firstStep = formattedQuery.length ? {
+            $match: {
+              $and: formattedQuery
             }
+          } : undefined
 
-            listener(filteredChange)
-          })
+          const formattedPipeline = [
+            firstStep,
+            ...pipeline
+          ].filter(Boolean) as Document[]
+
+          const result = collection.watch(formattedPipeline, options)
+          const originalOn = result.on.bind(result)
+
+          /**
+           * Validates a change event against the user's roles.
+           *
+           * @param {Document} change - A change event from the ChangeStream.
+           * @returns {Promise<{ status: boolean, document: Document, updatedFieldsStatus: boolean, updatedFields: Document }>}
+           */
+          const isValidChange = async ({ fullDocument, updateDescription }: Document) => {
+            const winningRole = getWinningRole(fullDocument, user, roles)
+
+            const { status, document } = winningRole
+              ? await checkValidation(
+                winningRole,
+                {
+                  type: 'read',
+                  roles,
+                  cursor: fullDocument,
+                  expansions: {}
+                },
+                user
+              )
+              : fallbackAccess(fullDocument)
+
+            const { status: updatedFieldsStatus, document: updatedFields } = winningRole
+              ? await checkValidation(
+                winningRole,
+                {
+                  type: 'read',
+                  roles,
+                  cursor: updateDescription?.updatedFields,
+                  expansions: {}
+                },
+                user
+              )
+              : fallbackAccess(updateDescription?.updatedFields)
+
+            return { status, document, updatedFieldsStatus, updatedFields }
+          }
+
+          // Override the .on() method to apply validation before emitting events
+          result.on = <EventKey extends keyof EventsDescription>(
+            eventType: EventKey,
+            listener: EventsDescription[EventKey]
+          ) => {
+            return originalOn(eventType, async (change: Document) => {
+              const { status, document, updatedFieldsStatus, updatedFields } =
+                await isValidChange(change)
+              if (!status) return
+
+              const filteredChange = {
+                ...change,
+                fullDocument: document,
+                updateDescription: {
+                  ...change.updateDescription,
+                  updatedFields: updatedFieldsStatus ? updatedFields : {}
+                }
+              }
+
+              listener(filteredChange)
+            })
+          }
+          return result
         }
-        return result
-      }
 
-      // System mode: no filtering applied
-      return collection.watch(pipeline, options)
+        // System mode: no filtering applied
+        return collection.watch(pipeline, options)
+      } catch (error) {
+        emitMongoEvent('watch', undefined, error)
+        throw error
+      }
     },
     //TODO -> add filter & rules in aggregate
     aggregate: (pipeline = [], options, isClient) => {
-      if (run_as_system || !isClient) {
-        return collection.aggregate(pipeline, options)
+      emitMongoEvent('aggregate')
+      try {
+        if (run_as_system || !isClient) {
+          return collection.aggregate(pipeline, options)
+        }
+
+        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+
+        const rulesConfig = collectionRules ?? { filters, roles }
+
+        ensureClientPipelineStages(pipeline)
+
+        const formattedQuery = getFormattedQuery(filters, {}, user)
+        logDebug('aggregate formattedQuery', {
+          collection: collName,
+          formattedQuery,
+          pipeline
+        })
+        const projection = getFormattedProjection(filters)
+        const hiddenFields = getHiddenFieldsFromRulesConfig(rulesConfig)
+
+        const sanitizedPipeline = applyAccessControlToPipeline(
+          pipeline,
+          normalizedRules,
+          user,
+          collName,
+          { isClientPipeline: true }
+        )
+        logDebug('aggregate sanitizedPipeline', {
+          collection: collName,
+          sanitizedPipeline
+        })
+
+        const guardedPipeline = [
+          ...(hiddenFields.length ? [{ $unset: hiddenFields }] : []),
+          ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
+          ...(projection ? [{ $project: projection }] : []),
+          ...sanitizedPipeline
+        ]
+
+        const originalCursor = collection.aggregate(guardedPipeline, options)
+        const newCursor = Object.create(originalCursor)
+
+        newCursor.toArray = async () => originalCursor.toArray()
+
+        return newCursor
+      } catch (error) {
+        emitMongoEvent('aggregate', undefined, error)
+        throw error
       }
-
-      checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
-
-      const rulesConfig = collectionRules ?? { filters, roles }
-
-      ensureClientPipelineStages(pipeline)
-
-      const formattedQuery = getFormattedQuery(filters, {}, user)
-      logDebug('aggregate formattedQuery', {
-        collection: collName,
-        formattedQuery,
-        pipeline
-      })
-      const projection = getFormattedProjection(filters)
-      const hiddenFields = getHiddenFieldsFromRulesConfig(rulesConfig)
-
-      const sanitizedPipeline = applyAccessControlToPipeline(
-        pipeline,
-        normalizedRules,
-        user,
-        collName,
-        { isClientPipeline: true }
-      )
-      logDebug('aggregate sanitizedPipeline', {
-        collection: collName,
-        sanitizedPipeline
-      })
-
-      const guardedPipeline = [
-        ...(hiddenFields.length ? [{ $unset: hiddenFields }] : []),
-        ...(formattedQuery.length ? [{ $match: { $and: formattedQuery } }] : []),
-        ...(projection ? [{ $project: projection }] : []),
-        ...sanitizedPipeline
-      ]
-
-      const originalCursor = collection.aggregate(guardedPipeline, options)
-      const newCursor = Object.create(originalCursor)
-
-      newCursor.toArray = async () => originalCursor.toArray()
-
-      return newCursor
     },
     /**
      * Inserts multiple documents into a MongoDB collection with optional role-based access control and validation.
@@ -706,109 +788,121 @@ const getOperators: GetOperatorsFunction = (
      * Only documents passing validation will be inserted.
      */
     insertMany: async (documents, options) => {
-      if (!run_as_system) {
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.CREATE)
-        // Validate each document against user's roles
-        const filteredItems = await Promise.all(
-          documents.map(async (currentDoc) => {
-            const winningRole = getWinningRole(currentDoc, user, roles)
+      emitMongoEvent('insertMany')
+      try {
+        if (!run_as_system) {
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.CREATE)
+          // Validate each document against user's roles
+          const filteredItems = await Promise.all(
+            documents.map(async (currentDoc) => {
+              const winningRole = getWinningRole(currentDoc, user, roles)
 
-            const { status, document } = winningRole
-              ? await checkValidation(
-                winningRole,
-                {
-                  type: 'insert',
-                  roles,
-                  cursor: currentDoc,
-                  expansions: {}
-                },
-                user
-              )
-              : fallbackAccess(currentDoc)
+              const { status, document } = winningRole
+                ? await checkValidation(
+                  winningRole,
+                  {
+                    type: 'insert',
+                    roles,
+                    cursor: currentDoc,
+                    expansions: {}
+                  },
+                  user
+                )
+                : fallbackAccess(currentDoc)
 
-            return status ? document : undefined
-          })
-        )
+              return status ? document : undefined
+            })
+          )
 
-        const canInsert = isEqual(filteredItems, documents)
+          const canInsert = isEqual(filteredItems, documents)
 
-        if (!canInsert) {
-          throw new Error('Insert not permitted')
+          if (!canInsert) {
+            throw new Error('Insert not permitted')
+          }
+
+          return collection.insertMany(documents, options)
         }
-
+        // If system mode is active, insert all documents without validation
         return collection.insertMany(documents, options)
+      } catch (error) {
+        emitMongoEvent('insertMany', undefined, error)
+        throw error
       }
-      // If system mode is active, insert all documents without validation
-      return collection.insertMany(documents, options)
     },
     updateMany: async (query, data, options) => {
-      if (!run_as_system) {
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
-        // Apply access control filters
-        const formattedQuery = getFormattedQuery(filters, query, user)
+      emitMongoEvent('updateMany')
+      try {
+        if (!run_as_system) {
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
+          // Apply access control filters
+          const formattedQuery = getFormattedQuery(filters, query, user)
 
-        // Retrieve the document to check permissions before updating
-        const result = await collection.find({ $and: formattedQuery }).toArray()
-        if (!result) {
-          console.log('check1 In updateMany --> (!result)')
-          throw new Error('Update not permitted')
+          // Retrieve the document to check permissions before updating
+          const result = await collection.find({ $and: formattedQuery }).toArray()
+          if (!result) {
+            console.log('check1 In updateMany --> (!result)')
+            throw new Error('Update not permitted')
+          }
+
+          // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
+          const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
+          const updatedPaths = getUpdatedPaths(data as Document)
+
+          // Flatten the update object to extract the actual fields being modified
+          // const docToCheck = hasOperators
+          //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
+          //   : data
+
+          const pipeline = [
+            {
+              $match: { $and: formattedQuery }
+            },
+            ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
+          ]
+
+          const docsToCheck = hasOperators
+            ? await collection.aggregate(pipeline).toArray()
+            : result
+
+          const filteredItems = await Promise.all(
+            docsToCheck.map(async (currentDoc) => {
+              const winningRole = getWinningRole(currentDoc, user, roles)
+
+              const { status, document } = winningRole
+                ? await checkValidation(
+                  winningRole,
+                  {
+                    type: 'write',
+                    roles,
+                    cursor: currentDoc,
+                    expansions: {}
+                  },
+                  user
+                )
+                : fallbackAccess(currentDoc)
+
+              return status ? document : undefined
+            })
+          )
+
+          // Ensure no unauthorized changes are made
+          const areDocumentsEqual = docsToCheck.every((doc, index) =>
+            areUpdatedFieldsAllowed(filteredItems[index], doc, updatedPaths)
+          )
+
+          if (!areDocumentsEqual) {
+            console.log('check1 In updateMany --> (!areDocumentsEqual)')
+
+            throw new Error('Update not permitted')
+          }
+
+          return collection.updateMany({ $and: formattedQuery }, data, options)
         }
-
-        // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
-        const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
-        const updatedPaths = getUpdatedPaths(data as Document)
-
-        // Flatten the update object to extract the actual fields being modified
-        // const docToCheck = hasOperators
-        //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
-        //   : data
-
-        const pipeline = [
-          {
-            $match: { $and: formattedQuery }
-          },
-          ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
-        ]
-
-        const docsToCheck = hasOperators
-          ? await collection.aggregate(pipeline).toArray()
-          : result
-
-        const filteredItems = await Promise.all(
-          docsToCheck.map(async (currentDoc) => {
-            const winningRole = getWinningRole(currentDoc, user, roles)
-
-            const { status, document } = winningRole
-              ? await checkValidation(
-                winningRole,
-                {
-                  type: 'write',
-                  roles,
-                  cursor: currentDoc,
-                  expansions: {}
-                },
-                user
-              )
-              : fallbackAccess(currentDoc)
-
-            return status ? document : undefined
-          })
-        )
-
-        // Ensure no unauthorized changes are made
-        const areDocumentsEqual = docsToCheck.every((doc, index) =>
-          areUpdatedFieldsAllowed(filteredItems[index], doc, updatedPaths)
-        )
-
-        if (!areDocumentsEqual) {
-          console.log('check1 In updateMany --> (!areDocumentsEqual)')
-
-          throw new Error('Update not permitted')
-        }
-
-        return collection.updateMany({ $and: formattedQuery }, data, options)
+        return collection.updateMany(query, data, options)
+      } catch (error) {
+        emitMongoEvent('updateMany', undefined, error)
+        throw error
       }
-      return collection.updateMany(query, data, options)
     },
     /**
      * Deletes multiple documents from a MongoDB collection with role-based access control and validation.
@@ -826,55 +920,61 @@ const getOperators: GetOperatorsFunction = (
      *  - Deletes only the documents that the current user has permission to delete.
      */
     deleteMany: async (query = {}, options) => {
-      if (!run_as_system) {
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
-        // Apply access control filters
-        const formattedQuery = getFormattedQuery(filters, query, user)
+      emitMongoEvent('deleteMany')
+      try {
+        if (!run_as_system) {
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
+          // Apply access control filters
+          const formattedQuery = getFormattedQuery(filters, query, user)
 
-        // Fetch documents matching the combined filters
-        const data = await collection.find({ $and: formattedQuery }).toArray()
+          // Fetch documents matching the combined filters
+          const data = await collection.find({ $and: formattedQuery }).toArray()
 
-        // Filter and validate each document based on user's roles
-        const filteredItems = await Promise.all(
-          data.map(async (currentDoc) => {
-            const winningRole = getWinningRole(currentDoc, user, roles)
+          // Filter and validate each document based on user's roles
+          const filteredItems = await Promise.all(
+            data.map(async (currentDoc) => {
+              const winningRole = getWinningRole(currentDoc, user, roles)
 
-            const { status, document } = winningRole
-              ? await checkValidation(
-                winningRole,
-                {
-                  type: 'delete',
-                  roles,
-                  cursor: currentDoc,
-                  expansions: {}
-                },
-                user
-              )
-              : fallbackAccess(currentDoc)
+              const { status, document } = winningRole
+                ? await checkValidation(
+                  winningRole,
+                  {
+                    type: 'delete',
+                    roles,
+                    cursor: currentDoc,
+                    expansions: {}
+                  },
+                  user
+                )
+                : fallbackAccess(currentDoc)
 
-            return status ? document : undefined
-          })
-        )
+              return status ? document : undefined
+            })
+          )
 
-        // Extract IDs of documents that passed validation
-        const elementsToDelete = (filteredItems.filter(Boolean) as WithId<Document>[]).map(
-          ({ _id }) => _id
-        )
+          // Extract IDs of documents that passed validation
+          const elementsToDelete = (filteredItems.filter(Boolean) as WithId<Document>[]).map(
+            ({ _id }) => _id
+          )
 
-        if (!elementsToDelete.length) {
-          return Promise.resolve({
-            acknowledged: true,
-            deletedCount: 0
-          })
+          if (!elementsToDelete.length) {
+            return Promise.resolve({
+              acknowledged: true,
+              deletedCount: 0
+            })
+          }
+          // Build final delete query with access control and ID filter
+          const deleteQuery = {
+            $and: [...formattedQuery, { _id: { $in: elementsToDelete } }]
+          }
+          return collection.deleteMany(deleteQuery, options)
         }
-        // Build final delete query with access control and ID filter
-        const deleteQuery = {
-          $and: [...formattedQuery, { _id: { $in: elementsToDelete } }]
-        }
-        return collection.deleteMany(deleteQuery, options)
+        // If running as system, bypass access control and delete directly
+        return collection.deleteMany(query, options)
+      } catch (error) {
+        emitMongoEvent('deleteMany', undefined, error)
+        throw error
       }
-      // If running as system, bypass access control and delete directly
-      return collection.deleteMany(query, options)
     }
   }
 }

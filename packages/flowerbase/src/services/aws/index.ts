@@ -18,6 +18,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { getSignedUrl as presignGetSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { S3_CONFIG } from '../../constants'
+import { emitServiceEvent } from '../monitoring'
 
 type LambdaInvokeResponse = Omit<InvokeCommandOutput, 'Payload'> & {
   Payload: {
@@ -61,19 +62,55 @@ const Aws = () => {
       }
 
       lambda.Invoke = async (params: InvokeCommandInput): Promise<LambdaInvokeResponse> => {
-        const res = await lambda.send(new InvokeCommand(params))
-        return {
-          ...res,
-          Payload: {
-            text: () => decodePayload(res.Payload)
+        const meta = { operation: 'Invoke', region, functionName: params.FunctionName }
+        emitServiceEvent({
+          type: 'aws',
+          source: 'service:aws',
+          message: 'aws lambda Invoke',
+          data: meta
+        })
+        try {
+          const res = await lambda.send(new InvokeCommand(params))
+          return {
+            ...res,
+            Payload: {
+              text: () => decodePayload(res.Payload)
+            }
           }
+        } catch (error) {
+          emitServiceEvent({
+            type: 'aws',
+            source: 'service:aws',
+            message: 'aws lambda Invoke failed',
+            data: meta,
+            error
+          })
+          throw error
         }
       }
 
       const invokeAsync = async (
         params: InvokeAsyncCommandInput
       ): Promise<InvokeAsyncCommandOutput> => {
-        return lambda.send(new InvokeAsyncCommand(params))
+        const meta = { operation: 'InvokeAsync', region, functionName: params.FunctionName }
+        emitServiceEvent({
+          type: 'aws',
+          source: 'service:aws',
+          message: 'aws lambda InvokeAsync',
+          data: meta
+        })
+        try {
+          return await lambda.send(new InvokeAsyncCommand(params))
+        } catch (error) {
+          emitServiceEvent({
+            type: 'aws',
+            source: 'service:aws',
+            message: 'aws lambda InvokeAsync failed',
+            data: meta,
+            error
+          })
+          throw error
+        }
       }
 
       lambda.InvokeAsync = invokeAsync
@@ -98,11 +135,47 @@ const Aws = () => {
       }
 
       client.PutObject = async (params: PutObjectCommandInput): Promise<PutObjectCommandOutput> => {
-        return client.send(new PutObjectCommand(params))
+        const meta = { operation: 'PutObject', region, bucket: params.Bucket, key: params.Key }
+        emitServiceEvent({
+          type: 'aws',
+          source: 'service:aws',
+          message: 'aws s3 PutObject',
+          data: meta
+        })
+        try {
+          return await client.send(new PutObjectCommand(params))
+        } catch (error) {
+          emitServiceEvent({
+            type: 'aws',
+            source: 'service:aws',
+            message: 'aws s3 PutObject failed',
+            data: meta,
+            error
+          })
+          throw error
+        }
       }
 
       client.GetObject = async (params: GetObjectCommandInput): Promise<GetObjectCommandOutput> => {
-        return client.send(new GetObjectCommand(params))
+        const meta = { operation: 'GetObject', region, bucket: params.Bucket, key: params.Key }
+        emitServiceEvent({
+          type: 'aws',
+          source: 'service:aws',
+          message: 'aws s3 GetObject',
+          data: meta
+        })
+        try {
+          return await client.send(new GetObjectCommand(params))
+        } catch (error) {
+          emitServiceEvent({
+            type: 'aws',
+            source: 'service:aws',
+            message: 'aws s3 GetObject failed',
+            data: meta,
+            error
+          })
+          throw error
+        }
       }
 
       client.getSignedUrl = async (
@@ -112,20 +185,55 @@ const Aws = () => {
       ): Promise<string> => {
         const { Expires, ...rest } = params
         const expiresIn = options?.expiresIn ?? Expires
+        const meta = {
+          operation: 'getSignedUrl',
+          region,
+          bucket: (params as { Bucket?: string }).Bucket,
+          key: (params as { Key?: string }).Key,
+          method: operation
+        }
+        emitServiceEvent({
+          type: 'aws',
+          source: 'service:aws',
+          message: 'aws s3 getSignedUrl',
+          data: meta
+        })
 
         if (operation === 'putObject') {
-          return presignGetSignedUrl(
-            client,
-            new PutObjectCommand(rest as PutObjectCommandInput),
-            expiresIn ? { expiresIn } : undefined
-          )
+          try {
+            return await presignGetSignedUrl(
+              client,
+              new PutObjectCommand(rest as PutObjectCommandInput),
+              expiresIn ? { expiresIn } : undefined
+            )
+          } catch (error) {
+            emitServiceEvent({
+              type: 'aws',
+              source: 'service:aws',
+              message: 'aws s3 getSignedUrl failed',
+              data: meta,
+              error
+            })
+            throw error
+          }
         }
 
-        return presignGetSignedUrl(
-          client,
-          new GetObjectCommand(rest as GetObjectCommandInput),
-          expiresIn ? { expiresIn } : undefined
-        )
+        try {
+          return await presignGetSignedUrl(
+            client,
+            new GetObjectCommand(rest as GetObjectCommandInput),
+            expiresIn ? { expiresIn } : undefined
+          )
+        } catch (error) {
+          emitServiceEvent({
+            type: 'aws',
+            source: 'service:aws',
+            message: 'aws s3 getSignedUrl failed',
+            data: meta,
+            error
+          })
+          throw error
+        }
       }
 
       client.PresignURL = async (params: PresignURLParams): Promise<string> => {
@@ -136,7 +244,31 @@ const Aws = () => {
           Expires ?? (typeof ExpirationMS === 'number' ? Math.ceil(ExpirationMS / 1000) : undefined)
         const options = typeof expiresIn === 'number' ? { expiresIn } : undefined
 
-        return client.getSignedUrl(operation, rest as PresignParams, options)
+        const meta = {
+          operation: 'PresignURL',
+          region,
+          bucket: (params as { Bucket?: string }).Bucket,
+          key: (params as { Key?: string }).Key,
+          method: operation
+        }
+        emitServiceEvent({
+          type: 'aws',
+          source: 'service:aws',
+          message: 'aws s3 PresignURL',
+          data: meta
+        })
+        try {
+          return await client.getSignedUrl(operation, rest as PresignParams, options)
+        } catch (error) {
+          emitServiceEvent({
+            type: 'aws',
+            source: 'service:aws',
+            message: 'aws s3 PresignURL failed',
+            data: meta,
+            error
+          })
+          throw error
+        }
       }
 
       return client

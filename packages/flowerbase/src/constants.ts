@@ -51,7 +51,7 @@ export const DEFAULT_CONFIG = {
     .map((item) => item.trim())
     .filter(Boolean),
   MONIT_RATE_LIMIT_WINDOW_MS: Number(process.env.MONIT_RATE_LIMIT_WINDOW_MS) || 60_000,
-  MONIT_RATE_LIMIT_MAX: Number(process.env.MONIT_RATE_LIMIT_MAX) || 120,
+  MONIT_RATE_LIMIT_MAX: Number(process.env.MONIT_RATE_LIMIT_MAX) || 220,
   MONIT_ALLOW_INVOKE: parseBoolean(process.env.MONIT_ALLOW_INVOKE ?? 'true'),
   MONIT_ALLOW_EDIT: parseBoolean(process.env.MONIT_ALLOW_EDIT ?? 'true'),
   CORS_OPTIONS: {
