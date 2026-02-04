@@ -127,12 +127,16 @@
     header.innerHTML = '<div>time</div>' +
       '<div>type</div>' +
       '<div>run</div>' +
+      '<div>from</div>' +
       '<div>user</div>' +
       '<div>message</div>';
     eventsList.appendChild(header);
     recent.forEach((event) => {
       const userId = getEventUserId(event);
       const runMode = getEventRunMode(event);
+      const invokedFrom = (event && event.data && event.data.invokedFrom)
+        ? String(event.data.invokedFrom)
+        : '';
       const row = document.createElement('div');
       row.className = 'event-row';
       row.dataset.id = event.id;
@@ -140,8 +144,23 @@
       row.innerHTML = '<div>' + formatTime(event.ts) + '</div>' +
         '<div class="event-type ' + typeClass + '">' + (event.type || '-') + '</div>' +
         '<div class="event-run" title="' + (runMode || '-') + '">' + (runMode || '-') + '</div>' +
+        '<div class="event-invoked" title="' + (invokedFrom || '-') + '">' + (invokedFrom || '-') + '</div>' +
         '<div class="event-user" title="' + (userId || '-') + '">' + (userId || '-') + '</div>' +
         '<div>' + (event.message || '') + '</div>';
+      if (invokedFrom) {
+        const invokedCell = row.querySelector('.event-invoked');
+        if (invokedCell) {
+          invokedCell.classList.add('is-link');
+          invokedCell.addEventListener('click', (clickEvent) => {
+            clickEvent.stopPropagation();
+            if (root.functions && root.functions.selectFunction) {
+              root.functions.selectFunction(invokedFrom, { activateTab: true });
+            } else {
+              setActiveTab('functions');
+            }
+          });
+        }
+      }
       if (userId) {
         const userCell = row.querySelector('.event-user');
         if (userCell) {

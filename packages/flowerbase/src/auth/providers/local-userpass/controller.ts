@@ -111,6 +111,7 @@ export async function localUserPassController(app: FastifyInstance) {
         rules: {},
         user: {},
         currentFunction,
+        functionName: resetPasswordConfig.resetFunctionName,
         functionsList,
         services
       })

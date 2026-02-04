@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'node:path'
 import cron from 'node-cron'
 import { AUTH_CONFIG, DB_NAME } from '../../constants'
+import { createEventId, sanitize } from '../../monitoring/utils'
 import { StateManager } from '../../state'
 import { readJsonContent } from '../../utils'
 import { GenerateContext } from '../../utils/context'
@@ -40,6 +41,43 @@ const shouldIgnoreStreamError = (error: unknown) => {
   if (err?.message?.includes('client was closed')) return true
   if (err?.message?.includes('Client is closed')) return true
   return false
+}
+
+const emitTriggerEvent = ({
+  status,
+  triggerName,
+  triggerType,
+  functionName,
+  meta,
+  error
+}: {
+  status: 'fired' | 'error'
+  triggerName: string
+  triggerType: string
+  functionName?: string
+  meta?: Record<string, unknown>
+  error?: unknown
+}) => {
+  const monitoring = StateManager.select('monitoring')
+  const addEvent = monitoring?.addEvent
+  if (typeof addEvent !== 'function') return
+  addEvent({
+    id: createEventId(),
+    ts: Date.now(),
+    type: status === 'error' ? 'error' : 'trigger',
+    source: 'trigger',
+    message: status === 'error'
+      ? `trigger ${triggerName} failed`
+      : `trigger ${triggerName} fired`,
+    data: sanitize({
+      trigger: triggerName,
+      triggerType,
+      functionName,
+      status,
+      meta,
+      error: status === 'error' ? error : undefined
+    })
+  })
 }
 
 /**
@@ -87,18 +125,46 @@ const handleCronTrigger = async ({
   triggerHandler,
   functionsList,
   services,
-  app
+  app,
+  triggerName,
+  triggerType,
+  functionName
 }: HandlerParams) => {
   const task = cron.schedule(config.schedule, async () => {
-    await GenerateContext({
-      args: [],
-      app,
-      rules: {},
-      user: {},
-      currentFunction: triggerHandler,
-      functionsList,
-      services
+    emitTriggerEvent({
+      status: 'fired',
+      triggerName,
+      triggerType,
+      functionName,
+      meta: {
+        schedule: config.schedule,
+        isAutoTrigger: !!config.isAutoTrigger
+      }
     })
+    try {
+      await GenerateContext({
+        args: [],
+        app,
+        rules: {},
+        user: {},
+        currentFunction: triggerHandler,
+        functionName,
+        functionsList,
+        services
+      })
+    } catch (error) {
+      emitTriggerEvent({
+        status: 'error',
+        triggerName,
+        triggerType,
+        functionName,
+        meta: {
+          schedule: config.schedule,
+          isAutoTrigger: !!config.isAutoTrigger
+        },
+        error
+      })
+    }
   })
   registerOnClose(app, () => task.stop(), 'Scheduled trigger')
 }
@@ -172,7 +238,10 @@ const handleAuthenticationTrigger = async ({
   triggerHandler,
   functionsList,
   services,
-  app
+  app,
+  triggerName,
+  triggerType,
+  functionName
 }: HandlerParams) => {
   const { database, isAutoTrigger, operation_types = [], operation_type } = config
   const providerFilter = normalizeProviders(config.providers ?? [])
@@ -180,6 +249,13 @@ const handleAuthenticationTrigger = async ({
   const collection = app.mongo.client.db(database || DB_NAME).collection(authCollection)
   const operationCandidates = operation_type ? mapOpInverse[operation_type] : operation_types
   const normalizedOps = normalizeOperationTypes(operationCandidates)
+  const baseMeta = {
+    database: database || DB_NAME,
+    collection: authCollection,
+    operationTypes: normalizedOps,
+    providers: providerFilter,
+    isAutoTrigger: !!isAutoTrigger
+  }
   const { fullDocument, fullDocumentBeforeChange } = resolveDocumentOptions({
     requestFullDocument: config.full_document,
     requestFullDocumentBeforeChange: config.full_document_before_change,
@@ -289,17 +365,33 @@ const handleAuthenticationTrigger = async ({
         updateDescription
       }
       try {
+        emitTriggerEvent({
+          status: 'fired',
+          triggerName,
+          triggerType,
+          functionName,
+          meta: { ...baseMeta, event: 'LOGOUT' }
+        })
         await GenerateContext({
           args: [{ user: userData, ...op }],
           app,
           rules: StateManager.select("rules"),
           user: {},  // TODO from currentUser ??
           currentFunction: triggerHandler,
+          functionName,
           functionsList,
           services,
           runAsSystem: true
         })
       } catch (error) {
+        emitTriggerEvent({
+          status: 'error',
+          triggerName,
+          triggerType,
+          functionName,
+          meta: { ...baseMeta, event: 'LOGOUT' },
+          error
+        })
         console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
       }
       return
@@ -325,17 +417,33 @@ const handleAuthenticationTrigger = async ({
         updateDescription
       }
       try {
+        emitTriggerEvent({
+          status: 'fired',
+          triggerName,
+          triggerType,
+          functionName,
+          meta: { ...baseMeta, event: 'DELETE' }
+        })
         await GenerateContext({
           args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
           app,
           rules: StateManager.select("rules"),
           user: {},  // TODO from currentUser ??
           currentFunction: triggerHandler,
+          functionName,
           functionsList,
           services,
           runAsSystem: true
         })
       } catch (error) {
+        emitTriggerEvent({
+          status: 'error',
+          triggerName,
+          triggerType,
+          functionName,
+          meta: { ...baseMeta, event: 'DELETE' },
+          error
+        })
         console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
       }
       return
@@ -363,17 +471,33 @@ const handleAuthenticationTrigger = async ({
         updateDescription
       }
       try {
+        emitTriggerEvent({
+          status: 'fired',
+          triggerName,
+          triggerType,
+          functionName,
+          meta: { ...baseMeta, event: 'UPDATE' }
+        })
         await GenerateContext({
           args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
           app,
           rules: StateManager.select("rules"),
           user: {},  // TODO from currentUser ??
           currentFunction: triggerHandler,
+          functionName,
           functionsList,
           services,
           runAsSystem: true
         })
       } catch (error) {
+        emitTriggerEvent({
+          status: 'error',
+          triggerName,
+          triggerType,
+          functionName,
+          meta: { ...baseMeta, event: 'UPDATE' },
+          error
+        })
         console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
       }
       return
@@ -451,17 +575,33 @@ const handleAuthenticationTrigger = async ({
     }
 
     try {
+      emitTriggerEvent({
+        status: 'fired',
+        triggerName,
+        triggerType,
+        functionName,
+        meta: { ...baseMeta, event: 'CREATE' }
+      })
       await GenerateContext({
         args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
         app,
         rules: StateManager.select("rules"),
         user: {},  // TODO from currentUser ??
         currentFunction: triggerHandler,
+        functionName,
         functionsList,
         services,
         runAsSystem: true
       })
     } catch (error) {
+      emitTriggerEvent({
+        status: 'error',
+        triggerName,
+        triggerType,
+        functionName,
+        meta: { ...baseMeta, event: 'CREATE' },
+        error
+      })
       console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
     }
   })
@@ -497,7 +637,10 @@ const handleDataBaseTrigger = async ({
   triggerHandler,
   functionsList,
   services,
-  app
+  app,
+  triggerName,
+  triggerType,
+  functionName
 }: HandlerParams) => {
   const {
     database,
@@ -512,10 +655,10 @@ const handleDataBaseTrigger = async ({
   const collection = app.mongo.client.db(database).collection(collectionName)
   const pipeline = [
     {
-    $match: {
-      operationType: { $in: normalizedOperations },
-      ...match
-    }
+      $match: {
+        operationType: { $in: normalizedOperations },
+        ...match
+      }
     },
     Object.keys(project).length
       ? {
@@ -538,15 +681,44 @@ const handleDataBaseTrigger = async ({
     console.error('Database trigger change stream error', error)
   })
   changeStream.on('change', async function ({ clusterTime, ...change }) {
-    await GenerateContext({
-      args: [change],
-      app,
-      rules: StateManager.select("rules"),
-      user: {}, // TODO add from? 
-      currentFunction: triggerHandler,
-      functionsList,
-      services
+    emitTriggerEvent({
+      status: 'fired',
+      triggerName,
+      triggerType,
+      functionName,
+      meta: {
+        database: config.database || DB_NAME,
+        collection: config.collection,
+        operationTypes: normalizedOperations,
+        isAutoTrigger: !!config.isAutoTrigger
+      }
     })
+    try {
+      await GenerateContext({
+        args: [change],
+        app,
+        rules: StateManager.select("rules"),
+        user: {}, // TODO add from?
+        currentFunction: triggerHandler,
+        functionName,
+        functionsList,
+        services
+      })
+    } catch (error) {
+      emitTriggerEvent({
+        status: 'error',
+        triggerName,
+        triggerType,
+        functionName,
+        meta: {
+          database: config.database || DB_NAME,
+          collection: config.collection,
+          operationTypes: normalizedOperations,
+          isAutoTrigger: !!config.isAutoTrigger
+        },
+        error
+      })
+    }
   })
   registerOnClose(
     app,

@@ -19,11 +19,13 @@ export type MongodbAtlasFunction = (
   {
     rules,
     user,
-    run_as_system
+    run_as_system,
+    monitoring
   }: {
     user?: User
     rules?: Rules
     run_as_system?: boolean
+    monitoring?: { invokedFrom?: string }
   }
 ) => {
   db: (dbName: string) => {
@@ -44,12 +46,14 @@ export type GetOperatorsFunction = (
     rules,
     collName,
     user,
-    run_as_system
+    run_as_system,
+    monitoringOrigin
   }: {
     user?: User
     rules?: Rules
     run_as_system?: boolean
     collName: string
+    monitoringOrigin?: string
   }
 ) => {
   findOne: (

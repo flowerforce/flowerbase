@@ -66,13 +66,17 @@ export const activateTriggers = async ({
 
       const functionName: keyof Functions = event_processors.FUNCTION.config.function_name
       const triggerHandler = functionsList[functionName] as Function
+      const triggerName = content.name || trigger.fileName || 'trigger'
 
       await TRIGGER_HANDLERS[type]({
         config,
         triggerHandler,
         app: fastify,
         services,
-        functionsList
+        functionsList,
+        triggerName,
+        triggerType: type,
+        functionName: String(functionName)
       })
     }
     console.log('TRIGGERS ACTIVATION COMPLETED')

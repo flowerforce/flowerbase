@@ -130,6 +130,7 @@ export async function GenerateContext({
   currentFunction,
   functionsList,
   services,
+  functionName,
   runAsSystem,
   deserializeArgs = true,
   enqueue,
@@ -149,6 +150,7 @@ export async function GenerateContext({
       app,
       rules,
       currentFunction: functionToRun,
+      functionName,
       functionsList,
       GenerateContext,
       request

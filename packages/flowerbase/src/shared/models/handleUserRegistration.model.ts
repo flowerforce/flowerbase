@@ -13,6 +13,7 @@ export type Options = {
   skipUserCheck?: boolean
   provider?: PROVIDER
   run_as_system?: boolean
+  monitoring?: { invokedFrom?: string }
 }
 
 type RegistrationResult = {

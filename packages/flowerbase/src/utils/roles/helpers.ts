@@ -64,6 +64,7 @@ const evaluateComplexExpression = async (
     rules: StateManager.select("rules"),
     user,
     currentFunction,
+    functionName: name,
     functionsList,
     services
   })

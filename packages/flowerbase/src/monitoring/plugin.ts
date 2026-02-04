@@ -3,8 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import fp from 'fastify-plugin'
 import '@fastify/websocket'
 import { DEFAULT_CONFIG } from '../constants'
-import type { Rules } from '../features/rules/interface'
-import { services as coreServices } from '../services'
+import { StateManager } from '../state'
 import { registerCollectionRoutes } from './routes/collections'
 import { registerEndpointRoutes } from './routes/endpoints'
 import { registerEventsRoutes } from './routes/events'
@@ -12,19 +11,14 @@ import { registerFunctionRoutes } from './routes/functions'
 import { registerTriggerRoutes } from './routes/triggers'
 import { registerUserRoutes } from './routes/users'
 import {
-  buildRulesMeta,
-  classifyRequest,
   CollectionHistoryItem,
   createEventId,
   createEventStore,
   DAY_MS,
   EventStore,
   FunctionHistoryItem,
-  isPromiseLike,
   isTestEnv,
-  MonitMeta,
   MonitorEvent,
-  pickHeaders,
   readAsset,
   resolveAssetCandidates,
   safeStringify,
@@ -32,129 +26,6 @@ import {
 } from './utils'
 
 const MONIT_REALM = 'Flowerbase Monitor'
-
-const wrapServicesForMonitoring = (addEvent: (event: MonitorEvent) => void) => {
-  const wrapped = coreServices as unknown as Record<
-    string,
-    (app: FastifyInstance, options: Record<string, unknown>) => unknown
-  > & { __monitWrapped?: boolean }
-  if (wrapped.__monitWrapped) return
-  wrapped.__monitWrapped = true
-
-  const serviceTypeMap: Record<string, string> = {
-    api: 'api',
-    aws: 'aws',
-    auth: 'auth',
-    'mongodb-atlas': 'mongo'
-  }
-  const initMethodMap: Record<string, Set<string>> = {
-    aws: new Set(['lambda', 's3']),
-    'mongodb-atlas': new Set(['db', 'collection', 'limit', 'skip', 'toArray'])
-  }
-
-  const cache = new WeakMap<object, unknown>()
-
-  const wrapValue = (
-    value: unknown,
-    path: string,
-    serviceName: string,
-    meta?: MonitMeta
-  ): unknown => {
-    if (!value || (typeof value !== 'object' && typeof value !== 'function')) return value
-    if (isPromiseLike(value)) return value
-
-    if (cache.has(value as object)) {
-      return cache.get(value as object)
-    }
-
-    const handler: ProxyHandler<object> = {
-      get(target, prop, receiver) {
-        const propValue = Reflect.get(target, prop, receiver) as unknown
-        if (typeof prop === 'symbol') return propValue
-        if (prop === 'constructor' || prop === 'toJSON') return propValue
-        if (typeof propValue === 'function') {
-          const propName = String(prop)
-          const fnPath = `${path}.${propName}`
-          const wrappedFn = (...args: unknown[]) => {
-            let nextMeta = meta
-            if (serviceName === 'mongodb-atlas') {
-              if (propName === 'db' && typeof args[0] === 'string') {
-                nextMeta = { ...(meta ?? { serviceName }), dbName: args[0], serviceName }
-              }
-              if (propName === 'collection' && typeof args[0] === 'string') {
-                nextMeta = {
-                  ...(meta ?? { serviceName }),
-                  collection: args[0],
-                  serviceName
-                }
-              }
-            }
-            const shouldLog = !(initMethodMap[serviceName]?.has(propName))
-            if (shouldLog) {
-              const ruleInfo = buildRulesMeta(nextMeta ?? meta)
-              addEvent({
-                id: createEventId(),
-                ts: Date.now(),
-                type: serviceTypeMap[serviceName] ?? 'service',
-                source: `service:${serviceName}`,
-                message: fnPath,
-                data: sanitize({ args, rules: ruleInfo })
-              })
-            }
-            let result: unknown
-            try {
-              result = (propValue as (...inner: unknown[]) => unknown).apply(target, args)
-            } catch (error) {
-              addEvent({
-                id: createEventId(),
-                ts: Date.now(),
-                type: 'error',
-                source: `service:${serviceName}`,
-                message: `error ${fnPath}`,
-                data: sanitize({ error })
-              })
-              throw error
-            }
-            if (isPromiseLike(result)) {
-              return (result as Promise<unknown>).catch((error) => {
-                addEvent({
-                  id: createEventId(),
-                  ts: Date.now(),
-                  type: 'error',
-                  source: `service:${serviceName}`,
-                  message: `error ${fnPath}`,
-                  data: sanitize({ error })
-                })
-                throw error
-              })
-            }
-            return wrapValue(result, fnPath, serviceName, nextMeta)
-          }
-          return wrappedFn
-        }
-        return wrapValue(propValue, `${path}.${String(prop)}`, serviceName, meta)
-      }
-    }
-
-    const proxied = new Proxy(value as object, handler)
-    cache.set(value as object, proxied)
-    return proxied
-  }
-
-  Object.keys(coreServices).forEach((serviceName) => {
-    const original = wrapped[serviceName]
-    wrapped[serviceName] = (app: FastifyInstance, options: Record<string, unknown>) => {
-      const instance = (original as typeof original)(app, options)
-      const meta: MonitMeta = {
-        serviceName,
-        rules: options.rules as Rules | undefined,
-        user: options.user,
-        runAsSystem: Boolean(options.run_as_system)
-      }
-      return wrapValue(instance, serviceName, serviceName, meta)
-    }
-  })
-}
 
 const createMonitoringPlugin = fp(async (
   app: FastifyInstance,
@@ -268,7 +139,7 @@ const createMonitoringPlugin = fp(async (
     })
   }
 
-  wrapServicesForMonitoring(addEvent)
+  StateManager.setData('monitoring', { addEvent })
 
   if (DEFAULT_CONFIG.MONIT_CAPTURE_CONSOLE) {
     const original = {
@@ -378,51 +249,6 @@ const createMonitoringPlugin = fp(async (
       }
     }
     (req as { __monitStart?: number }).__monitStart = Date.now()
-    done()
-  })
-
-  app.addHook('onResponse', (req, reply, done) => {
-    if (shouldSkipLog(req)) {
-      done()
-      return
-    }
-    const start = (req as { __monitStart?: number }).__monitStart ?? Date.now()
-    const duration = Date.now() - start
-    const url = req.url ?? ''
-    const type = classifyRequest(url)
-    const data: Record<string, unknown> = {
-      method: req.method,
-      url,
-      statusCode: reply.statusCode,
-      durationMs: duration,
-      ip: req.ip,
-      query: sanitize(req.query),
-      headers: pickHeaders(req.headers)
-    }
-
-    if (type === 'function') {
-      const body = req.body as { name?: string; arguments?: unknown } | undefined
-      if (body?.name) {
-        data.function = body.name
-        data.arguments = sanitize(body.arguments)
-      }
-    }
-
-    if (type === 'auth') {
-      const body = req.body as { email?: string; username?: string } | undefined
-      if (body?.email || body?.username) {
-        data.user = body.email ?? body.username
-      }
-    }
-
-    addEvent({
-      id: createEventId(),
-      ts: Date.now(),
-      type,
-      source: 'http',
-      message: `${req.method} ${url} -> ${reply.statusCode} (${duration}ms)`,
-      data
-    })
     done()
   })
 

@@ -19,6 +19,7 @@ export const generateContextData = ({
   app,
   rules,
   currentFunction,
+  functionName,
   functionsList,
   GenerateContext,
   request
@@ -60,7 +61,8 @@ export const generateContextData = ({
       return services[serviceName](app, {
         rules,
         user,
-        run_as_system: currentFunction.run_as_system
+        run_as_system: currentFunction.run_as_system,
+        monitoring: functionName ? { invokedFrom: functionName } : undefined
       })
     } catch (error) {
       console.error(
@@ -108,6 +110,7 @@ export const generateContextData = ({
             rules,
             user,
             currentFunction,
+            functionName: String(name),
             functionsList,
             services
           })

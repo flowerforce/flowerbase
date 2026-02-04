@@ -223,6 +223,7 @@ const executeLocal = async ({
       rules: rulesList,
       user,
       currentFunction: currentFunction as Function,
+      functionName: name,
       functionsList,
       services,
       runAsSystem: true,

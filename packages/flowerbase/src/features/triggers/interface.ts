@@ -43,4 +43,7 @@ export type HandlerParams = {
   app: FastifyInstance
   services: Services
   functionsList: Functions
+  triggerName: string
+  triggerType: TriggerType
+  functionName: string
 }
