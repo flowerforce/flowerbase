@@ -30,7 +30,7 @@ export const activateTriggers = async ({
         triggersToActivate.push({
           fileName: '__auto_on_user_creation_trigger__.json',
           content: {
-            name: 'onUserCreation',
+            name: AUTH_CONFIG.on_user_creation_function_name,
             type: 'AUTHENTICATION',
             disabled: false,
             config: {
