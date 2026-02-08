@@ -1,3 +1,26 @@
+## 1.7.1 (2026-02-04)
+
+
+### 🩹 Fixes
+
+- add missing deps ([b7a0f42](https://github.com/flowerforce/flowerbase/commit/b7a0f42))
+
+## 1.7.0 (2026-02-04)
+
+
+### 🚀 Features
+
+- setup monit page ([7638e37](https://github.com/flowerforce/flowerbase/commit/7638e37))
+
+
+### 🩹 Fixes
+
+- monit separate css js html ([e62feea](https://github.com/flowerforce/flowerbase/commit/e62feea))
+
+- error monit ([68b4a56](https://github.com/flowerforce/flowerbase/commit/68b4a56))
+
+- monit edit code function ([e25ef2b](https://github.com/flowerforce/flowerbase/commit/e25ef2b))
+
 ## 1.6.2 (2026-01-30)
 
 

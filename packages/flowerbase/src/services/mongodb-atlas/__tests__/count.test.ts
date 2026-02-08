@@ -84,4 +84,37 @@ describe('mongodb-atlas count', () => {
     expect(result).toBe(42)
     expect(countDocuments).toHaveBeenCalledWith({ workspace: 'workspace-2' }, options)
   })
+
+  it('supports countDocuments alias with RBAC filtering', async () => {
+    const countDocuments = jest.fn().mockResolvedValue(3)
+    const collection = {
+      collectionName: 'todos',
+      countDocuments
+    }
+
+    const rules = {
+      filters: [
+        {
+          name: 'ownerFilter',
+          query: { ownerId: 'user-1' },
+          apply_when: {}
+        }
+      ]
+    }
+
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules(rules),
+      user: { id: 'user-1' }
+    })
+      .db('db')
+      .collection('todos')
+
+    const result = await operators.countDocuments({ workspace: 'workspace-1' })
+
+    expect(result).toBe(3)
+    expect(countDocuments).toHaveBeenCalledWith(
+      { $and: [{ ownerId: 'user-1' }, { workspace: 'workspace-1' }] },
+      undefined
+    )
+  })
 })

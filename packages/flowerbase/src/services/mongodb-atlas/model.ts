@@ -81,6 +81,9 @@ export type GetOperatorsFunction = (
   count: (
     ...params: Parameters<Method<'countDocuments'>>
   ) => ReturnType<Method<'countDocuments'>>
+  countDocuments: (
+    ...params: Parameters<Method<'countDocuments'>>
+  ) => ReturnType<Method<'countDocuments'>>
   watch: (...params: Parameters<Method<'watch'>>) => ReturnType<Method<'watch'>>
   aggregate: (
     ...params: [...Parameters<Method<'aggregate'>>, isClient: boolean]

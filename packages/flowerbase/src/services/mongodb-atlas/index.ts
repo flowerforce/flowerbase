@@ -628,6 +628,26 @@ const getOperators: GetOperatorsFunction = (
         throw error
       }
     },
+    countDocuments: async (query, options) => {
+      try {
+        if (!run_as_system) {
+          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+          const formattedQuery = getFormattedQuery(filters, query, user)
+          const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
+          logService('countDocuments query', { collName, currentQuery })
+          const result = await collection.countDocuments(currentQuery, options)
+          emitMongoEvent('countDocuments')
+          return result
+        }
+
+        const result = await collection.countDocuments(query, options)
+        emitMongoEvent('countDocuments')
+        return result
+      } catch (error) {
+        emitMongoEvent('countDocuments', undefined, error)
+        throw error
+      }
+    },
     /**
      * Watches changes on a MongoDB collection with optional role-based filtering of change events.
      *

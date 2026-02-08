@@ -351,6 +351,7 @@
         method: 'POST',
         body: JSON.stringify({
           route: state.selectedEndpoint.route,
+          functionName: state.selectedEndpoint.function_name,
           method,
           query,
           headers,

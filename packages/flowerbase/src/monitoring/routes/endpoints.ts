@@ -10,6 +10,7 @@ type EndpointInvokeBody = {
   query?: Record<string, unknown>
   headers?: Record<string, unknown>
   payload?: unknown
+  functionName?: string
 }
 
 type EndpointResponse = {
@@ -39,6 +40,10 @@ const buildQueryString = (query?: Record<string, unknown>) => {
     params.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value))
   })
   return params.toString()
+}
+
+const normalizeRoute = (value?: string) => {
+  return (value || '').replace(/^\/+/, '').trim()
 }
 
 const normalizeHeaders = (headers?: Record<string, unknown>) => {
@@ -84,10 +89,13 @@ export const registerEndpointRoutes = (app: FastifyInstance, deps: EndpointRoute
       reply.code(400)
       return { error: 'Project ID not available' }
     }
-    const normalizedRoute = route.replace(/^\/+/, '')
+    const normalizedRoute = normalizeRoute(route)
     const rawMethod = (body.method || 'POST').toUpperCase()
     const method = rawMethod as InjectOptions['method']
     const effectiveMethod = (rawMethod === 'ALL' ? 'POST' : rawMethod) as InjectOptions['method']
+    const functionName = body.functionName?.trim()
+    const functionsList = StateManager.select('functions') as Record<string, { run_as_system?: boolean }>
+    const runAsSystem = functionName ? !!functionsList?.[functionName]?.run_as_system : undefined
     const queryString = buildQueryString(body.query)
     const encodedProjectId = encodeURIComponent(projectId)
     const baseUrl = `/app/${encodedProjectId}/endpoint/${normalizedRoute}`
@@ -111,20 +119,42 @@ export const registerEndpointRoutes = (app: FastifyInstance, deps: EndpointRoute
       headers,
       payload
     }
-    const response = await app.inject(injectOptions) as InjectResponse
-    const parsedBody = parseInjectResponse(response.payload)
-    const responseHeaders: Record<string, string> = {}
-    Object.entries(response.headers ?? {}).forEach(([key, value]) => {
-      if (value === undefined) return
-      responseHeaders[key] = Array.isArray(value) ? value.join(', ') : String(value)
-    })
     addEvent({
       id: createEventId(),
       ts: Date.now(),
       type: 'http_endpoint',
       source: 'monit',
       message: `${rawMethod} ${route}`,
-      data: sanitize({ method: effectiveMethod, route, query: body.query, headers: body.headers, payload: body.payload })
+      data: sanitize({
+        method: effectiveMethod,
+        route,
+        query: body.query,
+        headers: body.headers,
+        payload: body.payload,
+        functionName
+      })
+    })
+    if (functionName) {
+      addEvent({
+        id: createEventId(),
+        ts: Date.now(),
+        type: 'function',
+        source: 'monit',
+        message: `invoke ${functionName}`,
+        data: sanitize({
+          name: functionName,
+          runAsSystem,
+          invokedFrom: functionName,
+          endpoint: { method: rawMethod, route }
+        })
+      })
+    }
+    const response = await app.inject(injectOptions) as InjectResponse
+    const parsedBody = parseInjectResponse(response.payload)
+    const responseHeaders: Record<string, string> = {}
+    Object.entries(response.headers ?? {}).forEach(([key, value]) => {
+      if (value === undefined) return
+      responseHeaders[key] = Array.isArray(value) ? value.join(', ') : String(value)
     })
     const result: EndpointResponse = {
       statusCode: response.statusCode,

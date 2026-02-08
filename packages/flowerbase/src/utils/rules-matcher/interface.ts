@@ -314,6 +314,15 @@ export type Operators = {
   /**
    * @param a
    * @param b
+   *
+   * Checks whether the length of the user input array is equal to the rule value.
+   *
+   * @returns
+   */
+  $size: OperatorsFunction
+  /**
+   * @param a
+   * @param b
    * @param opt
    *
    * Performs a regular expression match on the user input value with the rule value(s).
@@ -339,6 +348,7 @@ export enum RulesOperators {
   $in = '$in',
   $nin = '$nin',
   $all = '$all',
+  $size = '$size',
   $regex = '$regex'
 }
 

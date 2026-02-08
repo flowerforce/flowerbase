@@ -277,6 +277,8 @@ export const operators: Operators = {
             .length
       ),
 
+  $size: (a, b) => Array.isArray(a) && a.length === parseFloat(b),
+
   $regex: (a, b, opt) =>
     rulesMatcherUtils
       .forceArray(b)

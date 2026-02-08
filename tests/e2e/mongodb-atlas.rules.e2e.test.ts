@@ -163,6 +163,7 @@ const callServiceOperation = async ({
   | 'find'
   | 'findOne'
   | 'count'
+  | 'countDocuments'
   | 'findOneAndUpdate'
   | 'deleteOne'
   | 'deleteMany'
@@ -238,6 +239,8 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
     callServiceOperation({ collection, method: 'findOne', user, query, projection, options }),
   count: (query: Document = {}, options?: Document) =>
     callServiceOperation({ collection, method: 'count', user, query, options }),
+  countDocuments: (query: Document = {}, options?: Document) =>
+    callServiceOperation({ collection, method: 'countDocuments', user, query, options }),
   insertOne: (document: Document) => callServiceOperation({ collection, method: 'insertOne', user, document }),
   updateOne: (query: Document, update: Document) =>
     callServiceOperation({ collection, method: 'updateOne', user, query, update }),
