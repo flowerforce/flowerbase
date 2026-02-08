@@ -108,6 +108,11 @@ export const executeQuery = async ({
         EJSON.deserialize(resolvedQuery),
         parsedOptions
       ),
+    countDocuments: () =>
+      (currentMethod as ReturnType<GetOperatorsFunction>['countDocuments'])(
+        EJSON.deserialize(resolvedQuery),
+        parsedOptions
+      ),
     deleteOne: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['deleteOne'])(
         EJSON.deserialize(resolvedQuery),
