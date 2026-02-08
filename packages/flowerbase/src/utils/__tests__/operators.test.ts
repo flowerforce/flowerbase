@@ -86,6 +86,12 @@ describe('operators', () => {
     expect(operators.$all({ name: 'ciao' }, [{ name: 'ciao' }, 4, 5])).toBe(false)
     expect(operators.$all([{ name: 'ciao' }, 4, 5], [{ name: 'ciao' }, 4, 5])).toBe(false)
   })
+  it('should check array size', () => {
+    expect(operators.$size([1, 2, 3], 3)).toBe(true)
+    expect(operators.$size([1, 2, 3], 2)).toBe(false)
+    expect(operators.$size([], 0)).toBe(true)
+    expect(operators.$size('not-array', 0)).toBe(false)
+  })
   it('should check regex', () => {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
     expect(operators.$regex('test@gmail.com', emailRegex)).toBe(true)
