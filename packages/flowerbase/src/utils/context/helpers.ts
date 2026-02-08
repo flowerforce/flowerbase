@@ -3,6 +3,7 @@ import * as jwt from 'jsonwebtoken'
 import { Arguments } from '../../auth/dtos'
 import { Function } from '../../features/functions/interface'
 import { GenerateContextDataParams } from './interface'
+import { EJSON } from 'bson'
 
 type JwtUtils = {
   encode: (
@@ -121,10 +122,10 @@ export const generateContextData = ({
   const BSON = mongodb.BSON
   const Binary = BSON?.Binary as
     | (typeof mongodb.BSON.Binary & {
-        fromBase64?: (base64: string, subType?: number) => mongodb.BSON.Binary | Uint8Array
-        fromBase64Binary?: (base64: string, subType?: number) => mongodb.BSON.Binary
-        __fb_fromBase64Wrapped?: boolean
-      })
+      fromBase64?: (base64: string, subType?: number) => mongodb.BSON.Binary | Uint8Array
+      fromBase64Binary?: (base64: string, subType?: number) => mongodb.BSON.Binary
+      __fb_fromBase64Wrapped?: boolean
+    })
     | undefined
 
   if (Binary && typeof Binary.fromBase64 !== 'function') {
@@ -173,6 +174,7 @@ export const generateContextData = ({
 
   return {
     BSON,
+    EJSON,
     Buffer,
     utils,
     console: {
