@@ -21,9 +21,11 @@ const config: Config.InitialOptions = {
     }
   },
   setupFiles: ['<rootDir>/tests/jest.setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/tests/jest.e2e.progress.ts'],
   testEnvironment: 'node',
   testMatch: ['<rootDir>/tests/e2e/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
+  maxWorkers: 1,
   verbose: true
 }
 
