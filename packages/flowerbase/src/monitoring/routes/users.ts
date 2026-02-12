@@ -149,20 +149,22 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
 
     const userId = result?.insertedId?.toString()
 
+    /*  
+    non deve essere fatto, solo i trigger creano gli users
     if (userId && AUTH_CONFIG.userCollection && AUTH_CONFIG.user_id_field) {
-      const db = app.mongo.client.db(DB_NAME)
-      const customData = body?.customData ?? {}
-      await db.collection(AUTH_CONFIG.userCollection).updateOne(
-        { [AUTH_CONFIG.user_id_field]: userId },
-        {
-          $set: {
-            ...customData,
-            [AUTH_CONFIG.user_id_field]: userId
-          }
-        },
-        { upsert: true }
-      )
-    }
+          const db = app.mongo.client.db(DB_NAME)
+          const customData = body?.customData ?? {}
+          await db.collection(AUTH_CONFIG.userCollection).updateOne(
+            { [AUTH_CONFIG.user_id_field]: userId },
+            {
+              $set: {
+                ...customData,
+                [AUTH_CONFIG.user_id_field]: userId
+              }
+            },
+            { upsert: true }
+          )
+        } */
 
     addEvent({
       id: createEventId(),
