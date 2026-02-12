@@ -90,15 +90,7 @@
         })
           .then((response) => response.json())
           .then((data) => {
-            const blob = new Blob([JSON.stringify(data)], {
-              type: 'application/json'
-            })
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `${document.getElementById('projectName').value}-users.json`
-            a.click()
-            URL.revokeObjectURL(url)
+            alert('ok')
           })
           .catch((error) => alert('Qualcosa non ha funzionato'))
           .finally(() => {
