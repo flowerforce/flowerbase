@@ -1,9 +1,11 @@
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
+import handleUserRegistration from '../../../shared/handleUserRegistration'
+import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
 import { hashToken } from '../../../utils/crypto'
-import { AUTH_ENDPOINTS } from '../../utils'
+import { AUTH_ENDPOINTS, generatePassword } from '../../utils'
 import { LoginDto } from './dtos'
 import { LOGIN_SCHEMA } from './schema'
 
@@ -82,23 +84,48 @@ export async function customFunctionController(app: FastifyInstance) {
         reply.code(401).send({ message: 'Unauthorized' })
         return
       }
-
-      const authUser = await db.collection(authCollection!).findOne({ email: authResult.id })
+      let currentUserData: Record<string, unknown> = {};
+      const authUser = await db.collection(authCollection!).findOne({ 'identities.id': authResult.id })
       if (!authUser) {
-        reply.code(401).send({ message: 'Unauthorized' })
-        return
-      }
 
-      const currentUserData = {
-        _id: authUser._id,
-        user_data: {
-          _id: authUser._id
+        const newUser = await handleUserRegistration(app, {
+          run_as_system: true,
+          skipUserCheck: true,
+          provider: PROVIDER.CUSTOM_FUNCTION
+        })({
+          email: authResult.id,
+          password: generatePassword()
+        })
+
+        if (!newUser?.insertedId) {
+          throw new Error('Failed to register custom user')
+        }
+
+        currentUserData = {
+          _id: newUser.insertedId,
+          user_data: {
+            _id: newUser.insertedId
+          }
+        }
+      } else {
+
+        currentUserData = {
+          _id: authUser._id,
+          user_data: {
+            _id: authUser._id
+          }
         }
       }
+
+      if (!currentUserData._id) {
+        throw new Error('Failed to register custom user')
+      }
+
+
       const refreshToken = this.createRefreshToken(currentUserData)
       const refreshTokenHash = hashToken(refreshToken)
       await db.collection(refreshTokensCollection).insertOne({
-        userId: authUser._id,
+        userId: currentUserData._id,
         tokenHash: refreshTokenHash,
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + refreshTokenTtlMs),
@@ -108,7 +135,7 @@ export async function customFunctionController(app: FastifyInstance) {
         access_token: this.createAccessToken(currentUserData),
         refresh_token: refreshToken,
         device_id: '',
-        user_id: authUser._id.toString()
+        user_id: currentUserData._id.toString()
       }
     }
   )

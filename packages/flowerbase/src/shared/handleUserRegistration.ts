@@ -1,8 +1,8 @@
 import { AUTH_CONFIG, DB_NAME } from "../constants"
+import { emitServiceEvent } from "../services/monitoring"
 import { StateManager } from "../state"
 import { GenerateContext } from "../utils/context"
 import { generateToken, hashPassword } from "../utils/crypto"
-import { emitServiceEvent } from "../services/monitoring"
 import { HandleUserRegistration } from "./models/handleUserRegistration.model"
 
 /**
