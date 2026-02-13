@@ -1,11 +1,10 @@
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
-import handleUserRegistration from '../../../shared/handleUserRegistration'
 import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
 import { hashToken } from '../../../utils/crypto'
-import { AUTH_ENDPOINTS, generatePassword } from '../../utils'
+import { AUTH_ENDPOINTS } from '../../utils'
 import { LoginDto } from './dtos'
 import { LOGIN_SCHEMA } from './schema'
 
@@ -88,13 +87,17 @@ export async function customFunctionController(app: FastifyInstance) {
       const authUser = await db.collection(authCollection!).findOne({ 'identities.id': authResult.id })
       if (!authUser) {
 
-        const newUser = await handleUserRegistration(app, {
-          run_as_system: true,
-          skipUserCheck: true,
-          provider: PROVIDER.CUSTOM_FUNCTION
-        })({
+        const newUser = await db?.collection(authCollection!).insertOne({
           email: authResult.id,
-          password: generatePassword()
+          status: 'confirmed',
+          createdAt: new Date(),
+          custom_data: {},
+          identities: [
+            {
+              provider_type: PROVIDER.CUSTOM_FUNCTION,
+              id: authResult.id
+            }
+          ]
         })
 
         if (!newUser?.insertedId) {
