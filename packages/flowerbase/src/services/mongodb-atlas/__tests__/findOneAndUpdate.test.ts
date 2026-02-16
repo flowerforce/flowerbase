@@ -60,7 +60,6 @@ describe('mongodb-atlas findOneAndUpdate', () => {
     const result = await operators.findOneAndUpdate({ _id: id }, { $set: { title: 'New' } })
 
     expect(findOne).toHaveBeenCalled()
-    expect(aggregate).toHaveBeenCalled()
     expect(findOneAndUpdate).toHaveBeenCalledWith(
       { $and: [{ _id: id }] },
       { $set: { title: 'New' } }

@@ -111,6 +111,56 @@ const shouldFallbackFromVmModules = (error: unknown): boolean => {
   return code === 'ERR_VM_MODULES_DISABLED' || code === 'ERR_VM_MODULES_NOT_SUPPORTED'
 }
 
+type ExportedFunction = (...args: unknown[]) => unknown
+type SandboxModule = { exports: unknown }
+type SandboxContext = vm.Context & {
+  exports?: unknown
+  module?: SandboxModule
+  __fb_module?: SandboxModule
+  __fb_exports?: unknown
+  __fb_require?: NodeRequire
+  __fb_filename?: string
+  __fb_dirname?: string
+}
+
+const isExportedFunction = (value: unknown): value is ExportedFunction =>
+  typeof value === 'function'
+
+const getDefaultExport = (value: unknown): ExportedFunction | undefined => {
+  if (!value || typeof value !== 'object') return undefined
+  if (!('default' in value)) return undefined
+  const maybeDefault = (value as { default?: unknown }).default
+  return isExportedFunction(maybeDefault) ? maybeDefault : undefined
+}
+
+const resolveExport = (ctx: SandboxContext): ExportedFunction | undefined => {
+  const moduleExports = ctx.module?.exports ?? ctx.__fb_module?.exports
+  if (isExportedFunction(moduleExports)) return moduleExports
+  const contextExports = ctx.exports ?? ctx.__fb_exports
+  if (isExportedFunction(contextExports)) return contextExports
+  return getDefaultExport(moduleExports) ?? getDefaultExport(contextExports)
+}
+
+const buildVmContext = (contextData: ReturnType<typeof generateContextData>) => {
+  const sandboxModule: SandboxModule = { exports: {} }
+  const entryFile = require.main?.filename ?? process.cwd()
+  const customRequire = createRequire(entryFile)
+
+  const vmContext: SandboxContext = vm.createContext({
+    ...contextData,
+    require: customRequire,
+    exports: sandboxModule.exports,
+    module: sandboxModule,
+    __filename,
+    __dirname,
+    __fb_require: customRequire,
+    __fb_filename: __filename,
+    __fb_dirname: __dirname
+  }) as SandboxContext
+
+  return { sandboxModule, entryFile, customRequire, vmContext }
+}
+
 /**
  * > Used to generate the current context
  * @testable
@@ -153,55 +203,10 @@ export async function GenerateContext({
       functionName,
       functionsList,
       GenerateContext,
+      GenerateContextSync,
       request
     })
-
-    type ExportedFunction = (...args: unknown[]) => unknown
-    type SandboxModule = { exports: unknown }
-    type SandboxContext = vm.Context & {
-      exports?: unknown
-      module?: SandboxModule
-      __fb_module?: SandboxModule
-      __fb_exports?: unknown
-      __fb_require?: NodeRequire
-      __fb_filename?: string
-      __fb_dirname?: string
-    }
-
-    const isExportedFunction = (value: unknown): value is ExportedFunction =>
-      typeof value === 'function'
-
-    const getDefaultExport = (value: unknown): ExportedFunction | undefined => {
-      if (!value || typeof value !== 'object') return undefined
-      if (!('default' in value)) return undefined
-      const maybeDefault = (value as { default?: unknown }).default
-      return isExportedFunction(maybeDefault) ? maybeDefault : undefined
-    }
-
-    const resolveExport = (ctx: SandboxContext): ExportedFunction | undefined => {
-      const moduleExports = ctx.module?.exports ?? ctx.__fb_module?.exports
-      if (isExportedFunction(moduleExports)) return moduleExports
-      const contextExports = ctx.exports ?? ctx.__fb_exports
-      if (isExportedFunction(contextExports)) return contextExports
-      return getDefaultExport(moduleExports) ?? getDefaultExport(contextExports)
-    }
-
-    const sandboxModule: SandboxModule = { exports: {} }
-
-    const entryFile = require.main?.filename ?? process.cwd()
-    const customRequire = createRequire(entryFile)
-
-    const vmContext: SandboxContext = vm.createContext({
-      ...contextData,
-      require: customRequire,
-      exports: sandboxModule.exports,
-      module: sandboxModule,
-      __filename,
-      __dirname,
-      __fb_require: customRequire,
-      __fb_filename: __filename,
-      __fb_dirname: __dirname
-    }) as SandboxContext
+    const { sandboxModule, entryFile, customRequire, vmContext } = buildVmContext(contextData)
 
     const vmModules = vm as typeof vm & {
       SourceTextModule?: typeof vm.SourceTextModule
@@ -287,4 +292,46 @@ export async function GenerateContext({
   const res = await functionsQueue.add(run, enqueue)
   return res
 
+}
+
+export function GenerateContextSync({
+  args,
+  app,
+  rules,
+  user,
+  currentFunction,
+  functionsList,
+  services,
+  functionName,
+  runAsSystem,
+  deserializeArgs = true,
+  request
+}: GenerateContextParams): unknown {
+  if (!currentFunction) return
+
+  const functionToRun = { run_as_system: runAsSystem, ...currentFunction }
+  const contextData = generateContextData({
+    user,
+    services,
+    app,
+    rules,
+    currentFunction: functionToRun,
+    functionName,
+    functionsList,
+    GenerateContext,
+    GenerateContextSync,
+    request
+  })
+  const { sandboxModule, vmContext } = buildVmContext(contextData)
+  const codeToRun = functionToRun.code.includes('import ')
+    ? transformImportsToRequire(functionToRun.code)
+    : functionToRun.code
+
+  vm.runInContext(codeToRun, vmContext)
+  sandboxModule.exports = resolveExport(vmContext) ?? sandboxModule.exports
+  const fn = sandboxModule.exports as ExportedFunction
+  if (deserializeArgs) {
+    return fn(...EJSON.deserialize(args))
+  }
+  return fn(...args)
 }
