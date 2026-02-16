@@ -1,5 +1,8 @@
 import get from 'lodash/get'
 import isEqual from 'lodash/isEqual'
+import set from 'lodash/set'
+import unset from 'lodash/unset'
+import cloneDeep from 'lodash/cloneDeep'
 import {
   Collection,
   Document,
@@ -114,6 +117,154 @@ const hasAtomicOperators = (data: Document) => Object.keys(data).some((key) => k
 
 const normalizeUpdatePayload = (data: Document) =>
   hasAtomicOperators(data) ? data : { $set: data }
+
+const hasOperatorExpressions = (value: unknown) =>
+  isPlainObject(value) && Object.keys(value).some((key) => key.startsWith('$'))
+
+const matchesPullCondition = (item: unknown, operand: unknown) => {
+  if (!isPlainObject(operand)) return isEqual(item, operand)
+  if (hasOperatorExpressions(operand)) {
+    if (Array.isArray((operand as { $in?: unknown }).$in)) {
+      return ((operand as { $in: unknown[] }).$in).some((candidate) => isEqual(candidate, item))
+    }
+    return false
+  }
+  return Object.entries(operand).every(([key, value]) => isEqual(get(item, key), value))
+}
+
+const applyDocumentUpdateOperators = (baseDocument: Document, update: Document): Document => {
+  const updated = cloneDeep(baseDocument)
+
+  for (const [operator, payload] of Object.entries(update)) {
+    if (!isPlainObject(payload)) continue
+
+    switch (operator) {
+      case '$set':
+        Object.entries(payload).forEach(([path, value]) => set(updated, path, value))
+        break
+      case '$unset':
+        Object.keys(payload).forEach((path) => {
+          unset(updated, path)
+        })
+        break
+      case '$inc':
+        Object.entries(payload).forEach(([path, value]) => {
+          const currentValue = get(updated, path)
+          const increment = typeof value === 'number' ? value : 0
+          if (typeof currentValue === 'undefined') {
+            set(updated, path, increment)
+            return
+          }
+          if (typeof currentValue !== 'number') {
+            throw new Error(`Cannot apply $inc to a non-numeric value at path "${path}"`)
+          }
+          set(updated, path, currentValue + increment)
+        })
+        break
+      case '$push':
+        Object.entries(payload).forEach(([path, value]) => {
+          const currentValue = get(updated, path)
+          const targetArray = Array.isArray(currentValue) ? [...currentValue] : []
+          if (isPlainObject(value) && Array.isArray((value as { $each?: unknown[] }).$each)) {
+            targetArray.push(...((value as { $each: unknown[] }).$each))
+          } else {
+            targetArray.push(value)
+          }
+          set(updated, path, targetArray)
+        })
+        break
+      case '$addToSet':
+        Object.entries(payload).forEach(([path, value]) => {
+          const currentValue = get(updated, path)
+          const targetArray = Array.isArray(currentValue) ? [...currentValue] : []
+          const valuesToAdd =
+            isPlainObject(value) && Array.isArray((value as { $each?: unknown[] }).$each)
+              ? (value as { $each: unknown[] }).$each
+              : [value]
+          valuesToAdd.forEach((entry) => {
+            if (!targetArray.some((existing) => isEqual(existing, entry))) {
+              targetArray.push(entry)
+            }
+          })
+          set(updated, path, targetArray)
+        })
+        break
+      case '$pull':
+        Object.entries(payload).forEach(([path, value]) => {
+          const currentValue = get(updated, path)
+          if (!Array.isArray(currentValue)) return
+          const filtered = currentValue.filter((entry) => !matchesPullCondition(entry, value))
+          set(updated, path, filtered)
+        })
+        break
+      case '$pop':
+        Object.entries(payload).forEach(([path, value]) => {
+          const currentValue = get(updated, path)
+          if (!Array.isArray(currentValue) || !currentValue.length) return
+          const next = [...currentValue]
+          if (value === -1) {
+            next.shift()
+          } else {
+            next.pop()
+          }
+          set(updated, path, next)
+        })
+        break
+      case '$mul':
+        Object.entries(payload).forEach(([path, value]) => {
+          const currentValue = get(updated, path)
+          const factor = typeof value === 'number' ? value : 1
+          if (typeof currentValue === 'undefined') {
+            set(updated, path, 0)
+            return
+          }
+          if (typeof currentValue !== 'number') {
+            throw new Error(`Cannot apply $mul to a non-numeric value at path "${path}"`)
+          }
+          set(updated, path, currentValue * factor)
+        })
+        break
+      case '$min':
+        Object.entries(payload).forEach(([path, value]) => {
+          const currentValue = get(updated, path)
+          const comparableCurrent = currentValue as any
+          const comparableValue = value as any
+          if (typeof currentValue === 'undefined' || comparableCurrent > comparableValue) {
+            set(updated, path, value)
+          }
+        })
+        break
+      case '$max':
+        Object.entries(payload).forEach(([path, value]) => {
+          const currentValue = get(updated, path)
+          const comparableCurrent = currentValue as any
+          const comparableValue = value as any
+          if (typeof currentValue === 'undefined' || comparableCurrent < comparableValue) {
+            set(updated, path, value)
+          }
+        })
+        break
+      case '$rename':
+        Object.entries(payload).forEach(([fromPath, toPath]) => {
+          if (typeof toPath !== 'string') return
+          const currentValue = get(updated, fromPath)
+          if (typeof currentValue === 'undefined') return
+          set(updated, toPath, currentValue)
+          unset(updated, fromPath)
+        })
+        break
+      case '$currentDate':
+        Object.keys(payload).forEach((path) => set(updated, path, new Date()))
+        break
+      case '$setOnInsert':
+        break
+      default:
+        break
+    }
+  }
+
+  return updated
+}
 
 const getUpdatedPaths = (update: Document) => {
   const entries = Object.entries(update ?? {})
@@ -454,25 +605,8 @@ const getOperators: GetOperatorsFunction = (
           const winningRole = getWinningRole(result, user, roles)
 
           // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
-          const hasOperators = hasAtomicOperators(normalizedData)
           const updatedPaths = getUpdatedPaths(normalizedData)
-
-          // Flatten the update object to extract the actual fields being modified
-          // const docToCheck = hasOperators
-          //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
-          //   : data
-          const pipeline = [
-            {
-              $match: { $and: safeQuery }
-            },
-            {
-              $limit: 1
-            },
-            ...Object.entries(normalizedData).map(([key, value]) => ({ [key]: value }))
-          ]
-          const [docToCheck] = hasOperators
-            ? await collection.aggregate(pipeline).toArray()
-            : ([normalizedData] as [Document])
+          const docToCheck = applyDocumentUpdateOperators(result, normalizedData)
           // Validate update permissions
           const { status, document } = winningRole
             ? await checkValidation(
@@ -534,20 +668,19 @@ const getOperators: GetOperatorsFunction = (
           }
 
           const winningRole = getWinningRole(result, user, roles)
-          const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
-          const updatedPaths = Array.isArray(data) ? [] : getUpdatedPaths(data as Document)
-          const pipeline = [
-            {
-              $match: { $and: safeQuery }
-            },
-            {
-              $limit: 1
-            },
-            ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
-          ]
-          const [docToCheck] = hasOperators
-            ? await collection.aggregate(pipeline).toArray()
-            : ([data] as [Document])
+          const normalizedData = Array.isArray(data)
+            ? data
+            : normalizeUpdatePayload(data as Document)
+          const updatedPaths = Array.isArray(normalizedData)
+            ? []
+            : getUpdatedPaths(normalizedData as Document)
+          const [docToCheck] = Array.isArray(normalizedData)
+            ? await collection.aggregate([
+              { $match: { $and: safeQuery } },
+              { $limit: 1 },
+              ...normalizedData
+            ]).toArray()
+            : [applyDocumentUpdateOperators(result, normalizedData as Document)]
 
           const { status, document } = winningRole
             ? await checkValidation(
@@ -568,8 +701,8 @@ const getOperators: GetOperatorsFunction = (
           }
 
           const updateResult = options
-            ? await collection.findOneAndUpdate({ $and: safeQuery }, data, options)
-            : await collection.findOneAndUpdate({ $and: safeQuery }, data)
+            ? await collection.findOneAndUpdate({ $and: safeQuery }, normalizedData, options)
+            : await collection.findOneAndUpdate({ $and: safeQuery }, normalizedData)
           if (!updateResult) {
             emitMongoEvent('findOneAndUpdate')
             return updateResult
@@ -968,6 +1101,7 @@ const getOperators: GetOperatorsFunction = (
     },
     updateMany: async (query, data, options) => {
       try {
+        const normalizedData = normalizeUpdatePayload(data as Document)
         if (!run_as_system) {
           checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
           // Apply access control filters
@@ -981,24 +1115,10 @@ const getOperators: GetOperatorsFunction = (
           }
 
           // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
-          const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
-          const updatedPaths = getUpdatedPaths(data as Document)
-
-          // Flatten the update object to extract the actual fields being modified
-          // const docToCheck = hasOperators
-          //   ? Object.values(data).reduce((acc, operation) => ({ ...acc, ...operation }), {})
-          //   : data
-
-          const pipeline = [
-            {
-              $match: { $and: formattedQuery }
-            },
-            ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
-          ]
-
-          const docsToCheck = hasOperators
-            ? await collection.aggregate(pipeline).toArray()
-            : result
+          const updatedPaths = getUpdatedPaths(normalizedData)
+          const docsToCheck = result.map((currentDoc) =>
+            applyDocumentUpdateOperators(currentDoc, normalizedData)
+          )
 
           const filteredItems = await Promise.all(
             docsToCheck.map(async (currentDoc) => {
@@ -1032,11 +1152,11 @@ const getOperators: GetOperatorsFunction = (
             throw new Error('Update not permitted')
           }
 
-          const res = await collection.updateMany({ $and: formattedQuery }, data, options)
+          const res = await collection.updateMany({ $and: formattedQuery }, normalizedData, options)
           emitMongoEvent('updateMany')
           return res
         }
-        const result = await collection.updateMany(query, data, options)
+        const result = await collection.updateMany(query, normalizedData, options)
         emitMongoEvent('updateMany')
         return result
       } catch (error) {

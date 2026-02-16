@@ -94,6 +94,99 @@ describe('mongodb-atlas Realm compatibility', () => {
     )
   })
 
+  it('supports $inc in updateOne without using invalid aggregate stages', async () => {
+    const id = new ObjectId()
+    const findOne = jest.fn().mockResolvedValue({ _id: id, count: 1 })
+    const aggregate = jest.fn(() => {
+      throw new Error('aggregate should not be used for operator simulation')
+    })
+    const updateOne = jest.fn().mockResolvedValue({
+      acknowledged: true,
+      matchedCount: 1,
+      modifiedCount: 1
+    })
+    const collection = {
+      collectionName: 'todos',
+      findOne,
+      aggregate,
+      updateOne
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules(),
+      user: { id: 'user-1' }
+    }).db('db').collection('todos')
+
+    await operators.updateOne({ _id: id }, { $inc: { count: 1 } })
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { $and: [{ _id: id }] },
+      { $inc: { count: 1 } },
+      undefined
+    )
+    expect(aggregate).not.toHaveBeenCalled()
+  })
+
+  it('supports $push in findOneAndUpdate without treating it as a pipeline stage', async () => {
+    const id = new ObjectId()
+    const findOne = jest.fn().mockResolvedValue({ _id: id, tags: ['old'] })
+    const aggregate = jest.fn(() => {
+      throw new Error('aggregate should not be used for operator simulation')
+    })
+    const findOneAndUpdate = jest.fn().mockResolvedValue({ _id: id, tags: ['old', 'new'] })
+    const collection = {
+      collectionName: 'todos',
+      findOne,
+      aggregate,
+      findOneAndUpdate
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules(),
+      user: { id: 'user-1' }
+    }).db('db').collection('todos')
+
+    await operators.findOneAndUpdate({ _id: id }, { $push: { tags: 'new' } })
+
+    expect(findOneAndUpdate).toHaveBeenCalledWith(
+      { $and: [{ _id: id }] },
+      { $push: { tags: 'new' } }
+    )
+    expect(aggregate).not.toHaveBeenCalled()
+  })
+
+  it('supports operator updates in updateMany without using invalid aggregate stages', async () => {
+    const id = new ObjectId()
+    const find = jest.fn().mockReturnValue({
+      toArray: jest.fn().mockResolvedValue([{ _id: id, tags: ['old'] }])
+    })
+    const aggregate = jest.fn(() => {
+      throw new Error('aggregate should not be used for operator simulation')
+    })
+    const updateMany = jest.fn().mockResolvedValue({
+      acknowledged: true,
+      matchedCount: 1,
+      modifiedCount: 1
+    })
+    const collection = {
+      collectionName: 'todos',
+      find,
+      aggregate,
+      updateMany
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules(),
+      user: { id: 'user-1' }
+    }).db('db').collection('todos')
+
+    await operators.updateMany({ _id: id }, { $push: { tags: 'new' } })
+
+    expect(updateMany).toHaveBeenCalledWith(
+      { $and: [{ _id: id }] },
+      { $push: { tags: 'new' } },
+      undefined
+    )
+    expect(aggregate).not.toHaveBeenCalled()
+  })
+
   it('treats findOne second argument as options when it matches option keys', async () => {
     const findOne = jest.fn().mockResolvedValue({ _id: new ObjectId() })
     const collection = {
