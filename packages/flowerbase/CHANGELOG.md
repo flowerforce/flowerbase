@@ -1,3 +1,18 @@
+## 1.7.2 (2026-02-12)
+
+
+### 🩹 Fixes
+
+- monit endpoint event ([e696efc](https://github.com/flowerforce/flowerbase/commit/e696efc))
+
+- name trigger for monit ([f428fc2](https://github.com/flowerforce/flowerbase/commit/f428fc2))
+
+- add mongo method countDocuments ([7a7d872](https://github.com/flowerforce/flowerbase/commit/7a7d872))
+
+- add operator $size ([adbc749](https://github.com/flowerforce/flowerbase/commit/adbc749))
+
+- add EJSON to context function ([2332c3c](https://github.com/flowerforce/flowerbase/commit/2332c3c))
+
 ## 1.7.1 (2026-02-04)
 
 
