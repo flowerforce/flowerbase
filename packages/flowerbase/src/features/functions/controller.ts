@@ -1,4 +1,4 @@
-import { ObjectId } from 'bson'
+import { EJSON, ObjectId } from 'bson'
 import type { FastifyRequest } from 'fastify'
 import { ChangeStream, Document } from 'mongodb';
 import { services } from '../../services'
@@ -141,7 +141,7 @@ export const functionsController: FunctionController = async (
         return JSON.stringify({ message: result.message, name: result.name })
       }
       res.type('application/json')
-      return JSON.stringify(result)
+      return JSON.stringify(EJSON.serialize(result, { relaxed: false }));
     } catch (error) {
       res.status(400)
       res.type('application/json')

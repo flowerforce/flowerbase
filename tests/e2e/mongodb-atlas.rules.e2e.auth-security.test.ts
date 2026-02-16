@@ -910,7 +910,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       }
     })
     expect(response.statusCode).toBe(200)
-    const body = response.json() as { deletedCount?: number }
+    const body = EJSON.deserialize(response.json()) as { deletedCount?: number }
     expect(body.deletedCount).toBe(1)
 
     const existing = await client

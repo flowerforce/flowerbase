@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { EJSON } from 'bson'
 import { FastifyInstance } from 'fastify'
 import { Document, MongoClient, ObjectId } from 'mongodb'
 import type { User } from '../../packages/flowerbase/src/auth/dtos'
@@ -389,8 +390,8 @@ const ensureFilteredTriggerCollections = async () => {
   }
 
   await recreateCollection(FILTERED_TRIGGER_EVENTS_COLLECTION)
-    await recreateCollection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
-    await recreateCollection(FILTERED_TRIGGER_ITEMS_COLLECTION, {
+  await recreateCollection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
+  await recreateCollection(FILTERED_TRIGGER_ITEMS_COLLECTION, {
     changeStreamPreAndPostImages: { enabled: true }
   })
 }
@@ -629,7 +630,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     })
 
     expect(response.statusCode).toBe(200)
-    const body = response.json() as { count: number; users: Array<{ email: string }> }
+    const body = EJSON.deserialize(response.json()) as { count: number; users: Array<{ email: string }> }
     expect(body.count).toBe(2)
     expect(body.users).toHaveLength(2)
     expect(body.users.map((user) => user.email).sort()).toEqual([
