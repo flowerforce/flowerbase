@@ -4,6 +4,8 @@ import {
   Collection,
   Document,
   EventsDescription,
+  FindOneOptions,
+  FindOptions,
   FindOneAndUpdateOptions,
   Filter as MongoFilter,
   UpdateFilter,
@@ -43,6 +45,69 @@ const getUserId = (user?: unknown) => {
 const logService = (message: string, payload?: unknown) => {
   if (!debugServices) return
   console.log('[service-debug]', message, payload ?? '')
+}
+
+const findOptionKeys = new Set([
+  'sort',
+  'skip',
+  'limit',
+  'session',
+  'hint',
+  'maxTimeMS',
+  'collation',
+  'allowPartialResults',
+  'noCursorTimeout',
+  'batchSize',
+  'returnKey',
+  'showRecordId',
+  'comment',
+  'let',
+  'projection'
+])
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value)
+
+const looksLikeFindOptions = (value: unknown) => {
+  if (!isPlainObject(value)) return false
+  return Object.keys(value).some((key) => findOptionKeys.has(key))
+}
+
+const resolveFindArgs = (
+  projectionOrOptions?: Document | FindOptions | FindOneOptions,
+  options?: FindOptions | FindOneOptions
+) => {
+  if (typeof options !== 'undefined') {
+    return {
+      projection: projectionOrOptions as Document | undefined,
+      options
+    }
+  }
+
+  if (looksLikeFindOptions(projectionOrOptions)) {
+    const resolvedOptions = projectionOrOptions as FindOptions | FindOneOptions
+    const projection =
+      isPlainObject(resolvedOptions) && isPlainObject(resolvedOptions.projection)
+        ? (resolvedOptions.projection as Document)
+        : undefined
+    return {
+      projection,
+      options: resolvedOptions
+    }
+  }
+
+  return {
+    projection: projectionOrOptions as Document | undefined,
+    options: undefined
+  }
+}
+
+const normalizeInsertManyResult = <T extends { insertedIds?: Record<string, unknown> }>(result: T) => {
+  if (!result?.insertedIds || Array.isArray(result.insertedIds)) return result
+  return {
+    ...result,
+    insertedIds: Object.values(result.insertedIds)
+  }
 }
 
 const getUpdatedPaths = (update: Document) => {
@@ -133,12 +198,16 @@ const getOperators: GetOperatorsFunction = (
    *  - Validates the result using `checkValidation` to ensure read permission.
    *  - If validation fails, returns an empty object; otherwise returns the validated document.
    */
-    findOne: async (query = {}, projection, options) => {
+    findOne: async (query = {}, projectionOrOptions, options) => {
       try {
+        const { projection, options: normalizedOptions } = resolveFindArgs(
+          projectionOrOptions,
+          options
+        )
         const resolvedOptions =
-          projection || options
+          projection || normalizedOptions
             ? {
-              ...(options ?? {}),
+              ...(normalizedOptions ?? {}),
               ...(projection ? { projection } : {})
             }
             : undefined
@@ -364,6 +433,11 @@ const getOperators: GetOperatorsFunction = (
           const result = await collection.findOne({ $and: safeQuery })
 
           if (!result) {
+            if (options?.upsert) {
+              const upsertResult = await collection.updateOne({ $and: safeQuery }, data, options)
+              emitMongoEvent('updateOne')
+              return upsertResult
+            }
             throw new Error('Update not permitted')
           }
 
@@ -540,12 +614,16 @@ const getOperators: GetOperatorsFunction = (
      *
      * This ensures that both pre-query filtering and post-query validation are applied consistently.
      */
-    find: (query = {}, projection, options) => {
+    find: (query = {}, projectionOrOptions, options) => {
       try {
+        const { projection, options: normalizedOptions } = resolveFindArgs(
+          projectionOrOptions,
+          options
+        )
         const resolvedOptions =
-          projection || options
+          projection || normalizedOptions
             ? {
-              ...(options ?? {}),
+              ...(normalizedOptions ?? {}),
               ...(projection ? { projection } : {})
             }
             : undefined
@@ -867,12 +945,12 @@ const getOperators: GetOperatorsFunction = (
 
           const result = await collection.insertMany(documents, options)
           emitMongoEvent('insertMany')
-          return result
+          return normalizeInsertManyResult(result)
         }
         // If system mode is active, insert all documents without validation
         const result = await collection.insertMany(documents, options)
         emitMongoEvent('insertMany')
-        return result
+        return normalizeInsertManyResult(result)
       } catch (error) {
         emitMongoEvent('insertMany', undefined, error)
         throw error

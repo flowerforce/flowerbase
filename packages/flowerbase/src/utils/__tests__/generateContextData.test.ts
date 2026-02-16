@@ -25,6 +25,7 @@ const mockFunctions = {
 
 const currentFunction = mockFunctions.test
 const GenerateContextMock = jest.fn()
+const GenerateContextSyncMock = jest.fn()
 const mockUser = {} as User
 const mockRules = {} as Rules
 const mockEnv = {
@@ -52,6 +53,7 @@ describe('generateContextData', () => {
       functionsList: mockFunctions,
       currentFunction,
       GenerateContext: GenerateContextMock,
+      GenerateContextSync: GenerateContextSyncMock,
       user: mockUser,
       rules: mockRules
     })
@@ -77,7 +79,7 @@ describe('generateContextData', () => {
     mockErrorLog.mockRestore()
 
     context.functions.execute('test')
-    expect(GenerateContextMock).toHaveBeenCalled()
+    expect(GenerateContextSyncMock).toHaveBeenCalled()
 
     const token = jwt.sign(
       { sub: 'user', role: 'admin' },

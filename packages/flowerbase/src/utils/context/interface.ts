@@ -22,4 +22,5 @@ export interface GenerateContextParams {
 type ContextRequest = Pick<FastifyRequest, "ips" | "host" | "hostname" | "url" | "method" | "ip" | "id">
 export interface GenerateContextDataParams extends Omit<GenerateContextParams, 'args'> {
   GenerateContext: (params: GenerateContextParams) => Promise<unknown>
+  GenerateContextSync: (params: GenerateContextParams) => unknown
 }

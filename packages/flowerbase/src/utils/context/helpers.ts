@@ -117,6 +117,7 @@ export const generateContextData = ({
   functionName,
   functionsList,
   GenerateContext,
+  GenerateContextSync,
   request
 }: GenerateContextDataParams) => {
   const BSON = mongodb.BSON
@@ -206,7 +207,7 @@ export const generateContextData = ({
       functions: {
         execute: (name: keyof typeof functionsList, ...args: Arguments) => {
           const currentFunction = functionsList[name] as Function
-          return GenerateContext({
+          return GenerateContextSync({
             args,
             app,
             rules,
