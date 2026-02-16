@@ -144,7 +144,7 @@ describe('mongodb-atlas Realm compatibility', () => {
       user: { id: 'user-1' }
     }).db('db').collection('todos')
 
-    await operators.findOneAndUpdate({ _id: id }, { $push: { tags: 'new' } })
+    await operators.findOneAndUpdate({ _id: id }, { $push: { tags: 'new' } } as any)
 
     expect(findOneAndUpdate).toHaveBeenCalledWith(
       { $and: [{ _id: id }] },
@@ -177,7 +177,7 @@ describe('mongodb-atlas Realm compatibility', () => {
       user: { id: 'user-1' }
     }).db('db').collection('todos')
 
-    await operators.updateMany({ _id: id }, { $push: { tags: 'new' } })
+    await operators.updateMany({ _id: id }, { $push: { tags: 'new' } } as any)
 
     expect(updateMany).toHaveBeenCalledWith(
       { $and: [{ _id: id }] },

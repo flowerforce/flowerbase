@@ -54,7 +54,7 @@ describe('context.functions.execute compatibility', () => {
       functionName: 'caller'
     })
 
-    expect(result).toBeInstanceOf(Promise)
+    expect(result && typeof (result as Promise<unknown>).then).toBe('function')
     await expect(result).resolves.toEqual({ ok: true })
   })
 })
