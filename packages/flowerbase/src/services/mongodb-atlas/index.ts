@@ -4,6 +4,8 @@ import set from 'lodash/set'
 import unset from 'lodash/unset'
 import cloneDeep from 'lodash/cloneDeep'
 import {
+  ClientSession,
+  ClientSessionOptions,
   Collection,
   Document,
   EventsDescription,
@@ -1248,6 +1250,12 @@ const MongodbAtlas: MongodbAtlasFunction = (
   app,
   { rules, user, run_as_system, monitoring } = {}
 ) => ({
+  startSession: (options?: ClientSessionOptions) => {
+    const mongoClient = app.mongo.client as unknown as {
+      startSession: (sessionOptions?: ClientSessionOptions) => ClientSession
+    }
+    return mongoClient.startSession(options)
+  },
   db: (dbName: string) => {
     return {
       collection: (collName: string) => {

@@ -1,5 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import {
+  ClientSession,
+  ClientSessionOptions,
   Collection,
   Document,
   FindCursor,
@@ -31,6 +33,7 @@ export type MongodbAtlasFunction = (
   db: (dbName: string) => {
     collection: (collName: string) => ReturnType<GetOperatorsFunction>
   }
+  startSession: (options?: ClientSessionOptions) => ClientSession
 }
 
 export type GetValidRuleParams<T extends Role | Filter> = {

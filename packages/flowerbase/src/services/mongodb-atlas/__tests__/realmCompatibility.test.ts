@@ -245,4 +245,30 @@ describe('mongodb-atlas Realm compatibility', () => {
 
     expect(result.insertedIds).toEqual([id0, id1])
   })
+
+  it('exposes startSession and delegates to the underlying MongoClient', async () => {
+    const mockSession = { withTransaction: jest.fn() }
+    const startSession = jest.fn().mockReturnValue(mockSession)
+    const app = {
+      mongo: {
+        client: {
+          startSession,
+          db: jest.fn().mockReturnValue({
+            collection: jest.fn().mockReturnValue({
+              collectionName: 'todos'
+            })
+          })
+        }
+      }
+    }
+
+    const service = MongoDbAtlas(app as any, {
+      run_as_system: true
+    })
+    const options = { causalConsistency: true }
+    const session = service.startSession(options as any)
+
+    expect(startSession).toHaveBeenCalledWith(options)
+    expect(session).toBe(mockSession)
+  })
 })
