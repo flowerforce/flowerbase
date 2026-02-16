@@ -63,6 +63,37 @@ describe('mongodb-atlas Realm compatibility', () => {
     )
   })
 
+  it('accepts plain documents in updateOne by normalizing them to $set', async () => {
+    const updateResult = { acknowledged: true, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 }
+    const id = new ObjectId()
+    const findOne = jest.fn().mockResolvedValue({ _id: id, label: 'before' })
+    const aggregate = jest.fn().mockReturnValue({
+      toArray: jest.fn().mockResolvedValue([{ _id: id, label: 'after', count: 5 }])
+    })
+    const updateOne = jest.fn().mockResolvedValue(updateResult)
+    const collection = {
+      collectionName: 'todos',
+      findOne,
+      aggregate,
+      updateOne
+    }
+
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules(),
+      user: { id: 'user-1' }
+    }).db('db').collection('todos')
+
+    const replacementLikePayload = { label: 'after', count: 5 }
+    const result = await operators.updateOne({ _id: id }, replacementLikePayload)
+
+    expect(result).toEqual(updateResult)
+    expect(updateOne).toHaveBeenCalledWith(
+      { $and: [{ _id: id }] },
+      { $set: replacementLikePayload },
+      undefined
+    )
+  })
+
   it('treats findOne second argument as options when it matches option keys', async () => {
     const findOne = jest.fn().mockResolvedValue({ _id: new ObjectId() })
     const collection = {

@@ -110,6 +110,11 @@ const normalizeInsertManyResult = <T extends { insertedIds?: Record<string, unkn
   }
 }
 
+const hasAtomicOperators = (data: Document) => Object.keys(data).some((key) => key.startsWith('$'))
+
+const normalizeUpdatePayload = (data: Document) =>
+  hasAtomicOperators(data) ? data : { $set: data }
+
 const getUpdatedPaths = (update: Document) => {
   const entries = Object.entries(update ?? {})
   const hasOperators = entries.some(([key]) => key.startsWith('$'))
@@ -419,6 +424,7 @@ const getOperators: GetOperatorsFunction = (
      */
     updateOne: async (query, data, options) => {
       try {
+        const normalizedData = normalizeUpdatePayload(data as Document)
         if (!run_as_system) {
 
           checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
@@ -434,7 +440,11 @@ const getOperators: GetOperatorsFunction = (
 
           if (!result) {
             if (options?.upsert) {
-              const upsertResult = await collection.updateOne({ $and: safeQuery }, data, options)
+              const upsertResult = await collection.updateOne(
+                { $and: safeQuery },
+                normalizedData,
+                options
+              )
               emitMongoEvent('updateOne')
               return upsertResult
             }
@@ -444,8 +454,8 @@ const getOperators: GetOperatorsFunction = (
           const winningRole = getWinningRole(result, user, roles)
 
           // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
-          const hasOperators = Object.keys(data).some((key) => key.startsWith('$'))
-          const updatedPaths = getUpdatedPaths(data as Document)
+          const hasOperators = hasAtomicOperators(normalizedData)
+          const updatedPaths = getUpdatedPaths(normalizedData)
 
           // Flatten the update object to extract the actual fields being modified
           // const docToCheck = hasOperators
@@ -458,11 +468,11 @@ const getOperators: GetOperatorsFunction = (
             {
               $limit: 1
             },
-            ...Object.entries(data).map(([key, value]) => ({ [key]: value }))
+            ...Object.entries(normalizedData).map(([key, value]) => ({ [key]: value }))
           ]
           const [docToCheck] = hasOperators
             ? await collection.aggregate(pipeline).toArray()
-            : ([data] as [Document])
+            : ([normalizedData] as [Document])
           // Validate update permissions
           const { status, document } = winningRole
             ? await checkValidation(
@@ -482,11 +492,11 @@ const getOperators: GetOperatorsFunction = (
           if (!status || !areDocumentsEqual) {
             throw new Error('Update not permitted')
           }
-          const res = await collection.updateOne({ $and: safeQuery }, data, options)
+          const res = await collection.updateOne({ $and: safeQuery }, normalizedData, options)
           emitMongoEvent('updateOne')
           return res
         }
-        const result = await collection.updateOne(query, data, options)
+        const result = await collection.updateOne(query, normalizedData, options)
         emitMongoEvent('updateOne')
         return result
       } catch (error) {
