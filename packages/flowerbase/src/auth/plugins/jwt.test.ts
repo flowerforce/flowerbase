@@ -40,6 +40,13 @@ describe('jwtAuthentication', () => {
     await app.close()
   })
 
+  const unauthorizedSessionError = {
+    message: 'Unauthorized',
+    error: 'unauthorized',
+    errorCode: 'InvalidSession',
+    error_code: 'InvalidSession'
+  }
+
   const setupMongo = (userPayload: { _id: ObjectId; lastLogoutAt?: Date }) => {
     const findOneMock = jest.fn().mockResolvedValue(userPayload)
     const collectionMock = { findOne: findOneMock }
@@ -88,6 +95,20 @@ describe('jwtAuthentication', () => {
     await app.jwtAuthentication(request as any, reply)
 
     expect(reply.code).toHaveBeenCalledWith(401)
-    expect(reply.send).toHaveBeenCalledWith({ message: 'Unauthorized' })
+    expect(reply.send).toHaveBeenCalledWith(unauthorizedSessionError)
+  })
+
+  it('returns Realm-compatible unauthorized payload when jwt verification fails', async () => {
+    const request = {
+      jwtVerify: jest.fn(async () => {
+        throw new Error('jwt expired')
+      })
+    }
+    const reply = createReply()
+
+    await app.jwtAuthentication(request as any, reply)
+
+    expect(reply.code).toHaveBeenCalledWith(401)
+    expect(reply.send).toHaveBeenCalledWith(unauthorizedSessionError)
   })
 })
