@@ -13,9 +13,10 @@ jest.mock('node:diagnostics_channel', () => {
   }
 })
 
-import fastify, { FastifyInstance, FastifyReply } from 'fastify'
-import jwtAuthPlugin from './jwt'
 import { ObjectId } from 'bson'
+import fastify, { FastifyInstance, FastifyReply } from 'fastify'
+import * as jwt from 'jsonwebtoken'
+import jwtAuthPlugin from './jwt'
 
 const SECRET = 'test-secret'
 
@@ -40,12 +41,19 @@ describe('jwtAuthentication', () => {
     await app.close()
   })
 
+  const unauthorizedSessionError = {
+    message: 'Unauthorized',
+    error: 'unauthorized',
+    errorCode: 'InvalidSession',
+    error_code: 'InvalidSession'
+  }
+
   const setupMongo = (userPayload: { _id: ObjectId; lastLogoutAt?: Date }) => {
     const findOneMock = jest.fn().mockResolvedValue(userPayload)
     const collectionMock = { findOne: findOneMock }
     const dbMock = { collection: jest.fn().mockReturnValue(collectionMock) }
     const mongoMock = { client: { db: jest.fn().mockReturnValue(dbMock) } }
-    ;(app as any).mongo = mongoMock
+      ; (app as any).mongo = mongoMock
   }
 
   const createReply = () => {
@@ -88,6 +96,52 @@ describe('jwtAuthentication', () => {
     await app.jwtAuthentication(request as any, reply)
 
     expect(reply.code).toHaveBeenCalledWith(401)
-    expect(reply.send).toHaveBeenCalledWith({ message: 'Unauthorized' })
+    expect(reply.send).toHaveBeenCalledWith(unauthorizedSessionError)
+  })
+
+  it('returns Realm-compatible unauthorized payload when jwt verification fails', async () => {
+    const request = {
+      jwtVerify: jest.fn(async () => {
+        throw new Error('jwt expired')
+      })
+    }
+    const reply = createReply()
+
+    await app.jwtAuthentication(request as any, reply)
+
+    expect(reply.code).toHaveBeenCalledWith(401)
+    expect(reply.send).toHaveBeenCalledWith(unauthorizedSessionError)
+  })
+
+  it('preserves linked custom_data _id in access token payload', async () => {
+    const authId = new ObjectId()
+    const linkedId = new ObjectId()
+    const token = (app as any).createAccessToken({
+      _id: authId,
+      email: 'owner@example.com',
+      user_data: {
+        _id: linkedId.toHexString(),
+        role: 'owner'
+      },
+      custom_data: {
+        _id: linkedId.toHexString(),
+        role: 'owner'
+      }
+    })
+
+    const decoded = jwt.decode(token) as {
+      id: string
+      data: { _id: string; id: string }
+      user_data: { _id: string; id: string }
+      custom_data: { _id: string; role: string }
+      sub: string
+    }
+
+    expect(decoded.id).toBe(authId.toHexString())
+    expect(decoded.sub).toBe(authId.toHexString())
+    expect(decoded.data._id).toBe(authId.toHexString())
+    expect(decoded.user_data._id).toBe(authId.toHexString())
+    expect(decoded.custom_data._id).toBe(linkedId.toHexString())
+    expect(decoded.custom_data.role).toBe('owner')
   })
 })

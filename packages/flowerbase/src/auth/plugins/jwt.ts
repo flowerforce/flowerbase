@@ -13,6 +13,16 @@ type JwtAccessWithTimestamp = {
   iat?: number
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value)
+
+const unauthorizedSessionError = {
+  message: 'Unauthorized',
+  error: 'unauthorized',
+  errorCode: 'InvalidSession',
+  error_code: 'InvalidSession'
+} as const
+
 /**
  * This module is a Fastify plugin that sets up JWT-based authentication and token creation.
  * It registers JWT authentication, and provides methods to create access and refresh tokens.
@@ -33,7 +43,7 @@ export default fp(async function (fastify, opts: Options) {
       await request.jwtVerify()
     } catch (err) {
       fastify.log.warn({ err }, 'JWT authentication failed')
-      reply.code(401).send({ message: 'Unauthorized' })
+      reply.code(401).send(unauthorizedSessionError)
       return
     }
 
@@ -48,7 +58,7 @@ export default fp(async function (fastify, opts: Options) {
     }
 
     if (!request.user.sub) {
-      reply.code(401).send({ message: 'Unauthorized' })
+      reply.code(401).send(unauthorizedSessionError)
       return
     }
 
@@ -59,12 +69,12 @@ export default fp(async function (fastify, opts: Options) {
         .findOne({ _id: new ObjectId(request.user.sub) })
     } catch (err) {
       fastify.log.warn({ err }, 'Failed to lookup user during JWT authentication')
-      reply.code(401).send({ message: 'Unauthorized' })
+      reply.code(401).send(unauthorizedSessionError)
       return
     }
 
     if (!authUser) {
-      reply.code(401).send({ message: 'Unauthorized' })
+      reply.code(401).send(unauthorizedSessionError)
       return
     }
 
@@ -84,29 +94,32 @@ export default fp(async function (fastify, opts: Options) {
       !Number.isNaN(issuedAt) &&
       lastLogoutAt.getTime() >= issuedAt * 1000
     ) {
-      reply.code(401).send({ message: 'Unauthorized' })
+      reply.code(401).send(unauthorizedSessionError)
       return
     }
   })
 
   fastify.decorate('createAccessToken', function (user: WithId<Document>) {
     const id = user._id.toString()
-    // const userDataId = user.user_data._id.toString()
-
-    const user_data = {
-      ...user.user_data,
+    const userData = isRecord(user.user_data) ? { ...user.user_data } : {}
+    const customData = isRecord(user.custom_data)
+      ? { ...user.custom_data }
+      : { ...userData }
+    const mergedUserData = {
+      ...customData,
+      ...userData,
       _id: id,
-      id: id,
-      email: user.email,
+      id,
+      email: typeof user.email === 'string' ? user.email : userData.email
     }
 
     return this.jwt.sign(
       {
         typ: 'access',
         id,
-        data: user_data,
-        user_data: user_data,
-        custom_data: user_data
+        data: mergedUserData,
+        user_data: mergedUserData,
+        custom_data: customData
       },
       {
         iss: BAAS_ID,
