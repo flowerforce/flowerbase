@@ -153,6 +153,31 @@ describe('mongodb-atlas Realm compatibility', () => {
     expect(aggregate).not.toHaveBeenCalled()
   })
 
+  it('supports Realm returnNewDocument option in findOneAndUpdate', async () => {
+    const id = new ObjectId()
+    const findOneAndUpdate = jest.fn().mockResolvedValue({ _id: id, value: 101 })
+    const collection = {
+      collectionName: 'todos',
+      findOneAndUpdate
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      run_as_system: true
+    }).db('db').collection('todos')
+
+    const result = await operators.findOneAndUpdate(
+      { _id: id },
+      { $inc: { value: 1 } } as any,
+      { returnNewDocument: true } as any
+    )
+
+    expect(result).toEqual({ _id: id, value: 101 })
+    expect(findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: id },
+      { $inc: { value: 1 } },
+      { returnDocument: 'after' }
+    )
+  })
+
   it('supports operator updates in updateMany without using invalid aggregate stages', async () => {
     const id = new ObjectId()
     const find = jest.fn().mockReturnValue({

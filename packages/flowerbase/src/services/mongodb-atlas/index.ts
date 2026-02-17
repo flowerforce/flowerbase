@@ -1,17 +1,17 @@
+import cloneDeep from 'lodash/cloneDeep'
 import get from 'lodash/get'
 import isEqual from 'lodash/isEqual'
 import set from 'lodash/set'
 import unset from 'lodash/unset'
-import cloneDeep from 'lodash/cloneDeep'
 import {
   ClientSession,
   ClientSessionOptions,
   Collection,
   Document,
   EventsDescription,
+  FindOneAndUpdateOptions,
   FindOneOptions,
   FindOptions,
-  FindOneAndUpdateOptions,
   Filter as MongoFilter,
   UpdateFilter,
   WithId
@@ -21,7 +21,12 @@ import { buildRulesMeta } from '../../monitoring/utils'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
 import { emitServiceEvent } from '../monitoring'
-import { CRUD_OPERATIONS, GetOperatorsFunction, MongodbAtlasFunction } from './model'
+import {
+  CRUD_OPERATIONS,
+  GetOperatorsFunction,
+  MongodbAtlasFunction,
+  RealmCompatibleFindOneAndUpdateOptions
+} from './model'
 import {
   applyAccessControlToPipeline,
   checkDenyOperation,
@@ -112,6 +117,22 @@ const normalizeInsertManyResult = <T extends { insertedIds?: Record<string, unkn
   return {
     ...result,
     insertedIds: Object.values(result.insertedIds)
+  }
+}
+
+const normalizeFindOneAndUpdateOptions = (
+  options?: RealmCompatibleFindOneAndUpdateOptions
+): FindOneAndUpdateOptions | undefined => {
+  if (!options) return undefined
+
+  const { returnNewDocument, ...rest } = options
+  if (typeof returnNewDocument !== 'boolean' || typeof rest.returnDocument !== 'undefined') {
+    return rest
+  }
+
+  return {
+    ...rest,
+    returnDocument: returnNewDocument ? 'after' : 'before'
   }
 }
 
@@ -653,9 +674,10 @@ const getOperators: GetOperatorsFunction = (
     findOneAndUpdate: async (
       query: MongoFilter<Document>,
       data: UpdateFilter<Document> | Document[],
-      options?: FindOneAndUpdateOptions
+      options?: RealmCompatibleFindOneAndUpdateOptions
     ) => {
       try {
+        const normalizedOptions = normalizeFindOneAndUpdateOptions(options)
         if (!run_as_system) {
           checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
           const formattedQuery = getFormattedQuery(filters, query, user)
@@ -702,8 +724,8 @@ const getOperators: GetOperatorsFunction = (
             throw new Error('Update not permitted')
           }
 
-          const updateResult = options
-            ? await collection.findOneAndUpdate({ $and: safeQuery }, normalizedData, options)
+          const updateResult = normalizedOptions
+            ? await collection.findOneAndUpdate({ $and: safeQuery }, normalizedData, normalizedOptions)
             : await collection.findOneAndUpdate({ $and: safeQuery }, normalizedData)
           if (!updateResult) {
             emitMongoEvent('findOneAndUpdate')
@@ -729,8 +751,8 @@ const getOperators: GetOperatorsFunction = (
           return sanitizedDoc
         }
 
-        const updateResult = options
-          ? await collection.findOneAndUpdate(query, data, options)
+        const updateResult = normalizedOptions
+          ? await collection.findOneAndUpdate(query, data, normalizedOptions)
           : await collection.findOneAndUpdate(query, data)
         emitMongoEvent('findOneAndUpdate')
         return updateResult

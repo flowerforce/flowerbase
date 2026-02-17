@@ -91,4 +91,38 @@ describe('mongodb-atlas findOneAndUpdate', () => {
     ).rejects.toThrow('Update not permitted')
     expect(findOneAndUpdate).not.toHaveBeenCalled()
   })
+
+  it('maps returnNewDocument=true to returnDocument=after', async () => {
+    const id = new ObjectId()
+    const existingDoc = { _id: id, value: 100, userId: 'user-1' }
+    const updatedDoc = { _id: id, value: 101, userId: 'user-1' }
+    const findOne = jest.fn().mockResolvedValue(existingDoc)
+    const findOneAndUpdate = jest.fn().mockResolvedValue(updatedDoc)
+    const collection = {
+      collectionName: 'todos',
+      findOne,
+      findOneAndUpdate
+    }
+
+    const app = createAppWithCollection(collection)
+    const operators = MongoDbAtlas(app as any, {
+      rules: createRules(),
+      user: { id: 'user-1' }
+    })
+      .db('db')
+      .collection('todos')
+
+    const result = await operators.findOneAndUpdate(
+      { _id: id },
+      { $inc: { value: 1 } },
+      { returnNewDocument: true } as any
+    )
+
+    expect(result).toEqual(updatedDoc)
+    expect(findOneAndUpdate).toHaveBeenCalledWith(
+      { $and: [{ _id: id }] },
+      { $inc: { value: 1 } },
+      { returnDocument: 'after' }
+    )
+  })
 })
