@@ -136,6 +136,9 @@ const normalizeFindOneAndUpdateOptions = (
   }
 }
 
+const buildAndQuery = (clauses: MongoFilter<Document>[]): MongoFilter<Document> =>
+  clauses.length ? { $and: clauses } : {}
+
 const hasAtomicOperators = (data: Document) => Object.keys(data).some((key) => key.startsWith('$'))
 
 const normalizeUpdatePayload = (data: Document) =>
@@ -410,7 +413,7 @@ const getOperators: GetOperatorsFunction = (
           logService('findOne query', { collName, formattedQuery })
           const safeQuery = normalizeQuery(formattedQuery)
           logService('findOne normalizedQuery', { collName, safeQuery })
-          const result = await collection.findOne({ $and: safeQuery }, resolvedOptions)
+          const result = await collection.findOne(buildAndQuery(safeQuery), resolvedOptions)
           logDebug('findOne result', {
             collection: collName,
             result
@@ -477,7 +480,7 @@ const getOperators: GetOperatorsFunction = (
           const formattedQuery = getFormattedQuery(filters, query, user)
 
           // Retrieve the document to check permissions before deleting
-          const result = await collection.findOne({ $and: formattedQuery })
+          const result = await collection.findOne(buildAndQuery(formattedQuery))
           const winningRole = getWinningRole(result, user, roles)
 
           logDebug('delete winningRole', {
@@ -502,7 +505,7 @@ const getOperators: GetOperatorsFunction = (
             throw new Error('Delete not permitted')
           }
 
-          const res = await collection.deleteOne({ $and: formattedQuery }, options)
+          const res = await collection.deleteOne(buildAndQuery(formattedQuery), options)
           emitMongoEvent('deleteOne')
           return res
         }
@@ -610,12 +613,12 @@ const getOperators: GetOperatorsFunction = (
             ? normalizeQuery(formattedQuery)
             : formattedQuery
 
-          const result = await collection.findOne({ $and: safeQuery })
+          const result = await collection.findOne(buildAndQuery(safeQuery))
 
           if (!result) {
             if (options?.upsert) {
               const upsertResult = await collection.updateOne(
-                { $and: safeQuery },
+                buildAndQuery(safeQuery),
                 normalizedData,
                 options
               )
@@ -649,7 +652,7 @@ const getOperators: GetOperatorsFunction = (
           if (!status || !areDocumentsEqual) {
             throw new Error('Update not permitted')
           }
-          const res = await collection.updateOne({ $and: safeQuery }, normalizedData, options)
+          const res = await collection.updateOne(buildAndQuery(safeQuery), normalizedData, options)
           emitMongoEvent('updateOne')
           return res
         }
@@ -685,7 +688,7 @@ const getOperators: GetOperatorsFunction = (
             ? normalizeQuery(formattedQuery)
             : formattedQuery
 
-          const result = await collection.findOne({ $and: safeQuery })
+          const result = await collection.findOne(buildAndQuery(safeQuery))
 
           if (!result) {
             throw new Error('Update not permitted')
@@ -700,7 +703,7 @@ const getOperators: GetOperatorsFunction = (
             : getUpdatedPaths(normalizedData as Document)
           const [docToCheck] = Array.isArray(normalizedData)
             ? await collection.aggregate([
-              { $match: { $and: safeQuery } },
+              { $match: buildAndQuery(safeQuery) },
               { $limit: 1 },
               ...normalizedData
             ]).toArray()
@@ -725,8 +728,8 @@ const getOperators: GetOperatorsFunction = (
           }
 
           const updateResult = normalizedOptions
-            ? await collection.findOneAndUpdate({ $and: safeQuery }, normalizedData, normalizedOptions)
-            : await collection.findOneAndUpdate({ $and: safeQuery }, normalizedData)
+            ? await collection.findOneAndUpdate(buildAndQuery(safeQuery), normalizedData, normalizedOptions)
+            : await collection.findOneAndUpdate(buildAndQuery(safeQuery), normalizedData)
           if (!updateResult) {
             emitMongoEvent('findOneAndUpdate')
             return updateResult

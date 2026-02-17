@@ -250,6 +250,24 @@ describe('mongodb-atlas Realm compatibility', () => {
     expect(find).toHaveBeenCalledWith({ active: true }, { session })
   })
 
+  it('allows findOne({}) without emitting an empty $and query', async () => {
+    const doc = { _id: new ObjectId(), label: 'first' }
+    const findOne = jest.fn().mockResolvedValue(doc)
+    const collection = {
+      collectionName: 'todos',
+      findOne
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules(),
+      user: { id: 'user-1' }
+    }).db('db').collection('todos')
+
+    const result = await operators.findOne({})
+
+    expect(result).toEqual(doc)
+    expect(findOne).toHaveBeenCalledWith({}, undefined)
+  })
+
   it('returns insertMany insertedIds as an array', async () => {
     const id0 = new ObjectId()
     const id1 = new ObjectId()
