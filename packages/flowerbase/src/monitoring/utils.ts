@@ -404,8 +404,9 @@ export const resolveUserContext = async (
         ? String(customUser[userIdField])
         : normalizedUserId)
 
+  const custom_data = customUser ? stripSensitiveFields(customUser) : {}
   const user_data = {
-    ...(customUser ? stripSensitiveFields(customUser) : {}),
+    ...custom_data,
     id,
     _id: id,
     email: authUser && typeof (authUser as { email?: unknown }).email === 'string'
@@ -417,7 +418,7 @@ export const resolveUserContext = async (
     id,
     user_data,
     data: user_data,
-    custom_data: user_data
+    custom_data
   }
 
   if (isObjectId) {

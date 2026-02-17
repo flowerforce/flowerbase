@@ -13,6 +13,9 @@ type JwtAccessWithTimestamp = {
   iat?: number
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value)
+
 const unauthorizedSessionError = {
   message: 'Unauthorized',
   error: 'unauthorized',
@@ -98,22 +101,25 @@ export default fp(async function (fastify, opts: Options) {
 
   fastify.decorate('createAccessToken', function (user: WithId<Document>) {
     const id = user._id.toString()
-    // const userDataId = user.user_data._id.toString()
-
-    const user_data = {
-      ...user.user_data,
+    const userData = isRecord(user.user_data) ? { ...user.user_data } : {}
+    const customData = isRecord(user.custom_data)
+      ? { ...user.custom_data }
+      : { ...userData }
+    const mergedUserData = {
+      ...customData,
+      ...userData,
       _id: id,
-      id: id,
-      email: user.email,
+      id,
+      email: typeof user.email === 'string' ? user.email : userData.email
     }
 
     return this.jwt.sign(
       {
         typ: 'access',
         id,
-        data: user_data,
-        user_data: user_data,
-        custom_data: user_data
+        data: mergedUserData,
+        user_data: mergedUserData,
+        custom_data: customData
       },
       {
         iss: BAAS_ID,
