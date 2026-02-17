@@ -17,7 +17,7 @@ export async function customFunctionController(app: FastifyInstance) {
   const functionsList = StateManager.select('functions')
   const services = StateManager.select('services')
   const db = app.mongo.client.db(DB_NAME)
-  const { authCollection, refreshTokensCollection } = AUTH_CONFIG
+  const { authCollection, refreshTokensCollection, userCollection, user_id_field } = AUTH_CONFIG
   const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
 
   /**
@@ -89,10 +89,22 @@ export async function customFunctionController(app: FastifyInstance) {
         return
       }
 
+      const user =
+        user_id_field && userCollection
+          ? await db
+            .collection(userCollection)
+            .findOne({ [user_id_field]: authUser._id.toString() })
+          : {}
+
       const currentUserData = {
         _id: authUser._id,
         user_data: {
-          _id: authUser._id
+          ...(user || {}),
+          id: authUser._id.toString(),
+          email: authUser.email
+        },
+        custom_data: {
+          ...(user || {})
         }
       }
       const refreshToken = this.createRefreshToken(currentUserData)

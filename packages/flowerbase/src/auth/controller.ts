@@ -124,6 +124,9 @@ export async function authController(app: FastifyInstance) {
           user_data: {
             ...user,
             id: req.user.sub
+          },
+          custom_data: {
+            ...user
           }
         })
       }

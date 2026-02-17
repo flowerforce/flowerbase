@@ -268,7 +268,12 @@ export async function localUserPassController(app: FastifyInstance) {
 
       const userWithCustomData = {
         ...authUser,
-        user_data: { ...(user || {}), _id: authUser._id },
+        user_data: {
+          ...(user || {}),
+          id: authUser._id.toString(),
+          email: authUser.email
+        },
+        custom_data: { ...(user || {}) },
         data: { email: authUser.email },
         id: authUser._id.toString()
       }
