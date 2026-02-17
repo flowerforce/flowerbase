@@ -59,6 +59,11 @@ export type GetOperatorsFunction = (
     monitoringOrigin?: string
   }
 ) => {
+  findOneAndUpdate: (
+    filter: MongoFilter<Document>,
+    update: UpdateFilter<Document> | Document[],
+    options?: RealmCompatibleFindOneAndUpdateOptions
+  ) => Promise<Document | null>
   findOne: (
     filter?: MongoFilter<Document>,
     projection?: Document,
@@ -71,11 +76,6 @@ export type GetOperatorsFunction = (
   updateOne: (
     ...params: Parameters<Method<'updateOne'>>
   ) => ReturnType<Method<'updateOne'>>
-  findOneAndUpdate: (
-    filter: MongoFilter<Document>,
-    update: UpdateFilter<Document> | Document[],
-    options?: FindOneAndUpdateOptions
-  ) => Promise<Document | null>
   find: (
     filter?: MongoFilter<Document>,
     projection?: Document,
@@ -100,6 +100,10 @@ export type GetOperatorsFunction = (
   deleteMany: (
     ...params: Parameters<Method<'deleteMany'>>
   ) => ReturnType<Method<'deleteMany'>>
+}
+
+export type RealmCompatibleFindOneAndUpdateOptions = FindOneAndUpdateOptions & {
+  returnNewDocument?: boolean
 }
 
 
