@@ -1,3 +1,12 @@
+## 1.7.3 (2026-02-17)
+
+
+### 🩹 Fixes
+
+- response EJSON in function ([fa70c11](https://github.com/flowerforce/flowerbase/commit/fa70c11))
+
+- issues #5 #6 #7 #8 #10 #11 #12 #13 #14 ([#5](https://github.com/flowerforce/flowerbase/issues/5), [#6](https://github.com/flowerforce/flowerbase/issues/6), [#7](https://github.com/flowerforce/flowerbase/issues/7), [#8](https://github.com/flowerforce/flowerbase/issues/8), [#10](https://github.com/flowerforce/flowerbase/issues/10), [#11](https://github.com/flowerforce/flowerbase/issues/11), [#12](https://github.com/flowerforce/flowerbase/issues/12), [#13](https://github.com/flowerforce/flowerbase/issues/13), [#14](https://github.com/flowerforce/flowerbase/issues/14))
+
 ## 1.7.2 (2026-02-12)
 
 
