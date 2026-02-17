@@ -57,4 +57,38 @@ describe('context.functions.execute compatibility', () => {
     expect(result && typeof (result as Promise<unknown>).then).toBe('function')
     await expect(result).resolves.toEqual({ ok: true })
   })
+
+  it('passes circular native objects without EJSON deserialization', () => {
+    const functionsList = {
+      caller: {
+        code: `
+          module.exports = function() {
+            const session = { tx: true }
+            session.client = { sessionPool: { client: session } }
+            return context.functions.execute("target", session)
+          }
+        `
+      },
+      target: {
+        code: `
+          module.exports = function(session) {
+            return session.client.sessionPool.client === session
+          }
+        `
+      }
+    } as Functions
+
+    const result = GenerateContextSync({
+      args: [],
+      app: {} as any,
+      rules: {} as any,
+      user: {} as any,
+      currentFunction: functionsList.caller,
+      functionsList,
+      services: mockServices,
+      functionName: 'caller'
+    })
+
+    expect(result).toBe(true)
+  })
 })

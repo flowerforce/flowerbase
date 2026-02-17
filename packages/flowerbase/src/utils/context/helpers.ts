@@ -1,9 +1,9 @@
 import { mongodb } from '@fastify/mongodb'
+import { EJSON } from 'bson'
 import * as jwt from 'jsonwebtoken'
 import { Arguments } from '../../auth/dtos'
 import { Function } from '../../features/functions/interface'
 import { GenerateContextDataParams } from './interface'
-import { EJSON } from 'bson'
 
 type JwtUtils = {
   encode: (
@@ -116,7 +116,6 @@ export const generateContextData = ({
   currentFunction,
   functionName,
   functionsList,
-  GenerateContext,
   GenerateContextSync,
   request
 }: GenerateContextDataParams) => {
@@ -215,7 +214,8 @@ export const generateContextData = ({
             currentFunction,
             functionName: String(name),
             functionsList,
-            services
+            services,
+            deserializeArgs: false
           })
         }
       }
