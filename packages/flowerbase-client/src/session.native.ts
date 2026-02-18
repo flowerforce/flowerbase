@@ -1,4 +1,5 @@
 import { SessionData } from './types'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 type StorageLike = {
   getItem: (key: string) => Promise<string | null>
@@ -8,17 +9,7 @@ type StorageLike = {
 
 const memoryStore = new Map<string, string>()
 
-const getAsyncStorage = (): StorageLike | null => {
-  try {
-    const req = (0, eval)('require') as (name: string) => unknown
-    const asyncStorageModule = req('@react-native-async-storage/async-storage') as {
-      default?: StorageLike
-    }
-    return asyncStorageModule?.default ?? null
-  } catch {
-    return null
-  }
-}
+const getAsyncStorage = (): StorageLike => AsyncStorage
 
 const parseSession = (raw: string | null): SessionData | null => {
   if (!raw) return null
