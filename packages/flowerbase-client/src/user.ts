@@ -1,11 +1,11 @@
+import type { App } from './app'
 import { createFunctionsProxy } from './functions'
 import { createMongoClient } from './mongo'
 import { MongoClientLike, ProfileData, UserLike } from './types'
-import type { App } from './app'
 
 export class User implements UserLike {
   id: string
-  profile?: { email?: string; [key: string]: unknown }
+  profile?: { email?: string;[key: string]: unknown }
   private readonly app: App
 
   functions: Record<string, (...args: unknown[]) => Promise<unknown>>
@@ -27,7 +27,7 @@ export class User implements UserLike {
   async refreshCustomData(): Promise<ProfileData> {
     const profile = await this.app.getProfile()
     this.profile = profile.data
-    return profile
+    return profile.custom_data || {}
   }
 
   mongoClient(serviceName: string): MongoClientLike {
