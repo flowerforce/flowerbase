@@ -687,33 +687,46 @@ const getOperators: GetOperatorsFunction = (
           const safeQuery = Array.isArray(formattedQuery)
             ? normalizeQuery(formattedQuery)
             : formattedQuery
-
-          const result = await collection.findOne(buildAndQuery(safeQuery))
-
-          if (!result) {
-            throw new Error('Update not permitted')
-          }
-
-          const winningRole = getWinningRole(result, user, roles)
           const normalizedData = Array.isArray(data)
             ? data
             : normalizeUpdatePayload(data as Document)
+          const currentDoc = await collection.findOne(buildAndQuery(safeQuery))
           const updatedPaths = Array.isArray(normalizedData)
             ? []
             : getUpdatedPaths(normalizedData as Document)
-          const [docToCheck] = Array.isArray(normalizedData)
-            ? await collection.aggregate([
-              { $match: buildAndQuery(safeQuery) },
-              { $limit: 1 },
-              ...normalizedData
-            ]).toArray()
-            : [applyDocumentUpdateOperators(result, normalizedData as Document)]
+          let docToCheck: Document
+          let validationType: 'write' | 'insert' = 'write'
+
+          if (!currentDoc) {
+            if (!normalizedOptions?.upsert || Array.isArray(normalizedData)) {
+              throw new Error('Update not permitted')
+            }
+
+            const updateDocument = normalizedData as Document
+            const setOnInsertSeed =
+              isPlainObject(updateDocument.$setOnInsert)
+                ? (updateDocument.$setOnInsert as Document)
+                : {}
+            docToCheck = applyDocumentUpdateOperators(setOnInsertSeed, updateDocument)
+            validationType = 'insert'
+          } else {
+            const [computedDoc] = Array.isArray(normalizedData)
+              ? await collection.aggregate([
+                { $match: buildAndQuery(safeQuery) },
+                { $limit: 1 },
+                ...normalizedData
+              ]).toArray()
+              : [applyDocumentUpdateOperators(currentDoc, normalizedData as Document)]
+            docToCheck = computedDoc
+          }
+
+          const winningRole = getWinningRole(docToCheck, user, roles)
 
           const { status, document } = winningRole
             ? await checkValidation(
               winningRole,
               {
-                type: 'write',
+                type: validationType,
                 roles,
                 cursor: docToCheck,
                 expansions: {}
