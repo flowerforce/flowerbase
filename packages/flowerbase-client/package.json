@@ -1,0 +1,31 @@
+{
+  "name": "@flowerforce/flowerbase-client",
+  "version": "0.1.0",
+  "description": "Client for Flowerbase",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flowerforce/flowerbase.git"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "private": true,
+  "scripts": {
+    "test": "npx jest",
+    "build": "rm -rf dist/ && tsc"
+  },
+  "dependencies": {
+    "bson": "^6.10.4"
+  }
+}

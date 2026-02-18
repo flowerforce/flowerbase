@@ -2,10 +2,11 @@ import React, { createContext, useEffect, useState, ReactNode, useCallback } fro
 import { app, Realm } from "../api/client";
 import { useNavigate } from "react-router-dom";
 import { APP_ROUTES } from "../appRoutes";
+import type { UserLike } from "@flowerforce/flowerbase-client";
 
 export interface AuthenticationContextType {
-  user: Realm.User | null;
-  login: (email: string, password: string) => Promise<Realm.User>;
+  user: UserLike | null;
+  login: (email: string, password: string) => Promise<UserLike>;
   logout: () => Promise<void>;
   isLoggedIn: boolean;
 }
@@ -17,10 +18,10 @@ interface AuthenticationProviderProps {
 }
 
 export const AuthenticationProvider: React.FC<AuthenticationProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<Realm.User | null>(app.currentUser);
+  const [user, setUser] = useState<UserLike | null>(app.currentUser);
   const navigate = useNavigate()
 
-  const login = useCallback(async (email: string, password: string): Promise<Realm.User> => {
+  const login = useCallback(async (email: string, password: string): Promise<UserLike> => {
     const credentials = Realm.Credentials.emailPassword(email, password);
     const loggedInUser = await app.logIn(credentials);
     setUser(loggedInUser);
@@ -62,4 +63,3 @@ export const AuthenticationProvider: React.FC<AuthenticationProviderProps> = ({ 
 
   return <AuthenticationContext.Provider value={value}>{children}</AuthenticationContext.Provider>;
 };
-

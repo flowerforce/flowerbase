@@ -90,7 +90,7 @@ export const Layout = () => {
                 >
                     {isLoggedIn && (
                         <Avatar
-                            label={user?.profile.email?.[0]?.toUpperCase()}
+                            label={user?.profile?.email?.[0]?.toUpperCase()}
                             shape="circle"
                             style={{ backgroundColor: "#1976d2", color: "white", cursor: "pointer" }}
                             size="large"
