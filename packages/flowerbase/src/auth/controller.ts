@@ -1,6 +1,7 @@
 import { ObjectId } from 'bson'
 import { FastifyInstance } from 'fastify'
 import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../constants'
+import { StateManager } from '../state'
 import { hashToken } from '../utils/crypto'
 import { SessionCreatedDto } from './dtos'
 import { AUTH_ENDPOINTS, AUTH_ERRORS } from './utils'
@@ -55,17 +56,28 @@ export async function authController(app: FastifyInstance) {
     if (req.user.typ !== 'access') {
       throw new Error('Access token required')
     }
-    const user = await db
+    const authUser = await db
       .collection<Record<string, unknown>>(authCollection)
       .findOne({ _id: ObjectId.createFromHexString(req.user.id) })
+
+    const customData = userCollection && AUTH_CONFIG.user_id_field
+      ? await db
+        .collection<Record<string, unknown>>(userCollection)
+        .findOne({ [AUTH_CONFIG.user_id_field]: req.user.id })
+      : null
+
+    const params = (req as unknown as { params?: { appId?: string } }).params
+    const stateProjectId = StateManager.select('projectId')
+    const domainId = params?.appId ?? stateProjectId ?? ''
+
     return {
-      _id: user?._id.toString(),
-      identities: user?.identities,
+      user_id: req.user.id,
+      domain_id: domainId,
+      identities: authUser?.identities,
+      custom_data: customData ?? {},
       type: 'normal',
-      custom_data: user?.curstom_data,
       data: {
-        _id: user?._id.toString(),
-        email: user?.email
+        email: authUser?.email
       }
     }
   })
