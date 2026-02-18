@@ -12,12 +12,17 @@ type LoginResponse = {
   user_id: string
 }
 
+type SessionResponse = {
+  access_token: string
+}
+
 export class App {
   readonly id: string
   readonly baseUrl: string
   readonly timeout: number
   private readonly sessionManager: SessionManager
   currentUser: User | null = null
+  private readonly sessionBootstrapPromise: Promise<void>
 
   emailPasswordAuth: {
     registerUser: (input: { email: string; password: string }) => Promise<unknown>
@@ -36,6 +41,7 @@ export class App {
     if (session?.userId) {
       this.currentUser = new User(this, session.userId)
     }
+    this.sessionBootstrapPromise = this.bootstrapSessionOnLoad()
 
     this.emailPasswordAuth = {
       registerUser: ({ email, password }) =>
@@ -61,9 +67,41 @@ export class App {
     return `${this.baseUrl}${API_PREFIX}/app/${this.id}/functions${path}`
   }
 
+  private async createSession(refreshToken: string): Promise<SessionResponse> {
+    return requestJson<SessionResponse>({
+      url: this.authUrl('/session'),
+      method: 'POST',
+      bearerToken: refreshToken,
+      timeout: this.timeout
+    })
+  }
+
+  private async bootstrapSessionOnLoad(): Promise<void> {
+    const session = this.sessionManager.get()
+    if (!session || typeof localStorage === 'undefined') {
+      return
+    }
+
+    try {
+      const result = await this.createSession(session.refreshToken)
+      this.sessionManager.set({
+        ...session,
+        accessToken: result.access_token
+      })
+    } catch {
+      this.sessionManager.clear()
+      this.currentUser = null
+    }
+  }
+
+  private async ensureSessionBootstrapped() {
+    await this.sessionBootstrapPromise
+  }
+
   private async setLoggedInUser(data: LoginResponse, profileEmail?: string) {
+    const sessionResult = await this.createSession(data.refresh_token)
     const session: SessionData = {
-      accessToken: data.access_token,
+      accessToken: sessionResult.access_token,
       refreshToken: data.refresh_token,
       userId: data.user_id
     }
@@ -111,6 +149,7 @@ export class App {
   }
 
   async callFunction(name: string, args: unknown[]) {
+    await this.ensureSessionBootstrapped()
     const session = this.getSessionOrThrow()
     const payload: FunctionCallPayload = {
       name,
@@ -129,6 +168,7 @@ export class App {
   }
 
   async callService(name: string, args: unknown[]) {
+    await this.ensureSessionBootstrapped()
     const session = this.getSessionOrThrow()
     const payload: FunctionCallPayload = {
       name,
@@ -146,6 +186,7 @@ export class App {
   }
 
   async getProfile(): Promise<ProfileData> {
+    await this.ensureSessionBootstrapped()
     const session = this.getSessionOrThrow()
     return requestJson<ProfileData>({
       url: this.authUrl('/profile'),
@@ -156,15 +197,11 @@ export class App {
   }
 
   async refreshAccessToken() {
+    await this.ensureSessionBootstrapped()
     const session = this.getSessionOrThrow()
 
     try {
-      const result = await requestJson<{ access_token: string }>({
-        url: this.authUrl('/session'),
-        method: 'POST',
-        bearerToken: session.refreshToken,
-        timeout: this.timeout
-      })
+      const result = await this.createSession(session.refreshToken)
 
       this.sessionManager.set({
         ...session,

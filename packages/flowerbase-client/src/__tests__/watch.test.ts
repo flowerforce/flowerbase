@@ -34,6 +34,10 @@ describe('flowerbase-client watch', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         body: streamFromLines(['data: {"operationType":"insert","fullDocument":{"title":"A"}}', ''])
       }) as unknown as typeof fetch
 
@@ -52,7 +56,7 @@ describe('flowerbase-client watch', () => {
 
     iterator.close()
 
-    const [url, request] = (global.fetch as jest.Mock).mock.calls[1]
+    const [url, request] = (global.fetch as jest.Mock).mock.calls[2]
     expect(url).toContain('/functions/call?baas_request=')
     expect(request.headers.Authorization).toBe('Bearer access')
   })
@@ -67,6 +71,10 @@ describe('flowerbase-client watch', () => {
           refresh_token: 'refresh',
           user_id: 'user-1'
         })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
       })
       .mockResolvedValue({
         ok: true,
@@ -99,6 +107,10 @@ describe('flowerbase-client watch', () => {
           user_id: 'user-1'
         })
       })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      })
       .mockRejectedValueOnce(new Error('network'))
       .mockResolvedValueOnce({
         ok: true,
@@ -119,7 +131,7 @@ describe('flowerbase-client watch', () => {
 
     expect(result.done).toBe(false)
     expect(result.value).toEqual({ operationType: 'update' })
-    expect((global.fetch as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(3)
+    expect((global.fetch as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(4)
 
     iterator.close()
   })

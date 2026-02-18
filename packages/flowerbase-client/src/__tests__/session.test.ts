@@ -21,6 +21,10 @@ describe('flowerbase-client session', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         text: async () => JSON.stringify({ access_token: 'access-2' })
       }) as unknown as typeof fetch
 
@@ -50,6 +54,10 @@ describe('flowerbase-client session', () => {
         })
       })
       .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      })
+      .mockResolvedValueOnce({
         ok: false,
         status: 401,
         text: async () => JSON.stringify({ message: 'Invalid refresh token provided' })
@@ -72,6 +80,10 @@ describe('flowerbase-client session', () => {
           refresh_token: 'refresh',
           user_id: 'user-1'
         })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
       })
       .mockResolvedValueOnce({
         ok: true,

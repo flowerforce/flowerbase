@@ -37,8 +37,8 @@ describe('flowerbase-client mongo service wrapper', () => {
     await collection.updateMany({ done: false }, { $set: { done: true } })
     await collection.deleteOne({ done: true })
 
-    expect((global.fetch as jest.Mock).mock.calls).toHaveLength(7)
-    const [url, request] = (global.fetch as jest.Mock).mock.calls[2]
+    expect((global.fetch as jest.Mock).mock.calls).toHaveLength(8)
+    const [url, request] = (global.fetch as jest.Mock).mock.calls[3]
     expect(url).toBe('http://localhost:3000/api/client/v2.0/app/my-app/functions/call')
     expect(request.method).toBe('POST')
     const parsed = JSON.parse(request.body)

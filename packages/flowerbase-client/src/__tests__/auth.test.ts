@@ -3,20 +3,35 @@ import { Credentials } from '../credentials'
 
 describe('flowerbase-client auth', () => {
   const originalFetch = global.fetch
+  const originalLocalStorage = (globalThis as typeof globalThis & { localStorage?: unknown }).localStorage
 
   afterEach(() => {
     global.fetch = originalFetch
+    if (typeof originalLocalStorage === 'undefined') {
+      Reflect.deleteProperty(globalThis, 'localStorage')
+    } else {
+      Object.defineProperty(globalThis, 'localStorage', {
+        configurable: true,
+        value: originalLocalStorage
+      })
+    }
   })
 
   it('logs in with email/password', async () => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      text: async () => JSON.stringify({
-        access_token: 'access',
-        refresh_token: 'refresh',
-        user_id: 'user-1'
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({
+          access_token: 'access',
+          refresh_token: 'refresh',
+          user_id: 'user-1'
+        })
       })
-    }) as unknown as typeof fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access-from-session' })
+      }) as unknown as typeof fetch
 
     const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
     const user = await app.logIn(Credentials.emailPassword('john@doe.com', 'secret123'))
@@ -26,6 +41,13 @@ describe('flowerbase-client auth', () => {
     expect(global.fetch).toHaveBeenCalledWith(
       'http://localhost:3000/api/client/v2.0/app/my-app/auth/providers/local-userpass/login',
       expect.objectContaining({ method: 'POST' })
+    )
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/api/client/v2.0/auth/session',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer refresh' })
+      })
     )
   })
 
@@ -101,6 +123,42 @@ describe('flowerbase-client auth', () => {
       4,
       'http://localhost:3000/api/client/v2.0/app/my-app/auth/providers/local-userpass/reset',
       expect.objectContaining({ method: 'POST' })
+    )
+  })
+
+  it('calls session endpoint on app load when browser session exists', async () => {
+    const storage = new Map<string, string>()
+    storage.set(
+      'flowerbase:my-app:session',
+      JSON.stringify({ accessToken: 'old-access', refreshToken: 'refresh', userId: 'user-1' })
+    )
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          storage.set(key, value)
+        },
+        removeItem: (key: string) => {
+          storage.delete(key)
+        }
+      }
+    })
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ access_token: 'fresh-access' })
+    }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+    await app.getProfile().catch(() => undefined)
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/api/client/v2.0/auth/session',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer refresh' })
+      })
     )
   })
 })

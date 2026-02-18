@@ -21,6 +21,10 @@ describe('flowerbase-client functions', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         text: async () => JSON.stringify({ result: 42 })
       }) as unknown as typeof fetch
 
@@ -31,7 +35,7 @@ describe('flowerbase-client functions', () => {
     expect(result).toEqual({ result: 42 })
 
     expect(global.fetch).toHaveBeenNthCalledWith(
-      2,
+      3,
       'http://localhost:3000/api/client/v2.0/app/my-app/functions/call',
       expect.objectContaining({
         method: 'POST',
@@ -50,6 +54,10 @@ describe('flowerbase-client functions', () => {
           refresh_token: 'refresh',
           user_id: 'user-1'
         })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
       })
       .mockResolvedValueOnce({
         ok: false,
