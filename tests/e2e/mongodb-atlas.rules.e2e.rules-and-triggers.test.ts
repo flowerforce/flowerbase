@@ -220,7 +220,7 @@ const callServiceOperation = async ({
     throw new Error(message ?? response.payload ?? 'failed to execute service operation')
   }
 
-  return response.json()
+  return EJSON.deserialize(response.json())
 }
 
 const createCollectionProxy = (collection: string, user: TestUser | null) => ({
