@@ -1,9 +1,19 @@
 {
   "name": "@flowerforce/flowerbase-client",
   "version": "0.1.0",
-  "description": "Realm-compatible client for Flowerbase",
+  "description": "Client for Flowerbase",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flowerforce/flowerbase.git"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
