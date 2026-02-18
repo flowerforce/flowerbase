@@ -1,7 +1,7 @@
-import { requestJson } from './http'
 import { normalizeFunctionResponse } from './functions'
+import { requestJson } from './http'
 import { SessionManager } from './session'
-import { CredentialsLike, AppConfig, FunctionCallPayload, ProfileData, SessionData } from './types'
+import { AppConfig, CredentialsLike, FunctionCallPayload, ProfileData, SessionData } from './types'
 import { User } from './user'
 
 const API_PREFIX = '/api/client/v2.0'

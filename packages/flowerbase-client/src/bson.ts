@@ -1,4 +1,4 @@
-import { BSON as RawBSON, EJSON, ObjectId } from 'bson'
+import { EJSON, ObjectId, BSON as RawBSON } from 'bson'
 
 const ObjectID = ObjectId
 const BSON = Object.assign({}, RawBSON, { ObjectId, ObjectID })
