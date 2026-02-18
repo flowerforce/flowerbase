@@ -21,4 +21,11 @@ export class Credentials {
       payload
     }
   }
+
+  static jwt(token: string): CredentialsLike {
+    return {
+      provider: 'custom-token',
+      token
+    }
+  }
 }

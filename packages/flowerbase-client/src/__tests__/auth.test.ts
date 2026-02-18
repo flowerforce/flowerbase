@@ -91,6 +91,26 @@ describe('flowerbase-client auth', () => {
     )
   })
 
+  it('logs in with custom jwt provider', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({
+        access_token: 'access',
+        refresh_token: 'refresh',
+        user_id: 'jwt-1'
+      })
+    }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+    const user = await app.logIn(Credentials.jwt('jwt-token'))
+
+    expect(user.id).toBe('jwt-1')
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/api/client/v2.0/app/my-app/auth/providers/custom-token/login',
+      expect.objectContaining({ method: 'POST' })
+    )
+  })
+
   it('supports register and reset endpoints', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -122,6 +142,35 @@ describe('flowerbase-client auth', () => {
     expect(global.fetch).toHaveBeenNthCalledWith(
       4,
       'http://localhost:3000/api/client/v2.0/app/my-app/auth/providers/local-userpass/reset',
+      expect.objectContaining({ method: 'POST' })
+    )
+  })
+
+  it('supports email/password confirmation endpoints', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ status: 'ok' })
+    }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+
+    await app.emailPasswordAuth.confirmUser({ token: 't1', tokenId: 'tid1' })
+    await app.emailPasswordAuth.resendConfirmationEmail({ email: 'john@doe.com' })
+    await app.emailPasswordAuth.retryCustomConfirmation({ email: 'john@doe.com' })
+
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      1,
+      'http://localhost:3000/api/client/v2.0/app/my-app/auth/providers/local-userpass/confirm',
+      expect.objectContaining({ method: 'POST' })
+    )
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      'http://localhost:3000/api/client/v2.0/app/my-app/auth/providers/local-userpass/confirm/send',
+      expect.objectContaining({ method: 'POST' })
+    )
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      3,
+      'http://localhost:3000/api/client/v2.0/app/my-app/auth/providers/local-userpass/confirm/call',
       expect.objectContaining({ method: 'POST' })
     )
   })
