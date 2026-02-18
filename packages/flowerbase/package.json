@@ -1,6 +1,6 @@
 {
   "name": "@flowerforce/flowerbase",
-  "version": "1.7.4-beta.2",
+  "version": "1.7.4-beta.3",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
