@@ -13,6 +13,17 @@ const streamFromLines = (lines: string[]) => {
   })
 }
 
+const decodeBaasRequest = (url: string) => {
+  const parsedUrl = new URL(url)
+  const encoded = parsedUrl.searchParams.get('baas_request')
+  if (!encoded) throw new Error('baas_request missing')
+  const base64 = decodeURIComponent(encoded)
+  const json = Buffer.from(base64, 'base64').toString('utf8')
+  return JSON.parse(json) as {
+    arguments: Array<{ pipeline?: unknown[] }>
+  }
+}
+
 describe('flowerbase-client watch', () => {
   const originalFetch = global.fetch
 
@@ -134,5 +145,68 @@ describe('flowerbase-client watch', () => {
     expect((global.fetch as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(4)
 
     iterator.close()
+  })
+
+  it('maps watch ids/filter options into pipeline', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({
+          access_token: 'access',
+          refresh_token: 'refresh',
+          user_id: 'user-1'
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      })
+      .mockResolvedValue({
+        ok: true,
+        body: streamFromLines([])
+      }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+    await app.logIn(Credentials.emailPassword('john@doe.com', 'secret123'))
+
+    const collection = app.currentUser!.mongoClient('mongodb-atlas').db('testdb').collection('todos')
+
+    const byIds = collection.watch({ ids: ['id-1', 'id-2'] })
+    byIds.close()
+    const firstRequest = decodeBaasRequest((global.fetch as jest.Mock).mock.calls[2][0] as string)
+    expect(firstRequest.arguments[0].pipeline).toEqual([
+      { $match: { 'documentKey._id': { $in: ['id-1', 'id-2'] } } }
+    ])
+
+    const byFilter = collection.watch({ filter: { operationType: 'insert' } })
+    byFilter.close()
+    const secondRequest = decodeBaasRequest((global.fetch as jest.Mock).mock.calls[3][0] as string)
+    expect(secondRequest.arguments[0].pipeline).toEqual([{ $match: { operationType: 'insert' } }])
+  })
+
+  it('rejects watch options with both ids and filter', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({
+          access_token: 'access',
+          refresh_token: 'refresh',
+          user_id: 'user-1'
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+    await app.logIn(Credentials.emailPassword('john@doe.com', 'secret123'))
+
+    const collection = app.currentUser!.mongoClient('mongodb-atlas').db('testdb').collection('todos')
+    expect(() => collection.watch({ ids: ['id-1'], filter: { operationType: 'insert' } })).toThrow(
+      'watch options cannot include both "ids" and "filter"'
+    )
   })
 })

@@ -45,4 +45,39 @@ describe('flowerbase-client mongo service wrapper', () => {
     expect(parsed.service).toBe('mongodb-atlas')
     expect(parsed.name).toBe('findOne')
   })
+
+  it('supports extended CRUD operations and custom service name', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({
+          access_token: 'access',
+          refresh_token: 'refresh',
+          user_id: 'user-1'
+        })
+      })
+      .mockResolvedValue({
+        ok: true,
+        text: async () => JSON.stringify({ ok: true })
+      }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+    await app.logIn(Credentials.emailPassword('john@doe.com', 'secret123'))
+
+    const collection = app.currentUser!.mongoClient('my-service').db('testdb').collection('todos')
+
+    await collection.findOneAndUpdate({ done: false }, { $set: { done: true } })
+    await collection.findOneAndReplace({ done: true }, { done: true, title: 'done' })
+    await collection.findOneAndDelete({ done: true })
+    await collection.aggregate([{ $match: { done: true } }])
+    await collection.count({ done: true })
+    await collection.insertMany([{ title: 'A' }, { title: 'B' }])
+    await collection.deleteMany({ done: true })
+
+    const calls = (global.fetch as jest.Mock).mock.calls
+    const lastBody = JSON.parse(calls[calls.length - 1][1].body)
+    expect(lastBody.service).toBe('my-service')
+    expect(lastBody.name).toBe('deleteMany')
+  })
 })
