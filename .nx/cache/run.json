@@ -1,18 +1,29 @@
 {
   "run": {
     "command": "nx run-many -t build",
-    "startTime": "2025-04-08T14:42:01.328Z",
-    "endTime": "2025-04-08T14:42:09.462Z",
+    "startTime": "2026-02-18T13:21:04.649Z",
+    "endTime": "2026-02-18T13:21:06.555Z",
     "inner": false
   },
   "tasks": [
     {
+      "taskId": "flowerbase-client:build",
+      "target": "build",
+      "projectName": "flowerbase-client",
+      "hash": "14969267837840804475",
+      "startTime": "2026-02-18T13:21:04.653Z",
+      "endTime": "2026-02-18T13:21:05.402Z",
+      "params": "",
+      "cacheStatus": "cache-miss",
+      "status": 0
+    },
+    {
       "taskId": "flowerbase:build",
       "target": "build",
       "projectName": "flowerbase",
-      "hash": "3084298656420127870",
-      "startTime": "2025-04-08T14:42:01.339Z",
-      "endTime": "2025-04-08T14:42:09.459Z",
+      "hash": "2980540345380768176",
+      "startTime": "2026-02-18T13:21:04.653Z",
+      "endTime": "2026-02-18T13:21:06.555Z",
       "params": "",
       "cacheStatus": "cache-miss",
       "status": 0

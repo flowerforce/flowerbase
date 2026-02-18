@@ -1,0 +1,15 @@
+{
+  "name": "@flowerforce/flowerbase-client",
+  "version": "0.1.0",
+  "description": "Realm-compatible client for Flowerbase",
+  "main": "dist/index.ts",
+  "types": "dist/index.ts",
+  "private": true,
+  "scripts": {
+    "test": "npx jest",
+    "build": "rm -rf dist/ && tsc"
+  },
+  "dependencies": {
+    "bson": "^6.10.4"
+  }
+}
