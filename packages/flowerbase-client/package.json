@@ -20,7 +20,6 @@
       "default": "./dist/index.js"
     }
   },
-  "private": true,
   "scripts": {
     "test": "npx jest",
     "build": "rm -rf dist/ && tsc"

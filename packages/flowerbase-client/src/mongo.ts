@@ -1,7 +1,7 @@
-import { EJSON } from './bson'
 import type { App } from './app'
-import { createWatchIterator } from './watch'
+import { EJSON } from './bson'
 import { CollectionLike, MongoClientLike } from './types'
+import { createWatchIterator } from './watch'
 
 const serialize = (value: unknown) => EJSON.serialize(value, { relaxed: false })
 const deserialize = <T>(value: T): T => {
