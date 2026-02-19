@@ -4,9 +4,16 @@ import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../constants'
 import { StateManager } from '../state'
 import { hashToken } from '../utils/crypto'
 import { SessionCreatedDto } from './dtos'
-import { AUTH_ENDPOINTS, AUTH_ERRORS } from './utils'
+import { AUTH_ENDPOINTS } from './utils'
 
 const HANDLER_TYPE = 'preHandler'
+const unauthorizedSessionError = {
+  message: 'Unauthorized',
+  error: 'unauthorized',
+  errorCode: 'InvalidSession',
+  error_code: 'InvalidSession'
+} as const
+type UnauthorizedSessionReply = typeof unauthorizedSessionError
 
 /**
  * Controller for handling user authentication, profile retrieval, and session management.
@@ -90,7 +97,7 @@ export async function authController(app: FastifyInstance) {
    * @param {import('fastify').FastifyReply} res - The response object.
    * @returns {Promise<SessionCreatedDto>} A promise resolving with the newly created session data.
    */
-  app.post<{ Reply: SessionCreatedDto }>(
+  app.post<{ Reply: SessionCreatedDto | UnauthorizedSessionReply }>(
     AUTH_ENDPOINTS.SESSION,
     {
       schema: {
@@ -99,12 +106,14 @@ export async function authController(app: FastifyInstance) {
     },
     async function (req, res) {
       if (req.user.typ !== 'refresh') {
-        throw new Error(AUTH_ERRORS.INVALID_TOKEN)
+        res.code(401).send(unauthorizedSessionError)
+        return
       }
 
       const authHeader = req.headers.authorization
       if (!authHeader?.startsWith('Bearer ')) {
-        throw new Error(AUTH_ERRORS.INVALID_TOKEN)
+        res.code(401).send(unauthorizedSessionError)
+        return
       }
       const refreshToken = authHeader.slice('Bearer '.length).trim()
       const refreshTokenHash = hashToken(refreshToken)
@@ -114,7 +123,8 @@ export async function authController(app: FastifyInstance) {
         expiresAt: { $gt: new Date() }
       })
       if (!storedToken) {
-        throw new Error(AUTH_ERRORS.INVALID_TOKEN)
+        res.code(401).send(unauthorizedSessionError)
+        return
       }
 
       const auth_user = await db
@@ -122,7 +132,8 @@ export async function authController(app: FastifyInstance) {
         .findOne({ _id: new this.mongo.ObjectId(req.user.sub) })
 
       if (!auth_user) {
-        throw new Error(`User with ID ${req.user.sub} not found`)
+        res.code(401).send(unauthorizedSessionError)
+        return
       }
 
       const user = userCollection && AUTH_CONFIG.user_id_field
