@@ -1,3 +1,5 @@
+import http from 'node:http'
+import { AddressInfo } from 'node:net'
 import path from 'node:path'
 import { EJSON } from 'bson'
 import { FastifyInstance } from 'fastify'
@@ -555,8 +557,8 @@ const ensureFilteredTriggerCollections = async () => {
   }
 
   await recreateCollection(FILTERED_TRIGGER_EVENTS_COLLECTION)
-    await recreateCollection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
-    await recreateCollection(FILTERED_TRIGGER_ITEMS_COLLECTION, {
+  await recreateCollection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
+  await recreateCollection(FILTERED_TRIGGER_ITEMS_COLLECTION, {
     changeStreamPreAndPostImages: { enabled: true }
   })
 }
@@ -618,6 +620,188 @@ const waitForFilteredUpdateTriggerEvent = async (documentId: string) => {
     await new Promise((resolve) => setTimeout(resolve, 250))
   }
   return null
+}
+
+type WatchEvent = Document & {
+  operationType?: string
+  fullDocument?: Document
+  documentKey?: {
+    _id?: unknown
+  }
+}
+
+type WatchConnection = {
+  nextEvent: (timeoutMs?: number) => Promise<WatchEvent>
+  expectNoEvent: (timeoutMs?: number) => Promise<void>
+  close: () => Promise<void>
+}
+
+const getServerPort = () => {
+  if (!appInstance) {
+    throw new Error('App instance not initialized')
+  }
+  const address = appInstance.server.address()
+  if (!address || typeof address === 'string') {
+    throw new Error('Unable to resolve app server address')
+  }
+  return (address as AddressInfo).port
+}
+
+const openWatchConnection = async ({
+  user,
+  collection,
+  filter
+}: {
+  user: TestUser
+  collection: string
+  filter?: Document
+}): Promise<WatchConnection> => {
+  const token = getTokenFor(user)
+  if (!token) {
+    throw new Error(`Missing token for ${user.id}`)
+  }
+
+  const payload = {
+    name: 'watch',
+    service: 'mongodb-atlas',
+    arguments: [
+      {
+        database: DB_NAME,
+        collection,
+        ...(filter ? { filter } : {})
+      }
+    ]
+  }
+  const encoded = Buffer.from(EJSON.stringify(payload)).toString('base64')
+  const port = getServerPort()
+  const path = `${FUNCTION_CALL_URL}?baas_request=${encodeURIComponent(encoded)}`
+
+  return new Promise<WatchConnection>((resolve, reject) => {
+    const queue: WatchEvent[] = []
+    const waiters: Array<(event: WatchEvent) => void> = []
+    let streamEnded = false
+    let settled = false
+    let buffer = ''
+
+    const emitEvent = (event: WatchEvent) => {
+      const waiter = waiters.shift()
+      if (waiter) {
+        waiter(event)
+        return
+      }
+      queue.push(event)
+    }
+
+    const parseSseChunk = (chunk: string) => {
+      buffer += chunk
+      while (true) {
+        const boundary = buffer.indexOf('\n\n')
+        if (boundary === -1) break
+        const rawEvent = buffer.slice(0, boundary)
+        buffer = buffer.slice(boundary + 2)
+        const lines = rawEvent.split('\n')
+        const dataLines = lines
+          .filter((line) => line.startsWith('data:'))
+          .map((line) => line.slice(5).trim())
+          .filter(Boolean)
+
+        if (!dataLines.length) continue
+        const dataPayload = dataLines.join('\n')
+        try {
+          const parsed = EJSON.deserialize(JSON.parse(dataPayload)) as WatchEvent
+          emitEvent(parsed)
+        } catch {
+          // Ignore malformed SSE payloads in tests.
+        }
+      }
+    }
+
+    const req = http.request(
+      {
+        host: '127.0.0.1',
+        port,
+        method: 'GET',
+        path,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'text/event-stream'
+        }
+      },
+      (response) => {
+        if (response.statusCode !== 200) {
+          if (!settled) {
+            settled = true
+            reject(new Error(`watch failed with status ${response.statusCode}`))
+          }
+          return
+        }
+
+        response.setEncoding('utf8')
+        response.on('data', parseSseChunk)
+        response.on('end', () => {
+          streamEnded = true
+        })
+        response.on('error', (error) => {
+          if (!settled) {
+            settled = true
+            reject(error)
+          }
+        })
+
+        if (!settled) {
+          settled = true
+          resolve({
+            nextEvent: (timeoutMs = 5000) =>
+              new Promise<WatchEvent>((resolveEvent, rejectEvent) => {
+                const immediate = queue.shift()
+                if (immediate) {
+                  resolveEvent(immediate)
+                  return
+                }
+                if (streamEnded) {
+                  rejectEvent(new Error('watch stream ended before receiving an event'))
+                  return
+                }
+                const timer = setTimeout(() => {
+                  const index = waiters.indexOf(waitForEvent)
+                  if (index >= 0) waiters.splice(index, 1)
+                  rejectEvent(new Error(`Timed out waiting for watch event (${timeoutMs}ms)`))
+                }, timeoutMs)
+                const waitForEvent = (event: WatchEvent) => {
+                  clearTimeout(timer)
+                  resolveEvent(event)
+                }
+                waiters.push(waitForEvent)
+              }),
+            expectNoEvent: async (timeoutMs = 800) => {
+              const immediate = queue.shift()
+              if (immediate) {
+                throw new Error(`Unexpected watch event: ${JSON.stringify(immediate)}`)
+              }
+              await new Promise((resolveDelay) => setTimeout(resolveDelay, timeoutMs))
+              const late = queue.shift()
+              if (late) {
+                throw new Error(`Unexpected watch event: ${JSON.stringify(late)}`)
+              }
+            },
+            close: async () => {
+              streamEnded = true
+              req.destroy()
+            }
+          })
+        }
+      }
+    )
+
+    req.on('error', (error) => {
+      if (!settled) {
+        settled = true
+        reject(error)
+      }
+    })
+
+    req.end()
+  })
 }
 
 const isReplicaSetNotInitializedError = (error: unknown) => {
@@ -1372,6 +1556,94 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
     const event = await waitForFilteredUpdateTriggerEvent(documentId.toString())
     expect(event).toBeNull()
+  })
+
+  it('keeps remaining same-user watchers alive when one tab closes', async () => {
+    const first = await openWatchConnection({ user: ownerUser, collection: COUNTERS_COLLECTION })
+    const second = await openWatchConnection({ user: ownerUser, collection: COUNTERS_COLLECTION })
+
+    await first.close()
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    const insertedId = new ObjectId()
+    await client.db(DB_NAME).collection(COUNTERS_COLLECTION).insertOne({
+      _id: insertedId,
+      ownerId: ownerUser.id,
+      workspace: 'workspace-1',
+      value: 501,
+      visibility: { type: 'all' }
+    })
+
+    const event = await second.nextEvent()
+    expect(event.operationType).toBe('insert')
+    expect(String(event.documentKey?._id)).toBe(String(insertedId))
+
+    await second.close()
+  })
+
+  it('keeps other users watchers alive when one user disconnects', async () => {
+    const ownerWatch = await openWatchConnection({ user: ownerUser, collection: COUNTERS_COLLECTION })
+    const adminWatch = await openWatchConnection({ user: adminUser, collection: COUNTERS_COLLECTION })
+
+    await ownerWatch.close()
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    const insertedId = new ObjectId()
+    await client.db(DB_NAME).collection(COUNTERS_COLLECTION).insertOne({
+      _id: insertedId,
+      ownerId: adminUser.id,
+      workspace: 'workspace-1',
+      value: 777,
+      visibility: { type: 'all' }
+    })
+
+    const event = await adminWatch.nextEvent()
+    expect(event.operationType).toBe('insert')
+    expect(String(event.documentKey?._id)).toBe(String(insertedId))
+
+    await adminWatch.close()
+  })
+
+  it('does not under-deliver when a less-privileged user subscribes first', async () => {
+    const guestWatch = await openWatchConnection({ user: guestUser, collection: COUNTERS_COLLECTION })
+    const adminWatch = await openWatchConnection({ user: adminUser, collection: COUNTERS_COLLECTION })
+
+    const insertedId = new ObjectId()
+    await client.db(DB_NAME).collection(COUNTERS_COLLECTION).insertOne({
+      _id: insertedId,
+      ownerId: adminUser.id,
+      workspace: 'workspace-1',
+      value: 888,
+      visibility: { type: 'private' }
+    })
+
+    const adminEvent = await adminWatch.nextEvent()
+    expect(String(adminEvent.documentKey?._id)).toBe(String(insertedId))
+    await guestWatch.expectNoEvent()
+
+    await guestWatch.close()
+    await adminWatch.close()
+  })
+
+  it('does not leak events when a privileged user subscribes first', async () => {
+    const adminWatch = await openWatchConnection({ user: adminUser, collection: COUNTERS_COLLECTION })
+    const guestWatch = await openWatchConnection({ user: guestUser, collection: COUNTERS_COLLECTION })
+
+    const insertedId = new ObjectId()
+    await client.db(DB_NAME).collection(COUNTERS_COLLECTION).insertOne({
+      _id: insertedId,
+      ownerId: adminUser.id,
+      workspace: 'workspace-1',
+      value: 999,
+      visibility: { type: 'private' }
+    })
+
+    const adminEvent = await adminWatch.nextEvent()
+    expect(String(adminEvent.documentKey?._id)).toBe(String(insertedId))
+    await guestWatch.expectNoEvent()
+
+    await adminWatch.close()
+    await guestWatch.close()
   })
   afterAll(async () => {
     await appInstance?.close()
