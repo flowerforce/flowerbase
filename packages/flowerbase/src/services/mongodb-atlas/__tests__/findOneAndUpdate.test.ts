@@ -125,4 +125,66 @@ describe('mongodb-atlas findOneAndUpdate', () => {
       { returnDocument: 'after' }
     )
   })
+
+  it('allows upsert when no document matches', async () => {
+    const id = new ObjectId()
+    const insertedDoc = { _id: id, title: 'Created', userId: 'user-1' }
+    const findOne = jest.fn().mockResolvedValue(null)
+    const findOneAndUpdate = jest.fn().mockResolvedValue(insertedDoc)
+    const collection = {
+      collectionName: 'todos',
+      findOne,
+      findOneAndUpdate
+    }
+
+    const app = createAppWithCollection(collection)
+    const operators = MongoDbAtlas(app as any, {
+      rules: createRules(),
+      user: { id: 'user-1' }
+    })
+      .db('db')
+      .collection('todos')
+
+    const result = await operators.findOneAndUpdate(
+      { _id: id },
+      { $set: { title: 'Created' } },
+      { upsert: true }
+    )
+
+    expect(result).toEqual(insertedDoc)
+    expect(findOneAndUpdate).toHaveBeenCalledWith(
+      { $and: [{ _id: id }] },
+      { $set: { title: 'Created' } },
+      { upsert: true }
+    )
+  })
+
+  it('rejects upsert when insert permission is denied', async () => {
+    const id = new ObjectId()
+    const findOne = jest.fn().mockResolvedValue(null)
+    const findOneAndUpdate = jest.fn()
+    const collection = {
+      collectionName: 'todos',
+      findOne,
+      findOneAndUpdate
+    }
+
+    const app = createAppWithCollection(collection)
+    const operators = MongoDbAtlas(app as any, {
+      rules: createRules({ insert: false }),
+      user: { id: 'user-1' }
+    })
+      .db('db')
+      .collection('todos')
+
+    await expect(
+      operators.findOneAndUpdate(
+        { _id: id },
+        { $set: { title: 'Created' }, $setOnInsert: { createdAt: new Date() } } as any,
+        { upsert: true }
+      )
+    ).rejects.toThrow('Update not permitted')
+
+    expect(findOneAndUpdate).not.toHaveBeenCalled()
+  })
 })
