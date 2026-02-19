@@ -200,6 +200,12 @@ export const functionsController: FunctionController = async (
       changeStream.on('change', (change) => {
         res.raw.write(`data: ${serializeEjson(change)}\n\n`);
       });
+      changeStream.on('error', (error) => {
+        res.raw.write(`event: error\ndata: ${formatFunctionExecutionError(error)}\n\n`)
+        changeStream?.close?.()
+        delete streams[requestKey]
+        res.raw.end()
+      })
 
       req.raw.on('close', () => {
         console.log("change stream closed");
