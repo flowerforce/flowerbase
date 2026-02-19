@@ -48,6 +48,9 @@ const isReturnedError = (value: unknown): value is { message: string; name: stri
   return typeof candidate.message === 'string' && typeof candidate.name === 'string'
 }
 
+const serializeEjson = (value: unknown) =>
+  JSON.stringify(EJSON.serialize(value, { relaxed: false }))
+
 /**
  * > Creates a pre handler for every query
  * @param app -> the fastify instance
@@ -111,7 +114,9 @@ export const functionsController: FunctionController = async (
         pipeline,
         isClient: true
       })
-      return operatorsByType[method as keyof typeof operatorsByType]()
+      const serviceResult = await operatorsByType[method as keyof typeof operatorsByType]()
+      res.type('application/json')
+      return serializeEjson(serviceResult)
     }
 
     const currentFunction = functionsList[method]
@@ -141,7 +146,7 @@ export const functionsController: FunctionController = async (
         return JSON.stringify({ message: result.message, name: result.name })
       }
       res.type('application/json')
-      return JSON.stringify(EJSON.serialize(result, { relaxed: false }));
+      return serializeEjson(result)
     } catch (error) {
       res.status(400)
       res.type('application/json')
@@ -193,7 +198,7 @@ export const functionsController: FunctionController = async (
 
     if (changeStream) {
       changeStream.on('change', (change) => {
-        res.raw.write(`data: ${JSON.stringify(change)}\n\n`);
+        res.raw.write(`data: ${serializeEjson(change)}\n\n`);
       });
 
       req.raw.on('close', () => {
@@ -214,7 +219,7 @@ export const functionsController: FunctionController = async (
 
 
     streams[requestKey].on('change', (change) => {
-      res.raw.write(`data: ${JSON.stringify(change)}\n\n`);
+      res.raw.write(`data: ${serializeEjson(change)}\n\n`);
     });
   })
 }
