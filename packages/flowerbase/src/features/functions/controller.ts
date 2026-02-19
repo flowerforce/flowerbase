@@ -194,32 +194,33 @@ export const functionsController: FunctionController = async (
 
     if (!requestKey) return
 
-    const changeStream = streams[requestKey]
+    try {
+      const stream = await services['mongodb-atlas'](app, {
+        user,
+        rules
+      })
+        .db(database)
+        .collection(collection)
+        .watch([], { fullDocument: 'whenAvailable' });
 
-    if (changeStream) {
-      changeStream.on('change', (change) => {
-        res.raw.write(`data: ${serializeEjson(change)}\n\n`);
+  
+      stream.on('change', (change) => {
+        res.raw.write(`data: ${JSON.stringify(change)}\n\n`);
+      });
+
+      stream.on('error', (error) => {
+        console.error('change stream error', { database, collection, requestKey, error })
+        stream?.close?.();
+        res.raw.end();
       });
 
       req.raw.on('close', () => {
-        console.log("change stream closed");
-        changeStream?.close?.();
-        delete streams[requestKey]
+        console.log('change stream closed', { database, collection, requestKey });
+        stream?.close?.();
       });
-      return
+    } catch (error) {
+      console.error('watch initialization error', { database, collection, requestKey, error })
+      res.raw.end();
     }
-
-    streams[requestKey] = await services['mongodb-atlas'](app, {
-      user,
-      rules
-    })
-      .db(database)
-      .collection(collection)
-      .watch([], { fullDocument: 'whenAvailable' });
-
-
-    streams[requestKey].on('change', (change) => {
-      res.raw.write(`data: ${serializeEjson(change)}\n\n`);
-    });
   })
 }
