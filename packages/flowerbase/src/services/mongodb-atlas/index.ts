@@ -4,6 +4,7 @@ import isEqual from 'lodash/isEqual'
 import set from 'lodash/set'
 import unset from 'lodash/unset'
 import {
+  ChangeStreamOptions,
   ClientSession,
   ClientSessionOptions,
   Collection,
@@ -154,6 +155,54 @@ const toWatchMatchFilter = (value: unknown): unknown => {
     acc[`fullDocument.${key}`] = toWatchMatchFilter(current)
     return acc
   }, {})
+}
+
+type RealmCompatibleWatchOptions = Document & {
+  filter?: MongoFilter<Document>
+  ids?: unknown[]
+}
+
+const resolveWatchArgs = (
+  pipelineOrOptions?: Document[] | RealmCompatibleWatchOptions,
+  options?: RealmCompatibleWatchOptions
+) => {
+  const inputPipeline = Array.isArray(pipelineOrOptions) ? pipelineOrOptions : []
+  const rawOptions = (Array.isArray(pipelineOrOptions) ? options : pipelineOrOptions) ?? {}
+
+  if (!isPlainObject(rawOptions)) {
+    return {
+      pipeline: inputPipeline,
+      options: options as ChangeStreamOptions | undefined,
+      extraMatches: [] as Document[]
+    }
+  }
+
+  const {
+    filter: watchFilter,
+    ids,
+    ...watchOptions
+  } = rawOptions as RealmCompatibleWatchOptions
+
+  const extraMatches: Document[] = []
+  if (typeof watchFilter !== 'undefined') {
+    extraMatches.push({ $match: toWatchMatchFilter(watchFilter) as Document })
+  }
+  if (Array.isArray(ids)) {
+    extraMatches.push({
+      $match: {
+        $or: [
+          { 'documentKey._id': { $in: ids } },
+          { 'fullDocument._id': { $in: ids } }
+        ]
+      }
+    })
+  }
+
+  return {
+    pipeline: inputPipeline,
+    options: watchOptions as ChangeStreamOptions,
+    extraMatches
+  }
 }
 
 const hasAtomicOperators = (data: Document) =>
@@ -946,8 +995,14 @@ const getOperators: GetOperatorsFunction = (
      *
      * This allows fine-grained control over what change events a user can observe, based on roles and filters.
      */
-    watch: (pipeline = [], options) => {
+    watch: (pipelineOrOptions = [], options) => {
       try {
+        const {
+          pipeline,
+          options: watchOptions,
+          extraMatches
+        } = resolveWatchArgs(pipelineOrOptions as Document[] | RealmCompatibleWatchOptions, options as RealmCompatibleWatchOptions)
+
         if (!run_as_system) {
           checkDenyOperation(
             normalizedRules,
@@ -968,9 +1023,9 @@ const getOperators: GetOperatorsFunction = (
               }
             : undefined
 
-          const formattedPipeline = [firstStep, ...pipeline].filter(Boolean) as Document[]
+          const formattedPipeline = [firstStep, ...extraMatches, ...pipeline].filter(Boolean) as Document[]
 
-          const result = collection.watch(formattedPipeline, options)
+          const result = collection.watch(formattedPipeline, watchOptions)
           const originalOn = result.on.bind(result)
 
           /**
@@ -1064,7 +1119,7 @@ const getOperators: GetOperatorsFunction = (
         }
 
         // System mode: no filtering applied
-        const result = collection.watch(pipeline, options)
+        const result = collection.watch([...extraMatches, ...pipeline], watchOptions)
         emitMongoEvent('watch')
         return result
       } catch (error) {
