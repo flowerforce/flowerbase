@@ -140,7 +140,7 @@ describe('jwtAuthentication', () => {
     expect(decoded.id).toBe(authId.toHexString())
     expect(decoded.sub).toBe(authId.toHexString())
     expect(decoded.data._id).toBe(authId.toHexString())
-    expect(decoded.user_data._id).toBe(authId.toHexString())
+    expect(decoded.user_data._id).toBe(linkedId.toHexString())
     expect(decoded.custom_data._id).toBe(linkedId.toHexString())
     expect(decoded.custom_data.role).toBe('owner')
   })
