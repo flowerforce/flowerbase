@@ -1,6 +1,6 @@
 import { EJSON, ObjectId } from 'bson'
 import type { FastifyRequest } from 'fastify'
-import { ChangeStream, Document } from 'mongodb';
+import { Document } from 'mongodb'
 import { services } from '../../services'
 import { StateManager } from '../../state'
 import { GenerateContext } from '../../utils/context'
@@ -62,8 +62,6 @@ export const functionsController: FunctionController = async (
   { functionsList, rules }
 ) => {
   app.addHook('preHandler', app.jwtAuthentication)
-
-  const streams = {} as Record<string, ChangeStream<Document, Document>>
 
   app.post<{ Body: FunctionCallDto }>('/call', {
     schema: {
@@ -190,42 +188,51 @@ export const functionsController: FunctionController = async (
     res.raw.writeHead(200, headers)
     res.raw.flushHeaders();
 
-    const requestKey = baas_request || stitch_request
-
-    if (!requestKey) return
-
-    const changeStream = streams[requestKey]
-
-    if (changeStream) {
-      changeStream.on('change', (change) => {
-        res.raw.write(`data: ${serializeEjson(change)}\n\n`);
-      });
-      changeStream.on('error', (error) => {
-        res.raw.write(`event: error\ndata: ${formatFunctionExecutionError(error)}\n\n`)
-        changeStream?.close?.()
-        delete streams[requestKey]
-        res.raw.end()
-      })
-
-      req.raw.on('close', () => {
-        console.log("change stream closed");
-        changeStream?.close?.();
-        delete streams[requestKey]
-      });
-      return
-    }
-
-    streams[requestKey] = await services['mongodb-atlas'](app, {
+    const changeStream = await services['mongodb-atlas'](app, {
       user,
       rules
     })
       .db(database)
       .collection(collection)
-      .watch([], { fullDocument: 'whenAvailable' });
+      .watch([], { fullDocument: 'whenAvailable' })
 
+    let cleanedUp = false
+    const safeWrite = (chunk: string) => {
+      if (res.raw.writableEnded || res.raw.destroyed) return
+      res.raw.write(chunk)
+    }
 
-    streams[requestKey].on('change', (change) => {
-      res.raw.write(`data: ${serializeEjson(change)}\n\n`);
-    });
+    const cleanup = async () => {
+      if (cleanedUp) return
+      cleanedUp = true
+      changeStream.off('change', onChange)
+      changeStream.off('error', onError)
+      req.raw.off('close', onRequestClose)
+      try {
+        await changeStream.close()
+      } catch {
+        // Ignore close errors on already-closed streams.
+      }
+    }
+
+    const onChange = (change: Document) => {
+      safeWrite(`data: ${serializeEjson(change)}\n\n`)
+    }
+
+    const onError = (error: unknown) => {
+      safeWrite(`event: error\ndata: ${formatFunctionExecutionError(error)}\n\n`)
+      if (!res.raw.writableEnded && !res.raw.destroyed) {
+        res.raw.end()
+      }
+      void cleanup()
+    }
+
+    const onRequestClose = () => {
+      void cleanup()
+    }
+
+    changeStream.on('change', onChange)
+    changeStream.on('error', onError)
+    req.raw.on('close', onRequestClose)
   })
 }
