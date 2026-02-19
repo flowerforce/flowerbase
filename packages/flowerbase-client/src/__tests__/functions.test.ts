@@ -111,6 +111,29 @@ describe('flowerbase-client functions', () => {
     expect(result).toEqual({ result: 7 })
   })
 
+  it('does not treat toJSON as a remote function name', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({
+          access_token: 'access',
+          refresh_token: 'refresh',
+          user_id: 'user-1'
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+    await app.logIn(Credentials.emailPassword('john@doe.com', 'secret123'))
+
+    expect(JSON.stringify(app.currentUser!.functions)).toBe('{}')
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+  })
+
   it('supports functions.callFunctionStreaming', async () => {
     global.fetch = jest
       .fn()

@@ -1,5 +1,15 @@
 import { EJSON } from './bson'
 
+const RESERVED_PROXY_KEYS = new Set([
+  'toJSON',
+  'then',
+  'catch',
+  'finally',
+  'constructor',
+  '__proto__',
+  'prototype'
+])
+
 const deserialize = <T>(value: T): T => {
   if (!value || typeof value !== 'object') return value
   return EJSON.deserialize(value as Record<string, unknown>) as T
@@ -30,6 +40,7 @@ export const createFunctionsProxy = (
     {
       get: (_, key) => {
         if (typeof key !== 'string') return undefined
+        if (RESERVED_PROXY_KEYS.has(key)) return undefined
         if (key === 'callFunction') {
           return (name: string, ...args: unknown[]) => callFunction(name, args)
         }

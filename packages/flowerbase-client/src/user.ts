@@ -5,6 +5,7 @@ import { MongoClientLike, UserLike } from './types'
 
 export class User implements UserLike {
   readonly id: string
+  customData: Record<string, unknown> = {}
   profile?: { email?: string;[key: string]: unknown }
   private readonly app: App
   private _providerType: string | null = null
@@ -22,6 +23,7 @@ export class User implements UserLike {
       (name, args) => this.app.callFunction(name, args, this.id),
       (name, args) => this.app.callFunctionStreaming(name, args, this.id)
     )
+    this.customData = this.resolveCustomDataFromToken()
   }
 
   get state() {
@@ -43,10 +45,10 @@ export class User implements UserLike {
     return this.app.getProfileSnapshot(this.id)?.identities ?? []
   }
 
-  get customData() {
+  private resolveCustomDataFromToken() {
     const payload = this.decodeAccessTokenPayload()
     if (!payload) return {}
-    const fromUserData =
+    return (
       'user_data' in payload && payload.user_data && typeof payload.user_data === 'object'
         ? (payload.user_data as Record<string, unknown>)
         : 'userData' in payload && payload.userData && typeof payload.userData === 'object'
@@ -54,7 +56,7 @@ export class User implements UserLike {
           : 'custom_data' in payload && payload.custom_data && typeof payload.custom_data === 'object'
             ? (payload.custom_data as Record<string, unknown>)
             : {}
-    return fromUserData
+    )
   }
 
   get accessToken() {
@@ -105,14 +107,19 @@ export class User implements UserLike {
   }
 
   async refreshAccessToken() {
-    return this.app.refreshAccessToken(this.id)
+    const accessToken = await this.app.refreshAccessToken(this.id)
+    this.customData = this.resolveCustomDataFromToken()
+    return accessToken
   }
 
   async refreshCustomData(): Promise<Record<string, unknown>> {
     const profile = await this.app.getProfile(this.id)
     this.profile = profile.data
+    this.customData = (profile.custom_data && typeof profile.custom_data === 'object'
+      ? profile.custom_data
+      : this.resolveCustomDataFromToken()) as Record<string, unknown>
     this.notifyListeners()
-    return profile.custom_data || {}
+    return this.customData
   }
 
   mongoClient(serviceName: string): MongoClientLike {
