@@ -49,6 +49,7 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
       const db = fastify.mongo.client.db(DB_NAME)
       const { email, password } = req.body
       const hashedPassword = await hashPassword(password)
+      const now = new Date()
 
       const users = db.collection(authCollection!).find()
 
@@ -65,6 +66,7 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
         email: email,
         password: hashedPassword,
         status: 'confirmed',
+        createdAt: now,
         custom_data: {}
       })
 

@@ -1,3 +1,14 @@
+## 1.7.4 (2026-02-19)
+
+
+### 🩹 Fixes
+
+- serialize result ([#16](https://github.com/flowerforce/flowerbase/pull/16))
+
+- update in findOneAndUpdate ([#17](https://github.com/flowerforce/flowerbase/pull/17))
+
+- profile response ([#18](https://github.com/flowerforce/flowerbase/pull/18))
+
 ## 1.7.3 (2026-02-17)
 
 
