@@ -1011,7 +1011,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
         authorization: `Bearer ${refreshToken}`
       }
     })
-    expect(sessionAfterLogout.statusCode).toBe(500)
+    expect(sessionAfterLogout.statusCode).toBe(401)
   })
 
   it('rejects access tokens issued before logout for protected functions', async () => {
@@ -1125,7 +1125,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
         authorization: `Bearer ${refreshToken}`
       }
     })
-    expect(sessionAfterExpiry.statusCode).toBe(500)
+    expect(sessionAfterExpiry.statusCode).toBe(401)
   })
 
   it('rejects registration with invalid email or password', async () => {
