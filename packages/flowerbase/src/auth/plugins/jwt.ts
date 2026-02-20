@@ -101,24 +101,21 @@ export default fp(async function (fastify, opts: Options) {
 
   fastify.decorate('createAccessToken', function (user: WithId<Document>) {
     const id = user._id.toString()
-    const userData = isRecord(user.user_data) ? { ...user.user_data } : {}
     const customData = isRecord(user.custom_data)
       ? { ...user.custom_data }
-      : { ...userData }
-    const mergedUserData = {
-      ...customData,
-      ...userData,
+      : (isRecord(user.user_data) ? { ...user.user_data } : {})
+    const authData = {
       _id: id,
       id,
-      email: typeof user.email === 'string' ? user.email : userData.email
+      email: typeof user.email === 'string' ? user.email : customData.email
     }
 
     return this.jwt.sign(
       {
         typ: 'access',
         id,
-        data: mergedUserData,
-        user_data: mergedUserData,
+        data: authData,
+        user_data: customData,
         custom_data: customData
       },
       {
