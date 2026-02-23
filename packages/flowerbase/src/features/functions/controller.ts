@@ -61,12 +61,36 @@ type WatchSubscriber = {
   extraFilter?: Document
 }
 
+type WatchUpdateDescription = {
+  updatedFields?: Document
+  removedFields?: string[]
+  truncatedArrays?: Array<{ field: string; newSize: number }>
+}
+
+type WatchChangeEvent = Document & {
+  _id?: unknown
+  operationType?: string
+  ns?: { db?: string; coll?: string }
+  documentKey?: { _id?: unknown }
+  fullDocument?: Document
+  fullDocumentBeforeChange?: Document
+  updateDescription?: WatchUpdateDescription
+  clusterTime?: unknown
+  wallTime?: Date
+}
+
 type SharedWatchStream = {
   database: string
   collection: string
   stream: {
-    on: (event: 'change' | 'error', listener: (payload: any) => void) => void
-    off: (event: 'change' | 'error', listener: (payload: any) => void) => void
+    on: {
+      (event: 'change', listener: (payload: WatchChangeEvent) => void): void
+      (event: 'error', listener: (payload: unknown) => void): void
+    }
+    off: {
+      (event: 'change', listener: (payload: WatchChangeEvent) => void): void
+      (event: 'error', listener: (payload: unknown) => void): void
+    }
     close: () => Promise<void> | void
   }
   subscribers: Map<string, WatchSubscriber>
@@ -262,7 +286,7 @@ export const functionsController: FunctionController = async (
         }
       }
 
-      const onHubChange = async (change: Document) => {
+      const onHubChange = async (change: WatchChangeEvent) => {
         const subscribers = Array.from(currentHub.subscribers.values())
         await Promise.all(subscribers.map(async (subscriber) => {
           const subscriberRes = subscriber.response
@@ -271,9 +295,7 @@ export const functionsController: FunctionController = async (
             return
           }
 
-          const docId =
-            (change as { documentKey?: { _id?: unknown } })?.documentKey?._id ??
-            (change as { fullDocument?: { _id?: unknown } })?.fullDocument?._id
+          const docId = change.documentKey?._id ?? change.fullDocument?._id
           if (typeof docId === 'undefined') return
 
           const readQuery = subscriber.extraFilter
@@ -290,7 +312,7 @@ export const functionsController: FunctionController = async (
               .findOne(readQuery)
 
             if (!isReadableDocumentResult(readableDoc)) return
-            subscriberRes.write(`data: ${serializeEjson(change)}\n\n`)
+            subscriberRes.write(`data: ${serializeEjson({ ...change, fullDocument: readableDoc })}\n\n`)
           } catch (error) {
             subscriberRes.write(`event: error\ndata: ${formatFunctionExecutionError(error)}\n\n`)
             subscriberRes.end()
