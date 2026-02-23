@@ -277,6 +277,17 @@ const handleAuthenticationTrigger = async ({
   changeStream.on('error', (error) => {
     if (shouldIgnoreStreamError(error)) return
     console.error('Authentication trigger change stream error', error)
+    emitTriggerEvent({
+      status: 'error',
+      triggerName,
+      triggerType,
+      functionName,
+      meta: {
+        ...baseMeta,
+        event: 'CHANGE_STREAM'
+      },
+      error
+    })
   })
   changeStream.on('change', async function (change) {
     const operationType = change['operationType' as keyof typeof change] as
@@ -365,13 +376,6 @@ const handleAuthenticationTrigger = async ({
         updateDescription
       }
       try {
-        emitTriggerEvent({
-          status: 'fired',
-          triggerName,
-          triggerType,
-          functionName,
-          meta: { ...baseMeta, event: 'LOGOUT' }
-        })
         await GenerateContext({
           args: [{ user: userData, ...op }],
           app,
@@ -382,6 +386,13 @@ const handleAuthenticationTrigger = async ({
           functionsList,
           services,
           runAsSystem: true
+        })
+        emitTriggerEvent({
+          status: 'fired',
+          triggerName,
+          triggerType,
+          functionName,
+          meta: { ...baseMeta, event: 'LOGOUT' }
         })
       } catch (error) {
         emitTriggerEvent({
@@ -417,13 +428,6 @@ const handleAuthenticationTrigger = async ({
         updateDescription
       }
       try {
-        emitTriggerEvent({
-          status: 'fired',
-          triggerName,
-          triggerType,
-          functionName,
-          meta: { ...baseMeta, event: 'DELETE' }
-        })
         await GenerateContext({
           args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
           app,
@@ -434,6 +438,13 @@ const handleAuthenticationTrigger = async ({
           functionsList,
           services,
           runAsSystem: true
+        })
+        emitTriggerEvent({
+          status: 'fired',
+          triggerName,
+          triggerType,
+          functionName,
+          meta: { ...baseMeta, event: 'DELETE' }
         })
       } catch (error) {
         emitTriggerEvent({
@@ -471,13 +482,6 @@ const handleAuthenticationTrigger = async ({
         updateDescription
       }
       try {
-        emitTriggerEvent({
-          status: 'fired',
-          triggerName,
-          triggerType,
-          functionName,
-          meta: { ...baseMeta, event: 'UPDATE' }
-        })
         await GenerateContext({
           args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
           app,
@@ -488,6 +492,13 @@ const handleAuthenticationTrigger = async ({
           functionsList,
           services,
           runAsSystem: true
+        })
+        emitTriggerEvent({
+          status: 'fired',
+          triggerName,
+          triggerType,
+          functionName,
+          meta: { ...baseMeta, event: 'UPDATE' }
         })
       } catch (error) {
         emitTriggerEvent({
@@ -575,13 +586,6 @@ const handleAuthenticationTrigger = async ({
     }
 
     try {
-      emitTriggerEvent({
-        status: 'fired',
-        triggerName,
-        triggerType,
-        functionName,
-        meta: { ...baseMeta, event: 'CREATE' }
-      })
       await GenerateContext({
         args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
         app,
@@ -592,6 +596,13 @@ const handleAuthenticationTrigger = async ({
         functionsList,
         services,
         runAsSystem: true
+      })
+      emitTriggerEvent({
+        status: 'fired',
+        triggerName,
+        triggerType,
+        functionName,
+        meta: { ...baseMeta, event: 'CREATE' }
       })
     } catch (error) {
       emitTriggerEvent({
