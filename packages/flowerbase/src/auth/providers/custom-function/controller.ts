@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify'
+import { ObjectId } from 'mongodb'
 import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
@@ -30,7 +31,10 @@ export async function customFunctionController(app: FastifyInstance) {
   app.post<LoginDto>(
     AUTH_ENDPOINTS.LOGIN,
     {
-      schema: LOGIN_SCHEMA
+      schema: LOGIN_SCHEMA,
+      errorHandler: (_error, _request, reply) => {
+        reply.code(500).send({ message: 'Internal Server Error' })
+      }
     },
     async function (req, reply) {
       const customFunctionProvider = AUTH_CONFIG.authProviders?.['custom-function']
@@ -54,7 +58,7 @@ export async function customFunctionController(app: FastifyInstance) {
         id
       } = req
 
-      type CustomFunctionAuthResult = { id?: string }
+      type CustomFunctionAuthResult = { id?: string; email?: string }
       const authResult = await GenerateContext({
         args: [
           req.body
@@ -77,16 +81,35 @@ export async function customFunctionController(app: FastifyInstance) {
         }
       }) as CustomFunctionAuthResult
 
-
       if (!authResult.id) {
         reply.code(401).send({ message: 'Unauthorized' })
         return
       }
 
-      const authUser = await db.collection(authCollection!).findOne({ email: authResult.id })
+      const email = authResult?.email || authResult.id
+      let authUser = await db.collection(authCollection!).findOne({ email })
+
       if (!authUser) {
-        reply.code(401).send({ message: 'Unauthorized' })
-        return
+        const authUserId = new ObjectId()
+        await db.collection(authCollection!).insertOne({
+          _id: authUserId,
+          email,
+          status: 'confirmed',
+          createdAt: new Date(),
+          custom_data: {},
+          identities: [
+            {
+              id: authResult.id.toString(),
+              provider_id: authResult.id.toString(),
+              provider_type: 'custom-function',
+              provider_data: { email }
+            }
+          ]
+        })
+        authUser = {
+          _id: authUserId,
+          email
+        }
       }
 
       const user =
@@ -107,6 +130,7 @@ export async function customFunctionController(app: FastifyInstance) {
           ...(user || {})
         }
       }
+
       const refreshToken = this.createRefreshToken(currentUserData)
       const refreshTokenHash = hashToken(refreshToken)
       await db.collection(refreshTokensCollection).insertOne({
@@ -116,12 +140,15 @@ export async function customFunctionController(app: FastifyInstance) {
         expiresAt: new Date(Date.now() + refreshTokenTtlMs),
         revokedAt: null
       })
-      return {
-        access_token: this.createAccessToken(currentUserData),
+      const accessToken = this.createAccessToken(currentUserData)
+
+      const responsePayload = {
+        access_token: accessToken,
         refresh_token: refreshToken,
         device_id: '',
         user_id: authUser._id.toString()
       }
+      reply.code(200).send(responsePayload)
     }
   )
 
