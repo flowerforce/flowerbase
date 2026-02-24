@@ -62,6 +62,7 @@ export const activateTriggers = async ({
 
     for await (const trigger of triggersToActivate) {
       const { content } = trigger
+      if (content.disabled) continue
       const { type, config, event_processors } = content
 
       const functionName: keyof Functions = event_processors.FUNCTION.config.function_name
