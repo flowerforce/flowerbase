@@ -54,6 +54,18 @@ const serializeEjson = (value: unknown) =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
+const isCursorLike = (
+  value: unknown
+): value is { toArray: () => Promise<unknown> | unknown } => {
+  if (!value || typeof value !== 'object') return false
+  return typeof (value as { toArray?: unknown }).toArray === 'function'
+}
+
+const normalizeFunctionResult = async (value: unknown) => {
+  if (!isCursorLike(value)) return value
+  return await value.toArray()
+}
+
 type WatchSubscriber = {
   id: string
   user: Record<string, any>
@@ -177,12 +189,13 @@ export const functionsController: FunctionController = async (
         functionsList,
         services
       })
-      if (isReturnedError(result)) {
+      const normalizedResult = await normalizeFunctionResult(result)
+      if (isReturnedError(normalizedResult)) {
         res.type('application/json')
-        return JSON.stringify({ message: result.message, name: result.name })
+        return JSON.stringify({ message: normalizedResult.message, name: normalizedResult.name })
       }
       res.type('application/json')
-      return serializeEjson(result)
+      return serializeEjson(normalizedResult)
     } catch (error) {
       res.status(400)
       res.type('application/json')
