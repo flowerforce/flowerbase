@@ -371,6 +371,8 @@
                         <select id="collectionMode">
                           <option value="query" selected>query</option>
                           <option value="aggregate">aggregate</option>
+                          <option value="insertOne">insert one</option>
+                          <option value="insertMany">insert many</option>
                         </select>
                       </div>
                       <div class="control-group">
@@ -391,6 +393,20 @@
                         <div class="json-editor">
                           <pre id="collectionAggregateHighlight" class="json-highlight"></pre>
                           <textarea id="collectionAggregate" placeholder='[{ "$match": { "field": "value" } }]'></textarea>
+                        </div>
+                      </div>
+                      <div class="io-column" data-collection-mode="insertOne">
+                        <label for="collectionInsertOne">document</label>
+                        <div class="json-editor">
+                          <pre id="collectionInsertOneHighlight" class="json-highlight"></pre>
+                          <textarea id="collectionInsertOne" placeholder='{ "field": "value" }'></textarea>
+                        </div>
+                      </div>
+                      <div class="io-column" data-collection-mode="insertMany">
+                        <label for="collectionInsertMany">documents</label>
+                        <div class="json-editor">
+                          <pre id="collectionInsertManyHighlight" class="json-highlight"></pre>
+                          <textarea id="collectionInsertMany" placeholder='[{ "field": "value" }]'></textarea>
                         </div>
                       </div>
                     </div>

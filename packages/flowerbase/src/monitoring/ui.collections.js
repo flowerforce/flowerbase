@@ -42,6 +42,10 @@
   dom.collectionQueryHighlight = document.getElementById('collectionQueryHighlight');
   dom.collectionAggregate = document.getElementById('collectionAggregate');
   dom.collectionAggregateHighlight = document.getElementById('collectionAggregateHighlight');
+  dom.collectionInsertOne = document.getElementById('collectionInsertOne');
+  dom.collectionInsertOneHighlight = document.getElementById('collectionInsertOneHighlight');
+  dom.collectionInsertMany = document.getElementById('collectionInsertMany');
+  dom.collectionInsertManyHighlight = document.getElementById('collectionInsertManyHighlight');
   dom.runCollectionQuery = document.getElementById('runCollectionQuery');
   dom.collectionResult = document.getElementById('collectionResult');
   dom.collectionPrev = document.getElementById('collectionPrev');
@@ -71,6 +75,10 @@
     collectionQueryHighlight,
     collectionAggregate,
     collectionAggregateHighlight,
+    collectionInsertOne,
+    collectionInsertOneHighlight,
+    collectionInsertMany,
+    collectionInsertManyHighlight,
     runCollectionQuery,
     collectionResult,
     collectionPrev,
@@ -235,6 +243,22 @@
     collectionAggregateHighlight.innerHTML = highlightJson(text || '');
     collectionAggregateHighlight.scrollTop = collectionAggregate.scrollTop;
     collectionAggregateHighlight.scrollLeft = collectionAggregate.scrollLeft;
+  };
+
+  const updateCollectionInsertOneHighlight = () => {
+    if (!collectionInsertOne || !collectionInsertOneHighlight) return;
+    const text = collectionInsertOne.value || '';
+    collectionInsertOneHighlight.innerHTML = highlightJson(text || '');
+    collectionInsertOneHighlight.scrollTop = collectionInsertOne.scrollTop;
+    collectionInsertOneHighlight.scrollLeft = collectionInsertOne.scrollLeft;
+  };
+
+  const updateCollectionInsertManyHighlight = () => {
+    if (!collectionInsertMany || !collectionInsertManyHighlight) return;
+    const text = collectionInsertMany.value || '';
+    collectionInsertManyHighlight.innerHTML = highlightJson(text || '');
+    collectionInsertManyHighlight.scrollTop = collectionInsertMany.scrollTop;
+    collectionInsertManyHighlight.scrollLeft = collectionInsertMany.scrollLeft;
   };
 
   const formatCellValue = (value) => {
@@ -483,6 +507,14 @@
       collectionAggregate.value = entry.pipeline ? JSON.stringify(entry.pipeline, null, 2) : '';
       updateCollectionAggregateHighlight();
     }
+    if (collectionInsertOne) {
+      collectionInsertOne.value = entry.document ? JSON.stringify(entry.document, null, 2) : '';
+      updateCollectionInsertOneHighlight();
+    }
+    if (collectionInsertMany) {
+      collectionInsertMany.value = entry.documents ? JSON.stringify(entry.documents, null, 2) : '';
+      updateCollectionInsertManyHighlight();
+    }
     if (entry.user && entry.user.id) {
       if (collectionUserInput) collectionUserInput.value = entry.user.id;
       setSelectedCollectionUser({
@@ -549,14 +581,16 @@
       setCollectionResult('Select a collection first', false);
       return;
     }
-    const keepPage = options && options.keepPage;
+    const mode = collectionMode ? collectionMode.value : 'query';
+    const supportsPaging = mode === 'query' || mode === 'aggregate';
+    const keepPage = supportsPaging && options && options.keepPage;
     const recordHistory = !keepPage;
     if (!keepPage) {
       state.collectionPage = 1;
     }
-    const shouldRefreshTotals = !keepPage || !state.collectionTotal;
+    const shouldRefreshTotals = supportsPaging && (!keepPage || !state.collectionTotal);
     state.collectionHasMore = false;
-    if (shouldRefreshTotals) {
+    if (shouldRefreshTotals || !supportsPaging) {
       state.collectionTotal = 0;
     }
     state.collectionLoading = true;
@@ -568,11 +602,10 @@
     const userId = selectedUser
       ? String(selectedUser.id || (selectedUser.auth && selectedUser.auth._id) || '')
       : fallbackUserId;
-    const mode = collectionMode ? collectionMode.value : 'query';
     try {
-      const sortRaw = collectionSort ? collectionSort.value.trim() : '';
-      const sort = parseJsonObject(sortRaw, 'Sort');
       if (mode === 'aggregate') {
+        const sortRaw = collectionSort ? collectionSort.value.trim() : '';
+        const sort = parseJsonObject(sortRaw, 'Sort');
         const raw = collectionAggregate ? collectionAggregate.value.trim() : '';
         const pipeline = raw ? JSON.parse(raw) : [];
         if (!Array.isArray(pipeline)) {
@@ -607,7 +640,58 @@
         updateCollectionPager();
         setCollectionTab('query');
         setCollectionResult(data, true);
+      } else if (mode === 'insertOne') {
+        const raw = collectionInsertOne ? collectionInsertOne.value.trim() : '';
+        const document = parseJsonObject(raw, 'Document');
+        if (!document) {
+          throw new Error('Document is required for insert one');
+        }
+        const data = await api('/collections/insert', {
+          method: 'POST',
+          body: JSON.stringify({
+            collection: name,
+            mode,
+            document,
+            runAsSystem,
+            userId: userId || undefined,
+            recordHistory
+          })
+        });
+        state.collectionHasMore = false;
+        state.collectionPage = 1;
+        state.collectionTotal = typeof data.count === 'number' ? data.count : 1;
+        updateCollectionPager();
+        setCollectionTab('query');
+        setCollectionResult(data, true);
+      } else if (mode === 'insertMany') {
+        const raw = collectionInsertMany ? collectionInsertMany.value.trim() : '';
+        const documents = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(documents)) {
+          throw new Error('Documents must be a JSON array for insert many');
+        }
+        if (!documents.length) {
+          throw new Error('Documents are required for insert many');
+        }
+        const data = await api('/collections/insert', {
+          method: 'POST',
+          body: JSON.stringify({
+            collection: name,
+            mode,
+            documents,
+            runAsSystem,
+            userId: userId || undefined,
+            recordHistory
+          })
+        });
+        state.collectionHasMore = false;
+        state.collectionPage = 1;
+        state.collectionTotal = typeof data.count === 'number' ? data.count : documents.length;
+        updateCollectionPager();
+        setCollectionTab('query');
+        setCollectionResult(data, true);
       } else {
+        const sortRaw = collectionSort ? collectionSort.value.trim() : '';
+        const sort = parseJsonObject(sortRaw, 'Sort');
         const raw = collectionQuery ? collectionQuery.value.trim() : '';
         const query = parseJsonObject(raw, 'Query') || {};
         const data = await api('/collections/query', {
@@ -806,6 +890,14 @@
       collectionAggregate.addEventListener('input', updateCollectionAggregateHighlight);
       collectionAggregate.addEventListener('scroll', updateCollectionAggregateHighlight);
     }
+    if (collectionInsertOne) {
+      collectionInsertOne.addEventListener('input', updateCollectionInsertOneHighlight);
+      collectionInsertOne.addEventListener('scroll', updateCollectionInsertOneHighlight);
+    }
+    if (collectionInsertMany) {
+      collectionInsertMany.addEventListener('input', updateCollectionInsertManyHighlight);
+      collectionInsertMany.addEventListener('scroll', updateCollectionInsertManyHighlight);
+    }
 
     if (collectionList) {
       collectionList.addEventListener('click', (event) => {
@@ -916,6 +1008,8 @@
     setCollectionResultView('json');
     updateCollectionQueryHighlight();
     updateCollectionAggregateHighlight();
+    updateCollectionInsertOneHighlight();
+    updateCollectionInsertManyHighlight();
     setRulesTabEnabled(false);
   };
 
