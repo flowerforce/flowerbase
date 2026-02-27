@@ -15,12 +15,7 @@ export const STEP_C_STATES: States = {
       stepName: 'evaluateTopLevelRead'
     })
     const check = await evaluateTopLevelReadFn(context)
-    if (check) {
-      return checkFieldsPropertyExists(context)
-        ? next('checkFieldsProperty')
-        : endValidation({ success: true })
-    }
-    return next('evaluateTopLevelWrite', { check })
+    return next('evaluateTopLevelWrite', { readCheck: check })
   },
   evaluateTopLevelWrite: async ({ context, next, endValidation }) => {
     logMachineInfo({
@@ -29,11 +24,12 @@ export const STEP_C_STATES: States = {
       step: 2,
       stepName: 'evaluateTopLevelWrite'
     })
-    const check = await evaluateTopLevelWriteFn(context)
-    if (check) return endValidation({ success: true })
-    return context?.prevParams?.check === false
-      ? endValidation({ success: false })
-      : next('checkFieldsProperty')
+    const writeCheck = await evaluateTopLevelWriteFn(context)
+    const readCheck = context?.prevParams?.readCheck === true
+    if (!readCheck && !writeCheck) return endValidation({ success: false })
+    return checkFieldsPropertyExists(context)
+      ? next('checkFieldsProperty')
+      : endValidation({ success: true })
   },
   checkFieldsProperty: async ({ context, goToNextValidationStage }) => {
     logMachineInfo({
@@ -42,9 +38,6 @@ export const STEP_C_STATES: States = {
       step: 3,
       stepName: 'checkFieldsProperty'
     })
-    const check = checkFieldsPropertyExists(context)
-    return goToNextValidationStage(
-      check ? 'checkIsValidFieldName' : 'checkAdditionalFields'
-    )
+    return goToNextValidationStage('checkIsValidFieldName')
   }
 }

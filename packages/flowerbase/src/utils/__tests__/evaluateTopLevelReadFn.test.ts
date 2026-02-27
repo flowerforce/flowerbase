@@ -17,7 +17,7 @@ describe('evaluateTopLevelReadFn', () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
-  it('should return false if type is different from read', async () => {
+  it('should return false if type is neither read nor search', async () => {
     const isValid = await evaluateTopLevelReadFn({
       role: mockedRole,
       user: mockUser,
@@ -31,6 +31,15 @@ describe('evaluateTopLevelReadFn', () => {
       role: mockedRole,
       user: mockUser,
       params: mockParams
+    })
+    expect(isValid).toBe(undefined)
+    expect(evaluateExpression).not.toHaveBeenCalled()
+  })
+  it('should return undefined if type is search and role read is not defined', async () => {
+    const isValid = await evaluateTopLevelReadFn({
+      role: mockedRole,
+      user: mockUser,
+      params: { type: 'search' } as Params
     })
     expect(isValid).toBe(undefined)
     expect(evaluateExpression).not.toHaveBeenCalled()

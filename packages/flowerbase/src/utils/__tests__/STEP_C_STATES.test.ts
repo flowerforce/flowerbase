@@ -22,7 +22,7 @@ describe('STEP_C_STATES', () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
-  it('evaluateTopLevelRead should go to evaluateTopLevelWrite if evaluateTopLevelReadFn returns false ', async () => {
+  it('evaluateTopLevelRead should pass readCheck=false to evaluateTopLevelWrite', async () => {
     const mockedLogInfo = jest
       .spyOn(Utils, 'logMachineInfo')
       .mockImplementation(() => 'Mocked Value')
@@ -35,7 +35,7 @@ describe('STEP_C_STATES', () => {
       next,
       initialStep: null
     })
-    expect(next).toHaveBeenCalledWith('evaluateTopLevelWrite', { check: false })
+    expect(next).toHaveBeenCalledWith('evaluateTopLevelWrite', { readCheck: false })
     expect(mockedLogInfo).toHaveBeenCalledWith({
       enabled: mockContext.enableLog,
       machine: 'C',
@@ -44,7 +44,7 @@ describe('STEP_C_STATES', () => {
     })
     mockedLogInfo.mockRestore()
   })
-  it('evaluateTopLevelRead should go to evaluateTopLevelWrite if evaluateTopLevelReadFn returns undefined ', async () => {
+  it('evaluateTopLevelRead should pass readCheck=undefined to evaluateTopLevelWrite', async () => {
     (evaluateTopLevelReadFn as jest.Mock).mockReturnValueOnce(undefined)
     const mockContext = {} as MachineContext
     await evaluateTopLevelRead({
@@ -54,9 +54,9 @@ describe('STEP_C_STATES', () => {
       next,
       initialStep: null
     })
-    expect(next).toHaveBeenCalledWith('evaluateTopLevelWrite', { check: undefined })
+    expect(next).toHaveBeenCalledWith('evaluateTopLevelWrite', { readCheck: undefined })
   })
-  it('evaluateTopLevelRead should endValidation validation if evaluateTopLevelReadFn returns true ', async () => {
+  it('evaluateTopLevelRead should pass readCheck=true to evaluateTopLevelWrite', async () => {
     (evaluateTopLevelReadFn as jest.Mock).mockReturnValueOnce(true)
     const mockContext = {} as MachineContext
     await evaluateTopLevelRead({
@@ -66,13 +66,12 @@ describe('STEP_C_STATES', () => {
       next,
       initialStep: null
     })
-    expect(endValidation).toHaveBeenCalledWith({ success: true })
+    expect(next).toHaveBeenCalledWith('evaluateTopLevelWrite', { readCheck: true })
   })
-  it('checkFieldsProperty should go to next validation stage if checkFieldsPropertyExists returns true with initialStep checkIsValidFieldName', async () => {
+  it('checkFieldsProperty should go to next validation stage with initialStep checkIsValidFieldName', async () => {
     const mockedLogInfo = jest
       .spyOn(Utils, 'logMachineInfo')
       .mockImplementation(() => 'Mocked Value')
-    ;(checkFieldsPropertyExists as jest.Mock).mockReturnValue(true)
     const mockContext = {} as MachineContext
     await checkFieldsProperty({
       endValidation,
@@ -90,24 +89,13 @@ describe('STEP_C_STATES', () => {
     })
     mockedLogInfo.mockRestore()
   })
-  it('checkFieldsProperty should go to next validation stage if checkFieldsPropertyExists returns fslse with initialStep checkAdditionalFields', async () => {
-    (checkFieldsPropertyExists as jest.Mock).mockReturnValue(false)
-    const mockContext = {} as MachineContext
-    await checkFieldsProperty({
-      endValidation,
-      context: mockContext,
-      goToNextValidationStage,
-      next,
-      initialStep: null
-    })
-    expect(goToNextValidationStage).toHaveBeenCalledWith('checkAdditionalFields')
-  })
-  it('evaluateTopLevelWrite should end a success validation if evaluateTopLevelWriteFn returns true', async () => {
+  it('evaluateTopLevelWrite should end a success validation when write is true and no field rules exist', async () => {
     const mockedLogInfo = jest
       .spyOn(Utils, 'logMachineInfo')
       .mockImplementation(() => 'Mocked Value')
     ;(evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(true)
-    const mockContext = {} as MachineContext
+    ;(checkFieldsPropertyExists as jest.Mock).mockReturnValue(false)
+    const mockContext = { prevParams: { readCheck: false } } as unknown as MachineContext
     await evaluateTopLevelWrite({
       endValidation,
       context: mockContext,
@@ -124,11 +112,24 @@ describe('STEP_C_STATES', () => {
     })
     mockedLogInfo.mockRestore()
   })
-  it('evaluateTopLevelWrite should end a failed validation if evaluateTopLevelWriteFn returns false and prevParams.check is false', async () => {
+  it('evaluateTopLevelWrite should go to checkFieldsProperty when write is true and field rules exist', async () => {
+    ;(evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(true)
+    ;(checkFieldsPropertyExists as jest.Mock).mockReturnValue(true)
+    const mockContext = { prevParams: { readCheck: false } } as unknown as MachineContext
+    await evaluateTopLevelWrite({
+      endValidation,
+      context: mockContext,
+      goToNextValidationStage,
+      next,
+      initialStep: null
+    })
+    expect(next).toHaveBeenCalledWith('checkFieldsProperty')
+  })
+  it('evaluateTopLevelWrite should end a failed validation if both read and write are not true', async () => {
     (evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(false)
     const mockContext = {
       prevParams: {
-        check: false
+        readCheck: undefined
       }
     } as unknown as MachineContext
     await evaluateTopLevelWrite({
@@ -140,11 +141,12 @@ describe('STEP_C_STATES', () => {
     })
     expect(endValidation).toHaveBeenCalledWith({ success: false })
   })
-  it('evaluateTopLevelWrite should go to next step checkFieldsProperty if evaluateTopLevelWriteFn returns false and prevParams.check is not false ', async () => {
+  it('evaluateTopLevelWrite should allow through readCheck=true even if write=false', async () => {
     (evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(false)
+    ;(checkFieldsPropertyExists as jest.Mock).mockReturnValue(false)
     const mockContext = {
       prevParams: {
-        check: true
+        readCheck: true
       }
     } as unknown as MachineContext
     await evaluateTopLevelWrite({
@@ -154,6 +156,6 @@ describe('STEP_C_STATES', () => {
       next,
       initialStep: null
     })
-    expect(next).toHaveBeenCalledWith('checkFieldsProperty')
+    expect(endValidation).toHaveBeenCalledWith({ success: true })
   })
 })

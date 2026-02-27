@@ -33,6 +33,6 @@ export const evaluateTopLevelPermissionsFn = async (
 
 export const checkFieldsPropertyExists = ({ role }: MachineContext) => {
   const hasFields = !!Object.keys(role?.fields ?? {}).length
-  const hasAdditional = !!Object.keys(role?.additional_fields ?? {}).length
+  const hasAdditional = typeof role?.additional_fields !== 'undefined'
   return hasFields || hasAdditional
 }

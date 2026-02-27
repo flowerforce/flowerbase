@@ -36,13 +36,15 @@ export const STEP_B_STATES: States = {
       stepName: 'evaluateTopLevelWrite'
     })
     const check = await evaluateTopLevelPermissionsFn(context, 'write')
-    if (check)
-      return context.params.type === 'insert'
-        ? next('evaluateTopLevelInsert')
+    if (check) {
+      return checkFieldsPropertyExists(context)
+        ? next('checkFieldsProperty')
         : endValidation({ success: true })
-    return check === false
-      ? endValidation({ success: false })
-      : next('checkFieldsProperty')
+    }
+    if (check === false) {
+      return endValidation({ success: false })
+    }
+    return next('evaluateTopLevelInsert')
   },
   checkFieldsProperty: async ({ context, goToNextValidationStage }) => {
     logMachineInfo({
@@ -56,7 +58,7 @@ export const STEP_B_STATES: States = {
       check ? 'checkIsValidFieldName' : 'checkAdditionalFields'
     )
   },
-  evaluateTopLevelInsert: async ({ context, endValidation }) => {
+  evaluateTopLevelInsert: async ({ context, next, endValidation }) => {
     logMachineInfo({
       enabled: context.enableLog,
       machine: 'B',
@@ -64,6 +66,11 @@ export const STEP_B_STATES: States = {
       stepName: 'evaluateTopLevelInsert'
     })
     const check = await evaluateTopLevelPermissionsFn(context, 'insert')
-    return endValidation({ success: !!check })
+    if (!check) {
+      return endValidation({ success: false })
+    }
+    return checkFieldsPropertyExists(context)
+      ? next('checkFieldsProperty')
+      : endValidation({ success: true })
   }
 }

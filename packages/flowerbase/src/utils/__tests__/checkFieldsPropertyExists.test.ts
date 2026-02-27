@@ -44,4 +44,17 @@ describe('checkFieldsPropertyExists', () => {
     })
     expect(isValid).toBe(true)
   })
+  it('should return true if additional_fields is defined (even empty)', () => {
+    const isValid = checkFieldsPropertyExists({
+      role: {
+        fields: {},
+        additional_fields: {},
+        apply_when: {},
+        name: 'test'
+      } as Role,
+      user: mockUser,
+      params: mockParams
+    })
+    expect(isValid).toBe(true)
+  })
 })
