@@ -37,14 +37,12 @@ export const STEP_B_STATES: States = {
     })
     const check = await evaluateTopLevelPermissionsFn(context, 'write')
     if (check) {
-      return checkFieldsPropertyExists(context)
-        ? next('checkFieldsProperty')
-        : endValidation({ success: true })
+      return next('evaluateTopLevelInsert')
     }
     if (check === false) {
       return endValidation({ success: false })
     }
-    return next('evaluateTopLevelInsert')
+    return next('checkFieldsProperty')
   },
   checkFieldsProperty: async ({ context, goToNextValidationStage }) => {
     logMachineInfo({
@@ -69,8 +67,6 @@ export const STEP_B_STATES: States = {
     if (!check) {
       return endValidation({ success: false })
     }
-    return checkFieldsPropertyExists(context)
-      ? next('checkFieldsProperty')
-      : endValidation({ success: true })
+    return endValidation({ success: true })
   }
 }

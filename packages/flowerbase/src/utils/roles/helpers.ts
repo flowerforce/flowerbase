@@ -8,17 +8,30 @@ import { MachineContext } from './machines/interface'
 
 const functionsConditions = ['%%true', '%%false']
 
+const normalizeUserRole = (user?: MachineContext['user']) => {
+  if (!user) return user
+  if (typeof user !== 'object') return user
+  const candidate = user as Record<string, unknown>
+  if (typeof candidate.role === 'string') return user
+  const customRole =
+    typeof candidate.custom_data === 'object' && candidate.custom_data !== null
+      ? (candidate.custom_data as Record<string, unknown>).role
+      : undefined
+  return typeof customRole === 'string' ? ({ ...candidate, role: customRole } as MachineContext['user']) : user
+}
+
 export const evaluateExpression = async (
   params: MachineContext['params'],
   expression?: PermissionExpression,
   user?: MachineContext['user']
 ): Promise<boolean> => {
   if (!expression || typeof expression === 'boolean') return !!expression
+  const normalizedUser = normalizeUserRole(user)
 
   const value = {
     ...params.expansions,
     ...params.cursor,
-    '%%user': user,
+    '%%user': normalizedUser,
     '%%true': true
   }
   const conditions = expandQuery(expression, value)
@@ -26,7 +39,7 @@ export const evaluateExpression = async (
     functionsConditions.includes(key)
   )
   return complexCondition
-    ? await evaluateComplexExpression(complexCondition, params, user)
+    ? await evaluateComplexExpression(complexCondition, params, normalizedUser)
     : rulesMatcherUtils.checkRule(conditions, value, {})
 }
 
@@ -36,6 +49,7 @@ const evaluateComplexExpression = async (
   user: MachineContext['user']
 ): Promise<boolean> => {
   const [key, config] = condition
+  const normalizedUser = normalizeUserRole(user)
 
   const functionConfig = config['%function']
   const { name, arguments: fnArguments } = functionConfig
@@ -47,7 +61,7 @@ const evaluateComplexExpression = async (
     ...params.expansions,
     ...params.cursor,
     '%%root': params.cursor,
-    '%%user': user,
+    '%%user': normalizedUser,
     '%%true': true,
     '%%false': false
   }
@@ -62,7 +76,7 @@ const evaluateComplexExpression = async (
     args: expandedArguments,
     app,
     rules: StateManager.select("rules"),
-    user,
+    user: normalizedUser,
     currentFunction,
     functionName: name,
     functionsList,

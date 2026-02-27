@@ -54,7 +54,10 @@ export const hasAdditionalFieldsDefined = (role?: Role) =>
 
 export const filterDocumentByFieldPermissions = async (
   context: Pick<MachineContext, 'params' | 'role' | 'user'>,
-  mode: 'read' | 'write'
+  mode: 'read' | 'write',
+  options?: {
+    defaultAllow?: boolean
+  }
 ): Promise<Document> => {
   const source = context.params?.cursor
   if (!isObject(source)) return {}
@@ -66,12 +69,13 @@ export const filterDocumentByFieldPermissions = async (
   for (const [key, value] of Object.entries(source)) {
     const fieldPermission = fields[key]
     const permission = fieldPermission ?? getAdditionalFieldPermission(additionalFields, key)
-    if (!permission) continue
-
-    const allowed =
-      mode === 'read'
-        ? await canReadField(context, permission)
-        : await canWriteField(context, permission)
+    let allowed = options?.defaultAllow === true
+    if (permission) {
+      allowed =
+        mode === 'read'
+          ? await canReadField(context, permission)
+          : await canWriteField(context, permission)
+    }
 
     if (allowed) {
       document[key] = value

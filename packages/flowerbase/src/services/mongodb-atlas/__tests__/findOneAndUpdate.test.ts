@@ -171,7 +171,7 @@ describe('mongodb-atlas findOneAndUpdate', () => {
 
     const app = createAppWithCollection(collection)
     const operators = MongoDbAtlas(app as any, {
-      rules: createRules({ insert: false }),
+      rules: createRules({ write: undefined, insert: false }),
       user: { id: 'user-1' }
     })
       .db('db')

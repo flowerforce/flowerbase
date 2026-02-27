@@ -89,13 +89,13 @@ describe('STEP_C_STATES', () => {
     })
     mockedLogInfo.mockRestore()
   })
-  it('evaluateTopLevelWrite should end a success validation when write is true and no field rules exist', async () => {
+  it('evaluateTopLevelWrite should end a success validation when read is true', async () => {
     const mockedLogInfo = jest
       .spyOn(Utils, 'logMachineInfo')
       .mockImplementation(() => 'Mocked Value')
-    ;(evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(true)
+    ;(evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(false)
     ;(checkFieldsPropertyExists as jest.Mock).mockReturnValue(false)
-    const mockContext = { prevParams: { readCheck: false } } as unknown as MachineContext
+    const mockContext = { prevParams: { readCheck: true } } as unknown as MachineContext
     await evaluateTopLevelWrite({
       endValidation,
       context: mockContext,
@@ -112,10 +112,58 @@ describe('STEP_C_STATES', () => {
     })
     mockedLogInfo.mockRestore()
   })
-  it('evaluateTopLevelWrite should go to checkFieldsProperty when write is true and field rules exist', async () => {
+  it('evaluateTopLevelWrite should end a success validation when read is false and write is true', async () => {
     ;(evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(true)
-    ;(checkFieldsPropertyExists as jest.Mock).mockReturnValue(true)
     const mockContext = { prevParams: { readCheck: false } } as unknown as MachineContext
+    await evaluateTopLevelWrite({
+      endValidation,
+      context: mockContext,
+      goToNextValidationStage,
+      next,
+      initialStep: null
+    })
+    expect(endValidation).toHaveBeenCalledWith({ success: true })
+  })
+  it('evaluateTopLevelWrite should end a failed validation when read is false and write is not true', async () => {
+    (evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(false)
+    const mockContext = {
+      prevParams: {
+        readCheck: false
+      }
+    } as unknown as MachineContext
+    await evaluateTopLevelWrite({
+      endValidation,
+      context: mockContext,
+      goToNextValidationStage,
+      next,
+      initialStep: null
+    })
+    expect(endValidation).toHaveBeenCalledWith({ success: false })
+  })
+  it('evaluateTopLevelWrite should end a success validation when read is undefined and write is true', async () => {
+    ;(evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(true)
+    const mockContext = {
+      prevParams: {
+        readCheck: undefined
+      }
+    } as unknown as MachineContext
+    await evaluateTopLevelWrite({
+      endValidation,
+      context: mockContext,
+      goToNextValidationStage,
+      next,
+      initialStep: null
+    })
+    expect(endValidation).toHaveBeenCalledWith({ success: true })
+  })
+  it('evaluateTopLevelWrite should go to checkFieldsProperty when read and write are undefined/false but fields exist', async () => {
+    (evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(false)
+    ;(checkFieldsPropertyExists as jest.Mock).mockReturnValue(true)
+    const mockContext = {
+      prevParams: {
+        readCheck: undefined
+      }
+    } as unknown as MachineContext
     await evaluateTopLevelWrite({
       endValidation,
       context: mockContext,
@@ -125,8 +173,9 @@ describe('STEP_C_STATES', () => {
     })
     expect(next).toHaveBeenCalledWith('checkFieldsProperty')
   })
-  it('evaluateTopLevelWrite should end a failed validation if both read and write are not true', async () => {
-    (evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(false)
+  it('evaluateTopLevelWrite should end a failed validation when read and write are undefined/false and no field rules exist', async () => {
+    ;(evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(undefined)
+    ;(checkFieldsPropertyExists as jest.Mock).mockReturnValue(false)
     const mockContext = {
       prevParams: {
         readCheck: undefined
@@ -140,22 +189,5 @@ describe('STEP_C_STATES', () => {
       initialStep: null
     })
     expect(endValidation).toHaveBeenCalledWith({ success: false })
-  })
-  it('evaluateTopLevelWrite should allow through readCheck=true even if write=false', async () => {
-    (evaluateTopLevelWriteFn as jest.Mock).mockReturnValue(false)
-    ;(checkFieldsPropertyExists as jest.Mock).mockReturnValue(false)
-    const mockContext = {
-      prevParams: {
-        readCheck: true
-      }
-    } as unknown as MachineContext
-    await evaluateTopLevelWrite({
-      endValidation,
-      context: mockContext,
-      goToNextValidationStage,
-      next,
-      initialStep: null
-    })
-    expect(endValidation).toHaveBeenCalledWith({ success: true })
   })
 })

@@ -1,13 +1,13 @@
+import { States } from '../../interface'
+import { logMachineInfo } from '../../utils'
 import {
   checkFieldsPropertyExists,
   evaluateTopLevelReadFn,
   evaluateTopLevelWriteFn
 } from './validators'
-import { States } from '../../interface'
-import { logMachineInfo } from '../../utils'
 
 export const STEP_C_STATES: States = {
-  evaluateTopLevelRead: async ({ context, next, endValidation }) => {
+  evaluateTopLevelRead: async ({ context, next }) => {
     logMachineInfo({
       enabled: context.enableLog,
       machine: 'C',
@@ -25,11 +25,18 @@ export const STEP_C_STATES: States = {
       stepName: 'evaluateTopLevelWrite'
     })
     const writeCheck = await evaluateTopLevelWriteFn(context)
-    const readCheck = context?.prevParams?.readCheck === true
-    if (!readCheck && !writeCheck) return endValidation({ success: false })
+    const readCheck = context?.prevParams?.readCheck
+
+    if (readCheck === true || writeCheck === true) {
+      return checkFieldsPropertyExists(context)
+        ? next('checkFieldsProperty')
+        : endValidation({ success: true })
+    }
+
+    if (readCheck === false) return endValidation({ success: false })
     return checkFieldsPropertyExists(context)
       ? next('checkFieldsProperty')
-      : endValidation({ success: true })
+      : endValidation({ success: false })
   },
   checkFieldsProperty: async ({ context, goToNextValidationStage }) => {
     logMachineInfo({

@@ -21,8 +21,8 @@ describe('activateTriggers', () => {
 
   it('skips triggers marked as disabled', async () => {
     const functionsList = {
-      runEnabled: jest.fn(),
-      runDisabled: jest.fn()
+      runEnabled: { code: 'exports = async () => {}' },
+      runDisabled: { code: 'exports = async () => {}' }
     }
 
     await activateTriggers({
