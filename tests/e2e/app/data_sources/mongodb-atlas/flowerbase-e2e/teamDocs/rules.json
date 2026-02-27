@@ -1,0 +1,34 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "teamDocs",
+  "filters": [
+    {
+      "name": "ownerOnly",
+      "apply_when": {},
+      "query": {
+        "ownerId": "%%user.id"
+      }
+    }
+  ],
+  "roles": [
+    {
+      "name": "collaborator",
+      "apply_when": {
+        "%%user.custom_data.accountRole": "collaborator"
+      },
+      "fields": {
+        "roles": {
+          "read": true
+        }
+      },
+      "additional_fields": {
+        "read": false,
+        "write": false
+      },
+      "search": false,
+      "write": false,
+      "insert": false,
+      "delete": false
+    }
+  ]
+}

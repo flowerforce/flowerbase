@@ -1,3 +1,4 @@
+import { evaluateTopLevelPermissionsFn } from '../../commonValidators'
 import { States } from '../../interface'
 import { logMachineInfo } from '../../utils'
 
@@ -14,14 +15,14 @@ export const STEP_A_STATES: States = {
     }
     return goToNextValidationStage()
   },
-  evaluateSearch: async ({ context, endValidation }) => {
+  evaluateSearch: async ({ context, endValidation, goToNextValidationStage }) => {
     logMachineInfo({
       enabled: context.enableLog,
       machine: 'A',
       step: 2,
       stepName: 'evaluateSearch'
     })
-    // NOTE -> we don't support search operations
-    return endValidation({ success: false })
+    const check = await evaluateTopLevelPermissionsFn(context, 'search')
+    return check ? goToNextValidationStage() : endValidation({ success: false })
   }
 }

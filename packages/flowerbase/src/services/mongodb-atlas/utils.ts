@@ -323,9 +323,10 @@ export function getHiddenFieldsFromRulesConfig(rulesConfig?: { roles?: Role[] })
 function collectHiddenFieldsFromRoles(roles: Role[] = []) {
   const hiddenFields = new Set<string>()
 
-  const collectFromFields = (
-    fields?: Role['fields'] | Role['additional_fields']
-  ) => {
+  const isFieldPermissionObject = (value: unknown): value is { read?: unknown; write?: unknown } =>
+    !!value && typeof value === 'object' && ('read' in value || 'write' in value)
+
+  const collectFromFields = (fields?: Role['fields']) => {
     if (!fields) return
     Object.entries(fields).forEach(([fieldName, permissions]) => {
       const canRead = Boolean(permissions?.read || permissions?.write)
@@ -335,9 +336,23 @@ function collectHiddenFieldsFromRoles(roles: Role[] = []) {
     })
   }
 
+  const collectFromAdditionalFields = (fields?: Role['additional_fields']) => {
+    if (!fields || typeof fields !== 'object') return
+    // Global additional_fields permissions (read/write) apply to unknown fields and cannot be mapped.
+    if (isFieldPermissionObject(fields)) return
+
+    Object.entries(fields).forEach(([fieldName, permissions]) => {
+      if (!isFieldPermissionObject(permissions)) return
+      const canRead = Boolean(permissions.read || permissions.write)
+      if (!canRead) {
+        hiddenFields.add(fieldName)
+      }
+    })
+  }
+
   roles.forEach((role) => {
     collectFromFields(role.fields)
-    collectFromFields(role.additional_fields)
+    collectFromAdditionalFields(role.additional_fields)
   })
 
   return Array.from(hiddenFields)

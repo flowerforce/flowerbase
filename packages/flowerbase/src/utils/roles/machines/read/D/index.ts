@@ -16,7 +16,7 @@ const runCheckIsValidFieldName = async ({
     step: 2,
     stepName: 'checkIsValidFieldName'
   })
-  const document = checkIsValidFieldNameFn(context)
+  const document = await checkIsValidFieldNameFn(context)
   return endValidation({ success: !!Object.keys(document).length, document })
 }
 

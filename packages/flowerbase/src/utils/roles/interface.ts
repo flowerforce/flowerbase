@@ -1,9 +1,18 @@
-export type PermissionExpression = boolean // TODO: add complex condition (%%true: %function)
+export type PermissionExpression = boolean | Record<string, unknown>
 
 export type FieldPermissionExpression = {
-  read?: boolean
-  write?: boolean
+  read?: PermissionExpression
+  write?: PermissionExpression
+  fields?: {
+    [K: string]: FieldPermissionExpression
+  }
 }
+
+export type AdditionalFieldsPermissionExpression =
+  | FieldPermissionExpression
+  | {
+      [K: string]: FieldPermissionExpression
+    }
 
 export interface DocumentFiltersPermissions {
   read?: PermissionExpression
@@ -23,9 +32,7 @@ export interface Role {
   fields?: {
     [K: string]: FieldPermissionExpression
   }
-  additional_fields?: {
-    [K: string]: FieldPermissionExpression
-  }
+  additional_fields?: AdditionalFieldsPermissionExpression
 }
 
 export interface Params {

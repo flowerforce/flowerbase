@@ -15,6 +15,7 @@ const APP_ROOT = path.join(__dirname, 'app')
 const DB_NAME = 'flowerbase-e2e'
 const TODO_COLLECTION = 'todos'
 const USER_COLLECTION = 'users'
+const TEAM_DOCS_COLLECTION = 'teamDocs'
 const ACTIVITIES_COLLECTION = 'activities'
 const COUNTERS_COLLECTION = 'counters'
 const UPLOADS_COLLECTION = 'uploads'
@@ -41,6 +42,7 @@ type TestUser = User & {
   email: string
   custom_data?: {
     key?: string
+    accountRole?: string
     workspaces: string[]
     adminIn?: string[]
   }
@@ -61,6 +63,9 @@ const userIds = {
 const projectIds = {
   ownerProject: new ObjectId('000000000000000000000020'),
   guestProject: new ObjectId('000000000000000000000021')
+}
+const teamDocIds = {
+  collaboratorDoc: new ObjectId('000000000000000000000022')
 }
 
 const logIds = {
@@ -96,6 +101,7 @@ const ownerUser: TestUser = {
   role: 'owner',
   custom_data: {
     role: 'owner',
+    accountRole: 'collaborator',
     key: 'publisher-owner',
     workspaces: ['workspace-1'],
     adminIn: ['workspace-1']
@@ -252,6 +258,7 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
 
 const getTodosCollection = (user: TestUser | null) => createCollectionProxy(TODO_COLLECTION, user)
 const getUsersCollection = (user: TestUser | null) => createCollectionProxy(USER_COLLECTION, user)
+const getTeamDocsCollection = (user: TestUser | null) => createCollectionProxy(TEAM_DOCS_COLLECTION, user)
 const getAuthUsersCollection = (user: TestUser | null) => createCollectionProxy(AUTH_USERS_COLLECTION, user)
 const getProjectsCollection = (user: TestUser | null) => createCollectionProxy('projects', user)
 const getActivityLogsCollection = (user: TestUser | null) => createCollectionProxy('activityLogs', user)
@@ -290,6 +297,10 @@ type ProjectDoc = Document & {
   summary: string
   secretNotes?: string
   internalCode?: string
+}
+type TeamDoc = Document & {
+  ownerId: string
+  roles: string[]
 }
 type ActivityLogDoc = Document & {
   status: string
@@ -335,6 +346,7 @@ const resetCollections = async () => {
   await Promise.all([
     db.collection(TODO_COLLECTION).deleteMany({}),
     db.collection(USER_COLLECTION).deleteMany({}),
+    db.collection(TEAM_DOCS_COLLECTION).deleteMany({}),
     db.collection('projects').deleteMany({}),
     db.collection('activityLogs').deleteMany({}),
     db.collection(ACTIVITIES_COLLECTION).deleteMany({}),
@@ -402,6 +414,16 @@ const resetCollections = async () => {
       summary: 'Guest summary',
       secretNotes: 'guest secret',
       internalCode: 'ABC987'
+    }
+  ])
+
+  await db.collection(TEAM_DOCS_COLLECTION).insertMany([
+    {
+      _id: teamDocIds.collaboratorDoc,
+      ownerId: ownerUser.id,
+      roles: ['editor'],
+      email: 'collaborator@example.com',
+      status: 'active'
     }
   ])
 
@@ -1153,6 +1175,17 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(projects[0]).not.toHaveProperty('secretNotes')
     expect(projects[0]).not.toHaveProperty('internalCode')
     expect(projects[0]).toHaveProperty('summary')
+  })
+
+  it('returns only allowed fields when read is undefined and field-level read is configured', async () => {
+    const docs = (await getTeamDocsCollection(ownerUser).find({}).toArray()) as TeamDoc[]
+    expect(docs).toHaveLength(1)
+    expect(docs[0]).toEqual({ roles: ['editor'] })
+
+    const singleDoc = (await getTeamDocsCollection(ownerUser).findOne({
+      _id: teamDocIds.collaboratorDoc
+    })) as TeamDoc | null
+    expect(singleDoc).toEqual({ roles: ['editor'] })
   })
 
   it('allows owners to update their project summary via function rules', async () => {

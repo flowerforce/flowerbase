@@ -11,17 +11,16 @@ describe('checkIsValidFieldNameFn', () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
-  it('should return filtered fields based on role permissions, without excluding _id', () => {
+
+  it('returns only explicitly allowed fields when no fallback is configured', async () => {
     const mockedRole = {
       name: 'test',
-      apply_when: {
-        '%%true': true
-      },
+      apply_when: { '%%true': true },
       fields: {
         name: { read: true, write: false },
-        email: { read: false, write: true }
-      },
-      additional_fields: {}
+        email: { read: false, write: true },
+        age: { read: false, write: false }
+      }
     } as Role
     const context = {
       user: mockUser,
@@ -29,168 +28,100 @@ describe('checkIsValidFieldNameFn', () => {
       params: {
         cursor: { _id: mockId, name: 'Alice', email: 'alice@example.com', age: 25 }
       }
-    }
+    } as MachineContext
 
-    const result = checkIsValidFieldNameFn(context as MachineContext)
+    const result = await checkIsValidFieldNameFn(context)
     expect(result).toEqual({
-      _id: mockId,
       name: 'Alice',
-      email: 'alice@example.com',
-      age: 25
+      email: 'alice@example.com'
     })
   })
-  it("should exclude _id if role doesn't allows it", () => {
+
+  it('uses per-field additional_fields as fallback for unknown fields', async () => {
     const mockedRole = {
       name: 'test',
-      apply_when: {
-        '%%true': true
-      },
-      fields: {
-        _id: { read: false, write: false },
-        name: { read: true, write: false }
-      },
-      additional_fields: {}
-    } as Role
-    const context = {
-      user: mockUser,
-      role: mockedRole,
-      params: {
-        cursor: { _id: mockId, name: 'Alice' }
-      }
-    }
-
-    const result = checkIsValidFieldNameFn(context as MachineContext)
-
-    expect(result).toEqual({ name: 'Alice' })
-  })
-  it('should include _id if write role allows it', () => {
-    const mockedRole = {
-      name: 'test',
-      apply_when: {
-        '%%true': true
-      },
-      fields: {
-        _id: { read: false, write: true },
-        name: { read: true, write: false }
-      },
-      additional_fields: {}
-    } as Role
-    const context = {
-      user: mockUser,
-      role: mockedRole,
-      params: {
-        cursor: { _id: mockId, name: 'Alice' }
-      }
-    }
-
-    const result = checkIsValidFieldNameFn(context as MachineContext)
-
-    expect(result).toEqual({ _id: mockId, name: 'Alice' })
-  })
-  it('should include _id if read role allows it', () => {
-    const mockedRole = {
-      name: 'test',
-      apply_when: {
-        '%%true': true
-      },
-      fields: {
-        _id: { read: true, write: false },
-        name: { read: true, write: false }
-      },
-      additional_fields: {}
-    } as Role
-    const context = {
-      user: mockUser,
-      role: mockedRole,
-      params: {
-        cursor: { _id: mockId, name: 'Alice' }
-      }
-    }
-
-    const result = checkIsValidFieldNameFn(context as MachineContext)
-
-    expect(result).toEqual({ _id: mockId, name: 'Alice' })
-  })
-
-  it('should return an empty object if no fields are readable/writable', () => {
-    const mockedRole = {
-      name: 'test',
-      apply_when: {
-        '%%true': true
-      },
-      fields: {
-        name: { read: false, write: false }
-      },
-      additional_fields: {}
-    } as Role
-    const context = {
-      role: mockedRole,
-      params: {
-        cursor: { name: 'Charlie', email: 'charlie@example.com' }
-      }
-    }
-
-    const result = checkIsValidFieldNameFn(context as MachineContext)
-
-    expect(result).toEqual({ email: 'charlie@example.com' })
-  })
-
-  it('should handle additional_fields correctly for read permission', () => {
-    const mockedRole = {
-      name: 'test',
-      apply_when: {
-        '%%true': true
-      },
-      fields: {},
-      additional_fields: { phone: { read: true, write: false } }
-    } as Role
-    const context = {
-      role: mockedRole,
-      params: {
-        cursor: { _id: mockId, phone: '123456789', address: 'Unknown' }
-      }
-    }
-
-    const result = checkIsValidFieldNameFn(context as MachineContext)
-    expect(result).toEqual({ _id: mockId, phone: '123456789', address: 'Unknown' })
-  })
-  it('should handle additional_fields correctly for write permission', () => {
-    const mockedRole = {
-      name: 'test',
-      apply_when: {
-        '%%true': true
-      },
+      apply_when: { '%%true': true },
       fields: {},
       additional_fields: {
-        phone: { read: false, write: true },
+        phone: { read: true, write: false },
         address: { read: false, write: true }
       }
     } as Role
     const context = {
       role: mockedRole,
       params: {
-        cursor: { _id: mockId, phone: '123456789', address: 'Unknown' }
+        cursor: { _id: mockId, phone: '123456789', address: 'Unknown', city: 'Rome' }
       }
-    }
+    } as MachineContext
 
-    const result = checkIsValidFieldNameFn(context as MachineContext)
-    expect(result).toEqual({ _id: mockId, phone: '123456789', address: 'Unknown' })
+    const result = await checkIsValidFieldNameFn(context)
+    expect(result).toEqual({
+      phone: '123456789',
+      address: 'Unknown'
+    })
   })
-  it('should return only the _id if fields and additional fields are not defined', () => {
+
+  it('supports realm-style global additional_fields fallback', async () => {
+    const mockedRole = {
+      name: 'collaborator',
+      apply_when: { '%%true': true },
+      fields: {
+        roles: { read: true, write: false }
+      },
+      additional_fields: {
+        read: false,
+        write: false
+      }
+    } as Role
+    const context = {
+      role: mockedRole,
+      params: {
+        cursor: { roles: ['editor'], email: 'user@example.com' }
+      }
+    } as MachineContext
+
+    const result = await checkIsValidFieldNameFn(context)
+    expect(result).toEqual({
+      roles: ['editor']
+    })
+  })
+
+  it('denies unknown fields when additional_fields global fallback is false', async () => {
     const mockedRole = {
       name: 'test',
-      apply_when: {
-        '%%true': true
+      apply_when: { '%%true': true },
+      fields: {
+        roles: { read: true }
+      },
+      additional_fields: {
+        read: false,
+        write: false
       }
+    } as Role
+    const context = {
+      role: mockedRole,
+      params: {
+        cursor: { email: 'user@example.com' }
+      }
+    } as MachineContext
+
+    const result = await checkIsValidFieldNameFn(context)
+    expect(result).toEqual({})
+  })
+
+  it('returns empty object when no field permissions are available', async () => {
+    const mockedRole = {
+      name: 'test',
+      apply_when: { '%%true': true }
     } as Role
     const context = {
       role: mockedRole,
       params: {
         cursor: { _id: mockId, phone: '123456789', address: 'Unknown' }
       }
-    }
+    } as MachineContext
 
-    const result = checkIsValidFieldNameFn(context as MachineContext)
-    expect(result).toEqual({ _id: mockId, phone: '123456789', address: 'Unknown' })
+    const result = await checkIsValidFieldNameFn(context)
+    expect(result).toEqual({})
   })
 })

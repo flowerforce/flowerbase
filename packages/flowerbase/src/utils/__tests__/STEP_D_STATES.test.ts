@@ -12,7 +12,7 @@ describe('STEP_D_STATES', () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
-  it('checkAdditionalFields should end validation if additional fields is not defined', () => {
+  it('checkAdditionalFields should end validation if additional fields is not defined', async () => {
     const mockedLogInfo = jest
       .spyOn(Utils, 'logMachineInfo')
       .mockImplementation(() => 'Mocked Value')
@@ -21,7 +21,7 @@ describe('STEP_D_STATES', () => {
         name: 'test'
       }
     } as MachineContext
-    checkAdditionalFields({
+    await checkAdditionalFields({
       endValidation,
       context: mockContext,
       goToNextValidationStage,
@@ -37,23 +37,23 @@ describe('STEP_D_STATES', () => {
     })
     mockedLogInfo.mockRestore()
   })
-  it('checkAdditionalFields should end validation if additional fields are empty', () => {
+  it('checkAdditionalFields should go to evaluateRead if additional fields are empty but defined', async () => {
     const mockContext = {
       role: {
         name: 'test',
         additional_fields: {}
       }
     } as MachineContext
-    checkAdditionalFields({
+    await checkAdditionalFields({
       endValidation,
       context: mockContext,
       goToNextValidationStage,
       next,
       initialStep: null
     })
-    expect(endValidation).toHaveBeenCalledWith({ success: false })
+    expect(next).toHaveBeenCalledWith('evaluateRead')
   })
-  it('checkAdditionalFields should go to evaluateRead step if additional fields are defined and not empty', () => {
+  it('checkAdditionalFields should go to evaluateRead step if additional fields are defined and not empty', async () => {
     const mockContext = {
       role: {
         name: 'test',
@@ -67,7 +67,7 @@ describe('STEP_D_STATES', () => {
         }
       } as Role
     } as MachineContext
-    checkAdditionalFields({
+    await checkAdditionalFields({
       endValidation,
       context: mockContext,
       goToNextValidationStage,
@@ -76,7 +76,7 @@ describe('STEP_D_STATES', () => {
     })
     expect(next).toHaveBeenCalledWith('evaluateRead')
   })
-  it('checkIsValidFieldName should end a successful validation, with a document', async () => {
+  it('checkIsValidFieldName should fail when no field-level permissions allow fields', async () => {
     const mockedLogInfo = jest
       .spyOn(Utils, 'logMachineInfo')
       .mockImplementation(() => 'Mocked Value')
@@ -95,7 +95,7 @@ describe('STEP_D_STATES', () => {
       next,
       initialStep: null
     })
-    expect(endValidation).toHaveBeenCalledWith({ success: true, document: { name: 'test' } })
+    expect(endValidation).toHaveBeenCalledWith({ success: false, document: {} })
     expect(mockedLogInfo).toHaveBeenCalledWith({
       enabled: mockContext.enableLog,
       machine: 'D',

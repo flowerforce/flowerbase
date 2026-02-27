@@ -34,12 +34,12 @@ describe('comparePassword', () => {
     })
     expect(isDefined).toBe(false)
   })
-  it('should return false for empty additional fields', () => {
+  it('should return true for empty additional fields (defined)', () => {
     const isDefined = checkAdditionalFieldsFn({
       role: { ...mockedRole, additional_fields: {} },
       user: mockUser,
       params: mockParams
     })
-    expect(isDefined).toBe(false)
+    expect(isDefined).toBe(true)
   })
 })
