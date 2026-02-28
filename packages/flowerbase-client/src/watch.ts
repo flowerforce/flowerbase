@@ -1,3 +1,4 @@
+import { EJSON } from './bson'
 import { WatchAsyncIterator, WatchConfig } from './types'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -33,7 +34,7 @@ const parseSsePayload = (line: string) => {
   if (!raw) return null
 
   try {
-    return JSON.parse(raw)
+    return EJSON.deserialize(JSON.parse(raw))
   } catch {
     return raw
   }
@@ -70,7 +71,7 @@ export const createWatchIterator = (config: WatchConfig): WatchAsyncIterator<unk
       const controller = new AbortController()
       activeController = controller
       const request = createWatchRequest(config)
-      const encoded = toBase64(JSON.stringify(request))
+      const encoded = toBase64(JSON.stringify(EJSON.serialize(request, { relaxed: false })))
       const url = `${config.baseUrl}/api/client/v2.0/app/${config.appId}/functions/call?baas_request=${encodeURIComponent(encoded)}`
 
       try {

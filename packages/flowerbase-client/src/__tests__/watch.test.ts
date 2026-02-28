@@ -1,4 +1,5 @@
 import { App } from '../app'
+import { EJSON, ObjectId } from '../bson'
 import { Credentials } from '../credentials'
 
 const streamFromLines = (lines: string[]) => {
@@ -19,7 +20,7 @@ const decodeBaasRequest = (url: string) => {
   if (!encoded) throw new Error('baas_request missing')
   const base64 = decodeURIComponent(encoded)
   const json = Buffer.from(base64, 'base64').toString('utf8')
-  return JSON.parse(json) as {
+  return EJSON.deserialize(JSON.parse(json)) as {
     arguments: Array<{
       filter?: Record<string, unknown>
       ids?: unknown[]
@@ -186,6 +187,46 @@ describe('flowerbase-client watch', () => {
     const secondRequest = decodeBaasRequest((global.fetch as jest.Mock).mock.calls[3][0] as string)
     expect(secondRequest.arguments[0].filter).toEqual({ operationType: 'insert' })
     expect(secondRequest.arguments[0].ids).toBeUndefined()
+  })
+
+  it('preserves ObjectId values in watch filter payload', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({
+          access_token: 'access',
+          refresh_token: 'refresh',
+          user_id: 'user-1'
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      })
+      .mockResolvedValue({
+        ok: true,
+        body: streamFromLines([])
+      }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+    await app.logIn(Credentials.emailPassword('john@doe.com', 'secret123'))
+
+    const collection = app.currentUser!.mongoClient('mongodb-atlas').db('testdb').collection('todos')
+    const requestId = new ObjectId('69a282a75cd849c244e001ca')
+
+    const iterator = collection.watch({
+      filter: {
+        'fullDocument.requestId': requestId,
+        operationType: 'update'
+      }
+    })
+    iterator.close()
+
+    const request = decodeBaasRequest((global.fetch as jest.Mock).mock.calls[2][0] as string)
+    const decodedRequestId = request.arguments[0].filter?.['fullDocument.requestId']
+    expect(decodedRequestId).toBeInstanceOf(ObjectId)
+    expect((decodedRequestId as ObjectId).toHexString()).toBe(requestId.toHexString())
   })
 
   it('rejects pipeline-based watch signature', async () => {
