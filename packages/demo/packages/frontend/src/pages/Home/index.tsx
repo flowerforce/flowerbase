@@ -22,6 +22,12 @@ export interface Todo {
   updatedAt: string
 }
 
+type PaginatedTodos = {
+  currentPage: number
+  total: number
+  todos: Todo[]
+}
+
 export const Home = () => {
 
   const [isLoading, setIsLoading] = useState(true)
@@ -41,8 +47,16 @@ export const Home = () => {
   const fetchTodos = useCallback(async (page?: number) => {
     try {
       setIsLoading(true)
-      const response = await app.currentUser?.functions.searchTodos({ page })
-      setPagination((prevPagination) => page ? response : { ...prevPagination, todos: response })
+      const response = await app.currentUser?.functions.searchTodos({ page }) as PaginatedTodos | Todo[] | undefined
+      if (!response) return
+      if (page) {
+        setPagination(response as PaginatedTodos)
+      } else {
+        setPagination((prevPagination) => ({
+          ...prevPagination,
+          todos: response as Todo[]
+        }))
+      }
     }
     catch (e) {
       console.log(e)
