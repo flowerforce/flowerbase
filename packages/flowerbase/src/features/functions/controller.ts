@@ -440,7 +440,6 @@ export const functionsController: FunctionController = async (
 
     const [{ database, collection, ...watchArgsInput }] = config.arguments
     const watchArgs = isRecord(watchArgsInput) ? watchArgsInput : {}
-    console.log("🚀 ~ functionsController ~ watchArgs:", watchArgs)
 
     const headers = {
       'Content-Type': 'text/event-stream',
@@ -511,7 +510,6 @@ export const functionsController: FunctionController = async (
       }
 
       const onHubChange = async (change: Document) => {
-        console.log("🚀 ~ onHubChange ~ change:", change)
         const subscribers = Array.from(currentHub.subscribers.values())
         await Promise.all(subscribers.map(async (subscriber) => {
           const subscriberRes = subscriber.response
@@ -538,7 +536,6 @@ export const functionsController: FunctionController = async (
               .db(currentHub.database)
               .collection(currentHub.collection)
               .findOne(readQuery)
-            console.log("🚀 ~ onHubChange ~ readableDoc:", readableDoc)
 
             if (!isReadableDocumentResult(readableDoc)) return
             subscriberRes.write(`data: ${serializeEjson(change)}\n\n`)
