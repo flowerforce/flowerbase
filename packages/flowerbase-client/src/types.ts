@@ -36,8 +36,8 @@ export type WatchConfig = {
   accessToken: string
   database: string
   collection: string
-  pipeline?: unknown[]
-  options?: Record<string, unknown>
+  filter?: Record<string, unknown>
+  ids?: unknown[]
   timeout?: number
 }
 

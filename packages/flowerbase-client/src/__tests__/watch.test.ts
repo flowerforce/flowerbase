@@ -20,7 +20,10 @@ const decodeBaasRequest = (url: string) => {
   const base64 = decodeURIComponent(encoded)
   const json = Buffer.from(base64, 'base64').toString('utf8')
   return JSON.parse(json) as {
-    arguments: Array<{ pipeline?: unknown[] }>
+    arguments: Array<{
+      filter?: Record<string, unknown>
+      ids?: unknown[]
+    }>
   }
 }
 
@@ -147,7 +150,7 @@ describe('flowerbase-client watch', () => {
     iterator.close()
   })
 
-  it('maps watch ids/filter options into pipeline', async () => {
+  it('maps watch ids/filter options into watch arguments', async () => {
     global.fetch = jest
       .fn()
       .mockResolvedValueOnce({
@@ -175,14 +178,69 @@ describe('flowerbase-client watch', () => {
     const byIds = collection.watch({ ids: ['id-1', 'id-2'] })
     byIds.close()
     const firstRequest = decodeBaasRequest((global.fetch as jest.Mock).mock.calls[2][0] as string)
-    expect(firstRequest.arguments[0].pipeline).toEqual([
-      { $match: { 'documentKey._id': { $in: ['id-1', 'id-2'] } } }
-    ])
+    expect(firstRequest.arguments[0].ids).toEqual(['id-1', 'id-2'])
+    expect(firstRequest.arguments[0].filter).toBeUndefined()
 
     const byFilter = collection.watch({ filter: { operationType: 'insert' } })
     byFilter.close()
     const secondRequest = decodeBaasRequest((global.fetch as jest.Mock).mock.calls[3][0] as string)
-    expect(secondRequest.arguments[0].pipeline).toEqual([{ $match: { operationType: 'insert' } }])
+    expect(secondRequest.arguments[0].filter).toEqual({ operationType: 'insert' })
+    expect(secondRequest.arguments[0].ids).toBeUndefined()
+  })
+
+  it('rejects pipeline-based watch signature', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({
+          access_token: 'access',
+          refresh_token: 'refresh',
+          user_id: 'user-1'
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      })
+      .mockResolvedValue({
+        ok: true,
+        body: streamFromLines([])
+      }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+    await app.logIn(Credentials.emailPassword('john@doe.com', 'secret123'))
+
+    const collection = app.currentUser!.mongoClient('mongodb-atlas').db('testdb').collection('todos')
+
+    expect(() =>
+      collection.watch([{ $match: { operationType: 'update', 'fullDocument.type': 'perennial' } }])
+    ).toThrow('watch accepts only an options object with "filter" or "ids"')
+  })
+
+  it('rejects unsupported watch option keys', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({
+          access_token: 'access',
+          refresh_token: 'refresh',
+          user_id: 'user-1'
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+    await app.logIn(Credentials.emailPassword('john@doe.com', 'secret123'))
+
+    const collection = app.currentUser!.mongoClient('mongodb-atlas').db('testdb').collection('todos')
+    expect(() => collection.watch({ fullDocument: 'updateLookup' })).toThrow(
+      'watch options support only "filter" or "ids"'
+    )
   })
 
   it('rejects watch options with both ids and filter', async () => {
@@ -207,6 +265,31 @@ describe('flowerbase-client watch', () => {
     const collection = app.currentUser!.mongoClient('mongodb-atlas').db('testdb').collection('todos')
     expect(() => collection.watch({ ids: ['id-1'], filter: { operationType: 'insert' } })).toThrow(
       'watch options cannot include both "ids" and "filter"'
+    )
+  })
+
+  it('rejects $match inside watch filter object', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({
+          access_token: 'access',
+          refresh_token: 'refresh',
+          user_id: 'user-1'
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ access_token: 'access' })
+      }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+    await app.logIn(Credentials.emailPassword('john@doe.com', 'secret123'))
+
+    const collection = app.currentUser!.mongoClient('mongodb-atlas').db('testdb').collection('todos')
+    expect(() => collection.watch({ filter: { $match: { operationType: 'insert' } } })).toThrow(
+      'watch filter must be a query object, not a $match stage'
     )
   })
 })

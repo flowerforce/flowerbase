@@ -2,15 +2,20 @@ import { WatchAsyncIterator, WatchConfig } from './types'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-const createWatchRequest = ({ database, collection, pipeline = [], options = {} }: WatchConfig) => ({
+const createWatchRequest = ({
+  database,
+  collection,
+  filter,
+  ids
+}: WatchConfig) => ({
   name: 'watch',
   service: 'mongodb-atlas',
   arguments: [
     {
       database,
       collection,
-      pipeline,
-      options
+      ...(filter ? { filter } : {}),
+      ...(ids ? { ids } : {})
     }
   ]
 })

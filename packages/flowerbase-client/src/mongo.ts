@@ -36,37 +36,42 @@ export const createMongoClient = (app: App, serviceName: string, userId: string)
       }
 
       const normalizeWatchInput = (input?: unknown) => {
-        if (Array.isArray(input)) {
-          return { pipeline: input, options: {} }
+        if (typeof input === 'undefined') {
+          return { filter: undefined, ids: undefined }
         }
-        if (input && typeof input === 'object' && ('ids' in input || 'filter' in input)) {
-          const typed = input as { ids?: unknown[]; filter?: Record<string, unknown>; [key: string]: unknown }
+        if (Array.isArray(input)) {
+          throw new Error('watch accepts only an options object with "filter" or "ids"')
+        }
+        if (!input || typeof input !== 'object') {
+          throw new Error('watch options must be an object')
+        }
+
+        const typed = input as { ids?: unknown[]; filter?: Record<string, unknown>; [key: string]: unknown }
+        const keys = Object.keys(typed)
+        const hasOnlyAllowedKeys = keys.every((key) => key === 'ids' || key === 'filter')
+        if (!hasOnlyAllowedKeys) {
+          throw new Error('watch options support only "filter" or "ids"')
+        }
+        if (typed.ids || typed.filter) {
           if (typed.ids && typed.filter) {
             throw new Error('watch options cannot include both "ids" and "filter"')
           }
-          const { ids, filter, ...options } = typed
+          const { ids, filter } = typed
+          if (filter && typeof filter === 'object' && '$match' in filter) {
+            throw new Error('watch filter must be a query object, not a $match stage')
+          }
           if (ids) {
-            return {
-              pipeline: [{ $match: { 'documentKey._id': { $in: ids } } }],
-              options
+            if (!Array.isArray(ids)) {
+              throw new Error('watch ids must be an array')
             }
+            return { filter: undefined, ids }
           }
           if (filter) {
-            return {
-              pipeline: [{ $match: filter }],
-              options
-            }
+            return { filter, ids: undefined }
           }
-          return { pipeline: [], options }
+          return { filter: undefined, ids: undefined }
         }
-        if (input && typeof input === 'object' && ('pipeline' in input || 'options' in input)) {
-          const typed = input as { pipeline?: unknown[]; options?: Record<string, unknown> }
-          return {
-            pipeline: typed.pipeline ?? [],
-            options: typed.options ?? {}
-          }
-        }
-        return { pipeline: [], options: (input as Record<string, unknown> | undefined) ?? {} }
+        throw new Error('watch options must include "filter" or "ids"')
       }
 
       return {
@@ -87,8 +92,8 @@ export const createMongoClient = (app: App, serviceName: string, userId: string)
           callService('updateMany', [{ filter, update, options }]),
         deleteOne: (filter, options = {}) => callService('deleteOne', [{ query: filter, options }]),
         deleteMany: (filter, options = {}) => callService('deleteMany', [{ query: filter, options }]),
-        watch: (input) => {
-          const { pipeline, options } = normalizeWatchInput(input)
+        watch: (options) => {
+          const { filter, ids } = normalizeWatchInput(options)
           const session = app.getSessionOrThrow(userId)
           return createWatchIterator({
             appId: app.id,
@@ -96,8 +101,8 @@ export const createMongoClient = (app: App, serviceName: string, userId: string)
             accessToken: session.accessToken,
             database,
             collection,
-            pipeline,
-            options,
+            filter,
+            ids,
             timeout: app.timeout
           })
         }

@@ -125,7 +125,7 @@ Metodi disponibili su `collection`:
 - `updateOne(filter, update, options?)`
 - `updateMany(filter, update, options?)`
 - `deleteOne(filter, options?)`
-- `watch(pipeline?, options?)`
+- `watch(options?)`
 
 ## Watch / Change streams
 
@@ -141,6 +141,17 @@ try {
 } finally {
   stream.close()
 }
+```
+
+Esempio con filtro Realm-like:
+
+```ts
+const stream = collection.watch({
+  filter: {
+    operationType: 'update',
+    'fullDocument.type': 'perennial'
+  }
+})
 ```
 
 ## BSON / EJSON
