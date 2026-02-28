@@ -1243,7 +1243,6 @@ const getOperators: GetOperatorsFunction = (
           // Retrieve the document to check permissions before updating
           const result = await collection.find({ $and: formattedQuery }).toArray()
           if (!result) {
-            console.log('check1 In updateMany --> (!result)')
             throw new Error('Update not permitted')
           }
 
@@ -1280,8 +1279,6 @@ const getOperators: GetOperatorsFunction = (
           )
 
           if (!areDocumentsEqual) {
-            console.log('check1 In updateMany --> (!areDocumentsEqual)')
-
             throw new Error('Update not permitted')
           }
 
