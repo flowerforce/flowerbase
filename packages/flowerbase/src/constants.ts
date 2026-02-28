@@ -57,6 +57,10 @@ export const DEFAULT_CONFIG = {
   CORS_OPTIONS: {
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"] as ALLOWED_METHODS[]
+  },
+  MONGODB_ENCRYPTION_CONFIG: {
+    keyVaultDb: "encryption",
+    keyVaultCollection: "__keyVault"
   }
 }
 export const API_VERSION = `/api/client/${DEFAULT_CONFIG.API_VERSION}`
