@@ -348,7 +348,7 @@
     if (highlight) {
       const text = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
       collectionResult.classList.add('json-highlight');
-      collectionResult.innerHTML = highlightJson(text || '');
+      collectionResult.innerHTML = highlightJson(text || '', { collapsible: true });
       return;
     }
     collectionResult.classList.remove('json-highlight');
@@ -366,7 +366,7 @@
     if (highlight) {
       const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
       collectionRules.classList.add('json-highlight');
-      collectionRules.innerHTML = highlightJson(text || '');
+      collectionRules.innerHTML = highlightJson(text || '', { collapsible: true });
       return;
     }
     collectionRules.classList.remove('json-highlight');

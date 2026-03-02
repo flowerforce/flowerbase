@@ -72,7 +72,7 @@
     }
     if (triggerDetail) {
       triggerDetail.classList.add('json-highlight');
-      triggerDetail.innerHTML = highlightJson(JSON.stringify(entry, null, 2) || '');
+      triggerDetail.innerHTML = highlightJson(JSON.stringify(entry, null, 2) || '', { collapsible: true });
     }
     if (triggerFunctionButton) {
       if (fnName) {

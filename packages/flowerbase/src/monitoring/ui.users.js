@@ -97,7 +97,7 @@
       return;
     }
     userDetail.classList.add('json-highlight');
-    userDetail.innerHTML = highlightJson(JSON.stringify(entry, null, 2) || '');
+    userDetail.innerHTML = highlightJson(JSON.stringify(entry, null, 2) || '', { collapsible: true });
   };
 
   const setUserConfigContent = (element, value, placeholder) => {
@@ -108,7 +108,7 @@
       return;
     }
     element.classList.add('json-highlight');
-    element.innerHTML = highlightJson(JSON.stringify(value, null, 2) || '');
+    element.innerHTML = highlightJson(JSON.stringify(value, null, 2) || '', { collapsible: true });
   };
 
   const renderUserConfig = () => {

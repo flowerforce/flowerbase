@@ -1134,6 +1134,65 @@ button.small {
   color: #dcdcaa;
 }
 
+.json-highlight .json-tree,
+.json-highlight .json-node,
+.json-highlight .json-children {
+  display: block;
+}
+
+.json-highlight .json-line {
+  display: block;
+  padding-left: calc(var(--json-depth, 0) * 14px);
+  white-space: pre;
+}
+
+.json-highlight .json-toggle,
+.json-highlight .json-toggle-spacer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  vertical-align: text-bottom;
+}
+
+.json-highlight .json-toggle {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.json-highlight .json-toggle:hover {
+  color: var(--fg);
+}
+
+.json-highlight .json-brace,
+.json-highlight .json-punct {
+  color: #d4d4d4;
+}
+
+.json-highlight .json-summary {
+  display: none;
+  color: var(--muted);
+}
+
+.json-highlight .json-node.is-collapsed > .json-children,
+.json-highlight .json-node.is-collapsed > .json-close {
+  display: none;
+}
+
+.json-highlight .json-node.is-collapsed > .json-open .json-summary {
+  display: inline;
+}
+
+.json-highlight .json-node.is-collapsed > .json-open .json-toggle {
+  transform: rotate(-90deg);
+}
+
 .function-io {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

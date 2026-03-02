@@ -77,7 +77,7 @@
     if (!endpointResult) return;
     if (highlight) {
       endpointResult.classList.add('json-highlight');
-      endpointResult.innerHTML = highlightJson(text || '');
+      endpointResult.innerHTML = highlightJson(text || '', { collapsible: true });
     } else {
       endpointResult.classList.remove('json-highlight');
       endpointResult.textContent = text || '';
@@ -123,7 +123,7 @@
     const status = endpoint.disabled ? 'disabled' : 'active';
     const jsonPayload = JSON.stringify(endpoint, null, 2) || '';
     endpointMeta.classList.add('json-highlight');
-    endpointMeta.innerHTML = highlightJson(jsonPayload);
+    endpointMeta.innerHTML = highlightJson(jsonPayload, { collapsible: true });
     if (endpointHint) endpointHint.textContent = status;
     if (endpointMethod) endpointMethod.value = method;
     if (endpointFunctionButton) {

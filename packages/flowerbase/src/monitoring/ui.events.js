@@ -184,7 +184,7 @@
     state.selectedEvent = event;
     const text = JSON.stringify(event, null, 2) || '';
     eventDetail.classList.add('json-highlight');
-    eventDetail.innerHTML = highlightJson(text);
+    eventDetail.innerHTML = highlightJson(text, { collapsible: true });
     const functionData = getFunctionEventData(event);
     if (functionData && eventFunctionButton) {
       eventFunctionButton.classList.remove('is-hidden');
