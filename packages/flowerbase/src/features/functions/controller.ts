@@ -241,9 +241,7 @@ export const functionsController: FunctionController = async (
     const streamKey = `${database}::${collection}`
     const subscriberId = `${Date.now()}-${watchSubscriberCounter++}`
     const extraFilter = parseWatchFilter(watchArgs)
-    const mongoClient = app.mongo.client as unknown as {
-      db: (name: string) => { collection: (name: string) => { watch: (...args: any[]) => any } }
-    }
+    const mongoClient = app.mongo.changestream.client
 
     let hub = sharedWatchStreams.get(streamKey)
     if (!hub) {

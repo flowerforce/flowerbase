@@ -92,18 +92,13 @@ const getRegisterConfig = async ({
     methods: ['POST', 'GET']
   }
 
-  const fastifyMongodbOptions: FastifyMongodbOptions = {
-    forceClose: true,
-    url: mongodbUrl,
-  }
-
-  if (mongodbEncryptionConfig) {
-    fastifyMongodbOptions.autoEncryption = await initMongoDBClientWithCSFLE({
+  const autoEncryption: FastifyMongodbOptions["autoEncryption"] = mongodbEncryptionConfig ?
+    await initMongoDBClientWithCSFLE({
       mongodbUrl,
       schemas: encryptionSchemas,
-      ...mongodbEncryptionConfig
-    })
-  }
+      ...mongodbEncryptionConfig,
+    }) : undefined
+
 
   const baseConfig = [
     {
@@ -114,7 +109,20 @@ const getRegisterConfig = async ({
     {
       pluginName: 'fastifyMongodb',
       plugin: fastifyMongodb,
-      options: fastifyMongodbOptions
+      options: {
+        url: mongodbUrl,
+        forceClose: true,
+        autoEncryption, // Auto-encryption is not supported for change streams
+      } satisfies FastifyMongodbOptions
+    },
+    {
+      pluginName: 'fastifyMongodb',
+      plugin: fastifyMongodb,
+      options: {
+        name: 'changestream',
+        url: mongodbUrl,
+        forceClose: true,
+      } satisfies FastifyMongodbOptions
     },
     {
       pluginName: 'jwtAuthPlugin',

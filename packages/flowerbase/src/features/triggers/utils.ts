@@ -246,7 +246,7 @@ const handleAuthenticationTrigger = async ({
   const { database, isAutoTrigger, operation_types = [], operation_type } = config
   const providerFilter = normalizeProviders(config.providers ?? [])
   const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
-  const collection = app.mongo.client.db(database || DB_NAME).collection(authCollection)
+  const collection = app.mongo.changestream.client.db(database || DB_NAME).collection(authCollection)
   const operationCandidates = operation_type ? mapOpInverse[operation_type] : operation_types
   const normalizedOps = normalizeOperationTypes(operationCandidates)
   const baseMeta = {
@@ -652,7 +652,7 @@ const handleDataBaseTrigger = async ({
 
   const normalizedOperations = normalizeOperationTypes(operation_types)
 
-  const collection = app.mongo.client.db(database).collection(collectionName)
+  const collection = app.mongo.changestream.client.db(database).collection(collectionName)
   const pipeline = [
     {
       $match: {

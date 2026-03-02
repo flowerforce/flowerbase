@@ -44,9 +44,10 @@ export type GetValidRuleParams<T extends Role | Filter> = {
 type Method<T extends keyof Collection<Document>> = Collection<Document>[T]
 
 export type GetOperatorsFunction = (
-  collection: Collection<Document>,
+  mongoInstance: FastifyInstance["mongo"],
   {
     rules,
+    dbName,
     collName,
     user,
     run_as_system,
@@ -55,6 +56,7 @@ export type GetOperatorsFunction = (
     user?: User
     rules?: Rules
     run_as_system?: boolean
+    dbName: string
     collName: string
     monitoringOrigin?: string
   }
