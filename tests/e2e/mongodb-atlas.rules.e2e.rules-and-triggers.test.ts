@@ -1678,6 +1678,55 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     await adminWatch.close()
     await guestWatch.close()
   })
+
+  it('emits upload watch event only when status changes with a complex change-stream filter', async () => {
+    const watch = await openWatchConnection({
+      user: ownerUser,
+      collection: UPLOADS_COLLECTION,
+      filter: {
+        'fullDocument.publisher': ownerUser.custom_data?.key,
+        $and: [
+          {
+            $or: [
+              { 'fullDocument._id': uploadIds.owner },
+              { 'fullDocument._id': uploadIds.owner }
+            ]
+          },
+          {
+            $or: [
+              { operationType: 'insert' },
+              { operationType: 'replace' },
+              {
+                operationType: 'update',
+                'updateDescription.updatedFields.status': { $exists: true }
+              }
+            ]
+          }
+        ]
+      }
+    })
+
+    try {
+      await client
+        .db(DB_NAME)
+        .collection(UPLOADS_COLLECTION)
+        .updateOne({ _id: uploadIds.owner }, { $set: { runAt: new Date() } })
+
+      await watch.expectNoEvent()
+
+      await client
+        .db(DB_NAME)
+        .collection(UPLOADS_COLLECTION)
+        .updateOne({ _id: uploadIds.owner }, { $set: { status: 'processing' } })
+
+      const event = await watch.nextEvent()
+      expect(event.operationType).toBe('update')
+      expect(String(event.documentKey?._id)).toBe(String(uploadIds.owner))
+      expect((event.fullDocument as UploadDoc | undefined)?.status).toBe('processing')
+    } finally {
+      await watch.close()
+    }
+  })
   afterAll(async () => {
     await appInstance?.close()
     await client.close()
