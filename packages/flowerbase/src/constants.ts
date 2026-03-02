@@ -14,12 +14,12 @@ const monitEnabled = typeof monitEnabledEnv === 'string'
   : false
 
 const {
-  database_name,
+  database_name = 'main',
   collection_name = 'users',
   user_id_field = 'id',
   on_user_creation_function_name
 } = loadCustomUserData()
-const { auth_collection = 'auth_users', ...configuration } = loadAuthConfig()
+const { auth_collection = 'auth_users', auth_database, ...configuration } = loadAuthConfig()
 
 export const DEFAULT_CONFIG = {
   PORT: Number(process.env.PORT) || 3000,
@@ -62,6 +62,7 @@ export const DEFAULT_CONFIG = {
 export const API_VERSION = `/api/client/${DEFAULT_CONFIG.API_VERSION}`
 export const HTTPS_SCHEMA = DEFAULT_CONFIG.HTTPS_SCHEMA
 export const DB_NAME = database_name
+export const AUTH_DB_NAME = auth_database ?? database_name
 
 type AuthProviders = Record<string, { disabled?: boolean; config?: unknown }>
 // TODO spostare nell'oggetto providers anche le altre configurazioni

@@ -7,6 +7,7 @@ jest.mock('../../constants', () => ({
     userCollection: 'users',
     user_id_field: 'id'
   },
+  AUTH_DB_NAME: 'test-auth-db',
   DB_NAME: 'test-db',
   DEFAULT_CONFIG: {
     REFRESH_TOKEN_TTL_DAYS: 1

@@ -3,6 +3,7 @@ import { TRIGGER_HANDLERS } from '../utils'
 
 jest.mock('../../../constants', () => ({
   AUTH_CONFIG: {},
+  AUTH_DB_NAME: 'test-auth-db',
   DB_NAME: 'test-db'
 }))
 

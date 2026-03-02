@@ -1,8 +1,8 @@
-import { AUTH_CONFIG, DB_NAME } from "../constants"
+import { AUTH_CONFIG, AUTH_DB_NAME } from "../constants"
+import { emitServiceEvent } from "../services/monitoring"
 import { StateManager } from "../state"
 import { GenerateContext } from "../utils/context"
 import { generateToken, hashPassword } from "../utils/crypto"
-import { emitServiceEvent } from "../services/monitoring"
 import { HandleUserRegistration } from "./models/handleUserRegistration.model"
 
 /**
@@ -35,7 +35,7 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
         const runConfirmationFunction = localUserpassConfig?.runConfirmationFunction === true
         const confirmationFunctionName = localUserpassConfig?.confirmationFunctionName
         const mongo = app?.mongo
-        const db = mongo.client.db(DB_NAME)
+        const db = mongo.client.db(AUTH_DB_NAME)
         const hashedPassword = await hashPassword(password)
 
         const existingUser = await db?.collection(authCollection!).findOne({ email })
