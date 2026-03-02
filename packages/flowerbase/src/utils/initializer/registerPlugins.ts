@@ -12,7 +12,7 @@ import { API_VERSION, DEFAULT_CONFIG } from '../../constants'
 import { Functions } from '../../features/functions/interface'
 import { EncryptionSchemas } from '../../features/encryption/interface'
 import monitoringPlugin from '../../monitoring/plugin'
-import { initMongoDBClientWithCSFLE, MongoDbEncryptionConfig } from './mongodbCSFLE'
+import { setupMongoDbCSFLE, MongoDbEncryptionConfig } from './mongodbCSFLE'
 
 type RegisterFunction = FastifyInstance['register']
 type RegisterParameters = Parameters<RegisterFunction>
@@ -93,7 +93,7 @@ const getRegisterConfig = async ({
   }
 
   const autoEncryption: FastifyMongodbOptions["autoEncryption"] = mongodbEncryptionConfig ?
-    await initMongoDBClientWithCSFLE({
+    await setupMongoDbCSFLE({
       mongodbUrl,
       schemas: encryptionSchemas,
       ...mongodbEncryptionConfig,

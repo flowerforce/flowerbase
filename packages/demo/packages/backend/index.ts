@@ -18,7 +18,7 @@ initialize({
         // },
         kmsProviders: [
             {
-                type: "aws",
+                provider: "aws",
                 keyAlias: "prod-data-key",
                 config: {
                     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
@@ -30,7 +30,7 @@ initialize({
                 }
             },
             {
-                type: "local",
+                provider: "local",
                 keyAlias: "dev-data-key",
                 config: {
                     key: "DE1+JeO3S2BTXar3FScBFsSnuz1TjhppXfqi9IBNA2JmVJx9lkBtcDu13/uzzL78r16iVeKKKLgzfOrXLrU+OqfjbaqzugOSbF/1I1q8pZP29vMzl625Thb2s1QEgMlF"

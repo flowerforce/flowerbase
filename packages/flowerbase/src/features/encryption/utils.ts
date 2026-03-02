@@ -12,7 +12,7 @@ export const loadEncryptionSchemas = async (rootDir = process.cwd()): Promise<En
   const schemasRoot = path.join(rootDir, 'data_sources', 'mongodb-atlas')
 
   const files = recursivelyCollectFiles(schemasRoot)
-  const schemaFiles = files.filter((x) => x.endsWith('encryption-schema.json'))
+  const schemaFiles = files.filter((x) => x.endsWith('encryption.json'))
 
   return schemaFiles.reduce((acc, filePath) => {
     const { collection, database, schema } = readJsonContent(filePath) as EncryptionSchemaFile

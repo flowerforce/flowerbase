@@ -28,9 +28,9 @@ type KMSProviderConfig =
      */
     keyAlias: string
     /**
-     * KMS Provider type.
+     * KMS Provider name.
      */
-    type: "aws"
+    provider: "aws"
     /**
      * KMS Provider specific authorization configuration.
      */
@@ -41,22 +41,22 @@ type KMSProviderConfig =
     masterKey: AWSEncryptionKeyOptions
   } | {
     keyAlias: string
-    type: "azure"
+    provider: "azure"
     config: AzureKMSProviderConfiguration,
     masterKey: AzureEncryptionKeyOptions
   } | {
     keyAlias: string
-    type: "gcp"
+    provider: "gcp"
     config: GCPKMSProviderConfiguration,
     masterKey: GCPEncryptionKeyOptions
   } | {
     keyAlias: string
-    type: "kmip"
+    provider: "kmip"
     config: KMIPKMSProviderConfiguration,
     masterKey: KMIPEncryptionKeyOptions
   } | {
     keyAlias: string
-    type: "local"
+    provider: "local"
     config: LocalKMSProviderConfiguration,
   }
 
@@ -112,7 +112,7 @@ async function ensureDataEncryptionKeys(
       continue
     }
 
-    const dataKeyId = await clientEncryption.createDataKey(kmsProvider.type, {
+    const dataKeyId = await clientEncryption.createDataKey(kmsProvider.provider, {
       masterKey: "masterKey" in kmsProvider ? kmsProvider.masterKey : undefined,
       keyAltNames: [kmsProvider.keyAlias],
     });
@@ -170,10 +170,10 @@ const buildSchemaMap = (schemas: EncryptionSchemas, dataKeys: DataKey[]) => {
 }
 
 /**
- * MongoDB Client-Side Field Level Encryption (CSFLE).
- * Setup encryption and return a MongoDB client with CSFLE enabled.
+ * Setup MongoDB Client-Side Field Level Encryption (CSFLE).
+ * @see https://www.mongodb.com/docs/manual/core/csfle
  */
-export const initMongoDBClientWithCSFLE = async (
+export const setupMongoDbCSFLE = async (
   config: MongoDbEncryptionConfig & { mongodbUrl: string; schemas?: EncryptionSchemas }
 ): Promise<AutoEncryptionOptions> => {
   if (config.kmsProviders.length === 0) {
@@ -187,7 +187,7 @@ export const initMongoDBClientWithCSFLE = async (
   }
 
   const kmsProviders = requiredConfig.kmsProviders.reduce(
-    (acc, provider) => ({ ...acc, [provider.type]: provider.config }),
+    (acc, { provider, config }) => ({ ...acc, [provider]: config }),
     {} as KMSProviders
   )
 
@@ -212,17 +212,8 @@ export const initMongoDBClientWithCSFLE = async (
 
   const dataKeys = await ensureDataEncryptionKeys(clientEncryption, keyVaultDb, requiredConfig)
 
-  /*   const encryptedClient = new MongoClient(config.mongodbUrl, {
-      autoEncryption: {
-        keyVaultNamespace,
-        kmsProviders,
-        schemaMap: config.schemas ? buildSchemaMap(config.schemas, dataKeys) : undefined,
-        extraOptions: config.extraOptions
-      },
-    }); */
-
   await keyVaultClient.close()
-  // return encryptedClient
+
   return {
     keyVaultNamespace,
     kmsProviders,
