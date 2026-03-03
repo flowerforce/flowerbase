@@ -215,4 +215,103 @@ export const registerCollectionRoutes = (app: FastifyInstance, deps: CollectionR
       return { error: details.message, stack: details.stack }
     }
   })
+
+  app.post(`${prefix}/api/collections/insert`, async (req, reply) => {
+    const body = req.body as {
+      collection?: string
+      mode?: 'insertOne' | 'insertMany'
+      document?: unknown
+      documents?: unknown
+      recordHistory?: boolean
+      runAsSystem?: boolean
+      userId?: string
+    }
+    const collection = body?.collection
+    if (!collection) {
+      reply.code(400)
+      return { error: 'Missing collection name' }
+    }
+    const mode = body?.mode === 'insertMany' ? 'insertMany' : 'insertOne'
+    if (mode === 'insertOne') {
+      if (!isPlainObject(body?.document)) {
+        reply.code(400)
+        return { error: 'Document must be an object' }
+      }
+    } else {
+      if (!Array.isArray(body?.documents) || !body.documents.length) {
+        reply.code(400)
+        return { error: 'Documents must be a non-empty array' }
+      }
+      const invalid = body.documents.some((entry) => !isPlainObject(entry))
+      if (invalid) {
+        reply.code(400)
+        return { error: 'Every document must be an object' }
+      }
+    }
+
+    const rules = StateManager.select('rules') as Rules
+    const services = StateManager.select('services') as typeof coreServices
+    const resolvedUser = await resolveUserContext(app, body?.userId)
+    const runAsSystem = body?.runAsSystem !== false
+    const recordHistory = body?.recordHistory !== false
+
+    try {
+      const mongoService = services['mongodb-atlas'](app, {
+        rules,
+        user: resolvedUser ?? {},
+        run_as_system: runAsSystem
+      })
+      const collectionService = mongoService.db(DB_NAME).collection(collection)
+      if (mode === 'insertMany') {
+        const documents = body.documents as Record<string, unknown>[]
+        const result = await collectionService.insertMany(documents)
+        const insertedIds = Array.isArray(result?.insertedIds)
+          ? result.insertedIds
+          : Object.values(result?.insertedIds || {})
+        if (recordHistory) {
+          addCollectionHistory({
+            ts: Date.now(),
+            collection,
+            mode: 'insertMany',
+            documents: sanitize(documents),
+            runAsSystem,
+            user: getUserInfo(resolvedUser as Record<string, unknown> | undefined),
+            page: 1
+          })
+        }
+        return {
+          mode: 'insertMany',
+          acknowledged: !!result?.acknowledged,
+          insertedCount: insertedIds.length,
+          insertedIds: sanitize(insertedIds),
+          count: insertedIds.length
+        }
+      }
+
+      const document = body.document as Record<string, unknown>
+      const result = await collectionService.insertOne(document)
+      const insertedId = result?.insertedId
+      if (recordHistory) {
+        addCollectionHistory({
+          ts: Date.now(),
+          collection,
+          mode: 'insertOne',
+          document: sanitize(document),
+          runAsSystem,
+          user: getUserInfo(resolvedUser as Record<string, unknown> | undefined),
+          page: 1
+        })
+      }
+      return {
+        mode: 'insertOne',
+        acknowledged: !!result?.acknowledged,
+        insertedId: sanitize(insertedId),
+        count: insertedId ? 1 : 0
+      }
+    } catch (error) {
+      const details = getErrorDetails(error)
+      reply.code(500)
+      return { error: details.message, stack: details.stack }
+    }
+  })
 }

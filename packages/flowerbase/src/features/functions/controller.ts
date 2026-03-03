@@ -55,6 +55,12 @@ const serializeEjson = (value: unknown) =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
+const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
+  if (!isRecord(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
 const isCursorLike = (
   value: unknown
 ): value is { toArray: () => Promise<unknown> | unknown } => {
@@ -71,7 +77,7 @@ type WatchSubscriber = {
   id: string
   user: Record<string, any>
   response: ServerResponse
-  extraFilter?: Document
+  documentFilter?: Document
 }
 
 type SharedWatchStream = {
@@ -87,13 +93,221 @@ type SharedWatchStream = {
 
 const sharedWatchStreams = new Map<string, SharedWatchStream>()
 let watchSubscriberCounter = 0
+const maxSharedWatchStreams = Number(process.env.MAX_SHARED_WATCH_STREAMS || 200)
+const debugWatchStreams = process.env.DEBUG_FUNCTIONS === 'true'
+
+const changeEventRootKeys = new Set([
+  '_id',
+  'operationType',
+  'clusterTime',
+  'txnNumber',
+  'lsid',
+  'ns',
+  'documentKey',
+  'fullDocument',
+  'updateDescription'
+])
+
+const isChangeEventPath = (key: string) => {
+  if (changeEventRootKeys.has(key)) return true
+  return (
+    key.startsWith('ns.') ||
+    key.startsWith('documentKey.') ||
+    key.startsWith('fullDocument.') ||
+    key.startsWith('updateDescription.')
+  )
+}
+
+const isOpaqueChangeEventObjectKey = (key: string) =>
+  key === 'ns' || key === 'documentKey' || key === 'fullDocument' || key === 'updateDescription'
+
+export const mapWatchFilterToChangeStreamMatch = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => mapWatchFilterToChangeStreamMatch(item))
+  }
+
+  if (!isPlainRecord(value)) return value
+
+  return Object.entries(value).reduce<Record<string, unknown>>((acc, [key, current]) => {
+    if (key.startsWith('$')) {
+      acc[key] = mapWatchFilterToChangeStreamMatch(current)
+      return acc
+    }
+
+    if (isOpaqueChangeEventObjectKey(key)) {
+      acc[key] = current
+      return acc
+    }
+
+    if (isChangeEventPath(key)) {
+      acc[key] = mapWatchFilterToChangeStreamMatch(current)
+      return acc
+    }
+
+    acc[`fullDocument.${key}`] = mapWatchFilterToChangeStreamMatch(current)
+    return acc
+  }, {})
+}
+
+const isLogicalOperator = (key: string) => key === '$and' || key === '$or' || key === '$nor'
+
+export const mapWatchFilterToDocumentQuery = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    const mapped = value
+      .map((item) => mapWatchFilterToDocumentQuery(item))
+      .filter((item) => !(isRecord(item) && Object.keys(item).length === 0))
+    return mapped
+  }
+
+  if (!isPlainRecord(value)) return value
+
+  return Object.entries(value).reduce<Record<string, unknown>>((acc, [key, current]) => {
+    if (key.startsWith('$')) {
+      const mapped = mapWatchFilterToDocumentQuery(current)
+      if (isLogicalOperator(key) && Array.isArray(mapped)) {
+        if (mapped.length > 0) {
+          acc[key] = mapped
+        }
+        return acc
+      }
+      if (typeof mapped !== 'undefined') {
+        acc[key] = mapped
+      }
+      return acc
+    }
+
+    if (key === 'fullDocument') {
+      if (!isPlainRecord(current)) return acc
+      const mapped = mapWatchFilterToDocumentQuery(current)
+      if (isRecord(mapped)) {
+        Object.assign(acc, mapped)
+      }
+      return acc
+    }
+
+    if (key.startsWith('fullDocument.')) {
+      const docKey = key.slice('fullDocument.'.length)
+      if (!docKey) return acc
+      acc[docKey] = mapWatchFilterToDocumentQuery(current)
+      return acc
+    }
+
+    if (isChangeEventPath(key)) {
+      return acc
+    }
+
+    acc[key] = mapWatchFilterToDocumentQuery(current)
+    return acc
+  }, {})
+}
+
+const toStableValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => toStableValue(item))
+  }
+  if (!isPlainRecord(value)) return value
+
+  const sortedEntries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+  return sortedEntries.reduce<Record<string, unknown>>((acc, [key, current]) => {
+    acc[key] = toStableValue(current)
+    return acc
+  }, {})
+}
+
+const stableSerialize = (value: unknown) => {
+  const serialized = EJSON.serialize(value, { relaxed: false })
+  return JSON.stringify(toStableValue(serialized))
+}
+
+const getWatchPermissionContext = (user: Record<string, any>) => ({
+  role: user.role,
+  roles: user.roles,
+  data: user.data,
+  custom_data: user.custom_data,
+  user_data: user.user_data
+})
+
+const resolveWatchStream = (
+  database: string,
+  collection: string,
+  watchArgs: Record<string, unknown>,
+  user: Record<string, any>
+) => {
+  const keys = Object.keys(watchArgs)
+  const hasOnlyAllowedKeys = keys.every((key) => key === 'filter' || key === 'ids')
+  if (!hasOnlyAllowedKeys) {
+    throw new Error('watch options support only "filter" or "ids"')
+  }
+
+  const extraFilter = parseWatchFilter(watchArgs)
+  const ids = watchArgs.ids
+  if (extraFilter && typeof ids !== 'undefined') {
+    throw new Error('watch options cannot include both "ids" and "filter"')
+  }
+
+  const pipeline: Document[] = []
+  if (extraFilter) {
+    pipeline.push({ $match: mapWatchFilterToChangeStreamMatch(extraFilter) as Document })
+  }
+
+  if (typeof ids !== 'undefined') {
+    if (!Array.isArray(ids)) {
+      throw new Error('watch ids must be an array')
+    }
+    pipeline.push({
+      $match: {
+        $or: [
+          { 'documentKey._id': { $in: ids } },
+          { 'fullDocument._id': { $in: ids } }
+        ]
+      }
+    })
+  }
+
+  const options = { fullDocument: 'updateLookup' }
+  const streamKey = stableSerialize({
+    database,
+    collection,
+    pipeline,
+    options,
+    permissionContext: getWatchPermissionContext(user)
+  })
+
+  return { extraFilter, options, pipeline, streamKey }
+}
+
+const getWatchStats = () => {
+  let subscribers = 0
+  for (const hub of sharedWatchStreams.values()) {
+    subscribers += hub.subscribers.size
+  }
+  return {
+    hubs: sharedWatchStreams.size,
+    subscribers
+  }
+}
+
+const logWatchStats = (
+  event: string,
+  details?: Record<string, unknown>
+) => {
+  if (!debugWatchStreams) return
+  const stats = getWatchStats()
+  console.log('[watch-pool]', event, {
+    hubs: stats.hubs,
+    subscribers: stats.subscribers,
+    ...details
+  })
+}
 
 const parseWatchFilter = (args: unknown): Document | undefined => {
   if (!isRecord(args)) return undefined
-  const candidate =
-    (isRecord(args.filter) ? args.filter : undefined) ??
-    (isRecord(args.query) ? args.query : undefined)
-  return candidate ? (candidate as Document) : undefined
+  const candidate = isRecord(args.filter) ? args.filter : undefined
+  if (!candidate) return undefined
+  if ('$match' in candidate) {
+    throw new Error('watch filter must be a query object, not a $match stage')
+  }
+  return candidate as Document
 }
 
 const isReadableDocumentResult = (value: unknown) =>
@@ -225,7 +439,8 @@ export const functionsController: FunctionController = async (
     )
     const config = EJSON.deserialize(decodedConfig) as Base64Function
 
-    const [{ database, collection, ...watchArgs }] = config.arguments
+    const [{ database, collection, ...watchArgsInput }] = config.arguments
+    const watchArgs = isRecord(watchArgsInput) ? watchArgsInput : {}
 
     const headers = {
       'Content-Type': 'text/event-stream',
@@ -236,19 +451,33 @@ export const functionsController: FunctionController = async (
       "access-control-allow-headers": "X-Stitch-Location, X-Baas-Location, Location",
     };
 
-    res.raw.writeHead(200, headers)
-    res.raw.flushHeaders();
-
-    const streamKey = `${database}::${collection}`
     const subscriberId = `${Date.now()}-${watchSubscriberCounter++}`
-    const extraFilter = parseWatchFilter(watchArgs)
-    const mongoClient = app.mongo[CHANGESTREAM].client
+    const {
+      streamKey,
+      extraFilter,
+      options: watchOptions,
+      pipeline: watchPipeline
+    } = resolveWatchStream(database, collection, watchArgs, user)
 
     let hub = sharedWatchStreams.get(streamKey)
     if (!hub) {
-      const stream = mongoClient.db(database).collection(collection).watch([], {
-        fullDocument: 'whenAvailable'
+      if (sharedWatchStreams.size >= maxSharedWatchStreams) {
+        res.status(503)
+        return JSON.stringify({
+          error: JSON.stringify({
+            message: 'Watch stream limit reached',
+            name: 'WatchStreamLimitError'
+          }),
+          error_code: 'WatchStreamLimitError'
+        })
+      }
+      const stream = services['mongodb-atlas'](app, {
+        user,
+        rules
       })
+        .db(database)
+        .collection(collection)
+        .watch(watchPipeline, watchOptions)
       hub = {
         database,
         collection,
@@ -256,7 +485,13 @@ export const functionsController: FunctionController = async (
         subscribers: new Map<string, WatchSubscriber>()
       }
       sharedWatchStreams.set(streamKey, hub)
+      logWatchStats('hub-created', { streamKey, database, collection })
+    } else {
+      logWatchStats('hub-reused', { streamKey, database, collection })
     }
+
+    res.raw.writeHead(200, headers)
+    res.raw.flushHeaders();
 
     const ensureHubListeners = (currentHub: SharedWatchStream) => {
       if ((currentHub as SharedWatchStream & { listenersBound?: boolean }).listenersBound) {
@@ -267,6 +502,7 @@ export const functionsController: FunctionController = async (
         currentHub.stream.off('change', onHubChange)
         currentHub.stream.off('error', onHubError)
         sharedWatchStreams.delete(streamKey)
+        logWatchStats('hub-closed', { streamKey, database, collection })
         try {
           await currentHub.stream.close()
         } catch {
@@ -280,6 +516,7 @@ export const functionsController: FunctionController = async (
           const subscriberRes = subscriber.response
           if (subscriberRes.writableEnded || subscriberRes.destroyed) {
             currentHub.subscribers.delete(subscriber.id)
+            logWatchStats('subscriber-auto-removed', { streamKey, subscriberId: subscriber.id })
             return
           }
 
@@ -288,8 +525,8 @@ export const functionsController: FunctionController = async (
             (change as { fullDocument?: { _id?: unknown } })?.fullDocument?._id
           if (typeof docId === 'undefined') return
 
-          const readQuery = subscriber.extraFilter
-            ? ({ $and: [subscriber.extraFilter, { _id: docId }] } as Document)
+          const readQuery = subscriber.documentFilter
+            ? ({ $and: [subscriber.documentFilter, { _id: docId }] } as Document)
             : ({ _id: docId } as Document)
 
           try {
@@ -307,6 +544,7 @@ export const functionsController: FunctionController = async (
             subscriberRes.write(`event: error\ndata: ${formatFunctionExecutionError(error)}\n\n`)
             subscriberRes.end()
             currentHub.subscribers.delete(subscriber.id)
+            logWatchStats('subscriber-error-removed', { streamKey, subscriberId: subscriber.id })
           }
         }))
 
@@ -338,17 +576,25 @@ export const functionsController: FunctionController = async (
       id: subscriberId,
       user,
       response: res.raw,
-      extraFilter
+      documentFilter: (() => {
+        if (!extraFilter) return undefined
+        const mapped = mapWatchFilterToDocumentQuery(extraFilter)
+        if (!isRecord(mapped) || Object.keys(mapped).length === 0) return undefined
+        return mapped as Document
+      })()
     }
     hub.subscribers.set(subscriberId, subscriber)
+    logWatchStats('subscriber-added', { streamKey, subscriberId })
 
     req.raw.on('close', () => {
       const currentHub = sharedWatchStreams.get(streamKey)
       if (!currentHub) return
       currentHub.subscribers.delete(subscriberId)
+      logWatchStats('subscriber-closed', { streamKey, subscriberId })
       if (!currentHub.subscribers.size) {
         void currentHub.stream.close()
         sharedWatchStreams.delete(streamKey)
+        logWatchStats('hub-empty-closed', { streamKey })
       }
     })
   })

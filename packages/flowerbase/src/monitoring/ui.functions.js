@@ -78,7 +78,8 @@
       functionHighlight.innerHTML = highlightCode(code);
     }
     if (functionGutter) {
-      const lines = Math.max(1, code.split('\n').length);
+      const lineBreaks = code.match(/\r\n|\r|\n/g);
+      const lines = Math.max(1, (lineBreaks ? lineBreaks.length : 0) + 1);
       let out = '';
       for (let i = 1; i <= lines; i += 1) {
         out += i + (i === lines ? '' : '\n');

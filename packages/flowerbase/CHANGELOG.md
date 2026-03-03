@@ -1,3 +1,24 @@
+## 1.7.5 (2026-03-02)
+
+
+### 🩹 Fixes
+
+- _id in user_data ([#21](https://github.com/flowerforce/flowerbase/pull/21))
+
+- refresh token ([#25](https://github.com/flowerforce/flowerbase/pull/25))
+
+- trigger disable ([61b6676](https://github.com/flowerforce/flowerbase/commit/61b6676))
+
+- cursor functions ([da6d590](https://github.com/flowerforce/flowerbase/commit/da6d590))
+
+- WIP roles ([35e93b4](https://github.com/flowerforce/flowerbase/commit/35e93b4))
+
+- roles ([f7a3b13](https://github.com/flowerforce/flowerbase/commit/f7a3b13))
+
+- roles read & write ([45ded56](https://github.com/flowerforce/flowerbase/commit/45ded56))
+
+- **monitoring:** keep function editor line numbers synced while scrolling ([#30](https://github.com/flowerforce/flowerbase/pull/30))
+
 ## 1.7.4 (2026-02-19)
 
 

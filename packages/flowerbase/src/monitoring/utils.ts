@@ -29,9 +29,11 @@ export type FunctionHistoryItem = {
 export type CollectionHistoryItem = {
   ts: number
   collection: string
-  mode: 'query' | 'aggregate'
+  mode: 'query' | 'aggregate' | 'insertOne' | 'insertMany'
   query?: unknown
   pipeline?: unknown
+  document?: unknown
+  documents?: unknown
   sort?: Record<string, unknown>
   runAsSystem: boolean
   user?: { id?: string; email?: string }

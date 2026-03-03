@@ -1101,18 +1101,6 @@ const getOperators: GetOperatorsFunction = (
                 }
               }
 
-              console.log('[flowerbase watch] delivered change', {
-                collection: collName,
-                operationType: change?.operationType,
-                eventType,
-                hasFullDocument,
-                hasWinningRole,
-                updatedFieldsStatus,
-                documentKey:
-                  change?.documentKey?._id?.toString?.() ||
-                  change?.documentKey?._id ||
-                  null
-              })
               listener(filteredChange)
             })
           }
@@ -1257,7 +1245,6 @@ const getOperators: GetOperatorsFunction = (
           // Retrieve the document to check permissions before updating
           const result = await collection.find({ $and: formattedQuery }).toArray()
           if (!result) {
-            console.log('check1 In updateMany --> (!result)')
             throw new Error('Update not permitted')
           }
 
@@ -1294,8 +1281,6 @@ const getOperators: GetOperatorsFunction = (
           )
 
           if (!areDocumentsEqual) {
-            console.log('check1 In updateMany --> (!areDocumentsEqual)')
-
             throw new Error('Update not permitted')
           }
 
