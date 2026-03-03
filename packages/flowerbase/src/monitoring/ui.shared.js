@@ -279,6 +279,109 @@
 
   bindJsonToggleHandlers();
 
+  const getJsonViewerStore = () => {
+    if (!state.__jsonViewerStore || typeof state.__jsonViewerStore.get !== 'function') {
+      state.__jsonViewerStore = new WeakMap();
+    }
+    return state.__jsonViewerStore;
+  };
+
+  const getCodeMirrorLib = () => {
+    if (typeof window === 'undefined') return null;
+    const codeMirror = window.CodeMirror;
+    if (!codeMirror || typeof codeMirror !== 'function') return null;
+    return codeMirror;
+  };
+
+  const clearJsonViewer = (element, placeholder) => {
+    if (!element) return;
+    const store = getJsonViewerStore();
+    const editor = store.get(element);
+    if (editor && typeof editor.getWrapperElement === 'function') {
+      const wrapper = editor.getWrapperElement();
+      if (wrapper && wrapper.parentNode === element) {
+        wrapper.parentNode.removeChild(wrapper);
+      }
+      store.delete(element);
+    }
+    element.classList.remove('cm-json-host');
+    element.classList.remove('json-highlight');
+    element.textContent = placeholder || '';
+  };
+
+  const renderJsonViewer = (element, value, options) => {
+    if (!element) return;
+    const opts = options || {};
+    let text = '';
+    let mode = { name: 'javascript', json: true };
+
+    if (typeof value === 'string') {
+      text = value;
+      const trimmed = text.trim();
+      if (trimmed) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (opts.pretty !== false) {
+            text = JSON.stringify(parsed, null, 2);
+          }
+        } catch (err) {
+          mode = 'text/plain';
+        }
+      } else {
+        mode = 'text/plain';
+      }
+    } else if (value === undefined || value === null) {
+      text = '';
+      mode = 'text/plain';
+    } else {
+      try {
+        text = JSON.stringify(value, null, 2);
+      } catch (err) {
+        text = safeStringify(value);
+        mode = 'text/plain';
+      }
+    }
+
+    const CodeMirrorLib = getCodeMirrorLib();
+    if (!CodeMirrorLib) {
+      element.classList.add('json-highlight');
+      element.innerHTML = highlightJson(text || '', { collapsible: opts.collapsible !== false });
+      return;
+    }
+
+    const store = getJsonViewerStore();
+    let editor = store.get(element);
+    if (!editor) {
+      editor = CodeMirrorLib((node) => {
+        element.innerHTML = '';
+        element.appendChild(node);
+      }, {
+        lineNumbers: true,
+        lineWrapping: false,
+        readOnly: 'nocursor',
+        foldGutter: true,
+        gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+        mode
+      });
+      store.set(element, editor);
+    }
+
+    const collapsible = opts.collapsible !== false;
+    editor.setOption('lineNumbers', opts.lineNumbers !== false);
+    editor.setOption('readOnly', opts.readOnly === false ? false : 'nocursor');
+    editor.setOption('foldGutter', collapsible);
+    editor.setOption('gutters', collapsible
+      ? ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
+      : ['CodeMirror-linenumbers']);
+    editor.setOption('mode', mode);
+    editor.setValue(text || '');
+    if (typeof editor.clearHistory === 'function') editor.clearHistory();
+    if (typeof editor.refresh === 'function') editor.refresh();
+
+    element.classList.remove('json-highlight');
+    element.classList.add('cm-json-host');
+  };
+
   const setActiveTab = (tab) => {
     if (!dom.tabButtons || !dom.tabPanels) return;
     dom.tabButtons.forEach((item) => {
@@ -302,7 +405,9 @@
       escapeHtml,
       safeStringify,
       highlightCode,
-      highlightJson
+      highlightJson,
+      renderJsonViewer,
+      clearJsonViewer
     },
     helpers: {
       setActiveTab

@@ -463,6 +463,69 @@ button.danger {
   white-space: pre-wrap;
 }
 
+.event-detail.cm-json-host {
+  padding: 0;
+  overflow: hidden;
+  white-space: normal;
+}
+
+.event-detail.cm-json-host .CodeMirror {
+  height: 100%;
+  min-height: 140px;
+  width: 100%;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #d4d4d4;
+  background: var(--panel);
+}
+
+.event-detail.cm-json-host .CodeMirror-gutters {
+  background: #141414;
+  border-right: 1px solid #2b2b2b;
+}
+
+.event-detail.cm-json-host .CodeMirror-linenumber,
+.event-detail.cm-json-host .CodeMirror-foldgutter-open,
+.event-detail.cm-json-host .CodeMirror-foldgutter-folded {
+  color: #8a8a8a;
+}
+
+.event-detail.cm-json-host .CodeMirror-cursor {
+  border-left-color: #ffffff;
+}
+
+.event-detail.cm-json-host .CodeMirror-selected {
+  background: rgba(88, 166, 255, 0.35);
+}
+
+.event-detail.cm-json-host .cm-comment {
+  color: #6a9955;
+}
+
+.event-detail.cm-json-host .cm-string,
+.event-detail.cm-json-host .cm-string-2 {
+  color: #ce9178;
+}
+
+.event-detail.cm-json-host .cm-number {
+  color: #b5cea8;
+}
+
+.event-detail.cm-json-host .cm-keyword,
+.event-detail.cm-json-host .cm-atom {
+  color: #569cd6;
+}
+
+.event-detail.cm-json-host .cm-property,
+.event-detail.cm-json-host .cm-def,
+.event-detail.cm-json-host .cm-variable,
+.event-detail.cm-json-host .cm-variable-2,
+.event-detail.cm-json-host .cm-variable-3,
+.event-detail.cm-json-host .cm-operator,
+.event-detail.cm-json-host .cm-bracket {
+  color: #d4d4d4;
+}
+
 .subpanel {
   margin-top: 0;
   padding: 10px;
@@ -1068,6 +1131,71 @@ button.small {
   word-break: normal;
   overflow: hidden;
   pointer-events: none;
+}
+
+.code-editor.cm-enabled .code-gutter,
+.code-editor.cm-enabled #functionHighlight {
+  display: none;
+}
+
+.code-editor.cm-enabled .code-surface {
+  overflow: hidden;
+}
+
+.code-editor.cm-enabled .CodeMirror {
+  height: 100%;
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #d4d4d4;
+  background: #1e1e1e;
+}
+
+.code-editor.cm-enabled .CodeMirror-gutters {
+  background: #141414;
+  border-right: 1px solid #2b2b2b;
+}
+
+.code-editor.cm-enabled .CodeMirror-linenumber,
+.code-editor.cm-enabled .CodeMirror-foldgutter-open,
+.code-editor.cm-enabled .CodeMirror-foldgutter-folded {
+  color: #8a8a8a;
+}
+
+.code-editor.cm-enabled .CodeMirror-cursor {
+  border-left-color: #ffffff;
+}
+
+.code-editor.cm-enabled .CodeMirror-selected {
+  background: rgba(88, 166, 255, 0.35);
+}
+
+.code-editor.cm-enabled .cm-comment {
+  color: #6a9955;
+}
+
+.code-editor.cm-enabled .cm-string,
+.code-editor.cm-enabled .cm-string-2 {
+  color: #ce9178;
+}
+
+.code-editor.cm-enabled .cm-number {
+  color: #b5cea8;
+}
+
+.code-editor.cm-enabled .cm-keyword,
+.code-editor.cm-enabled .cm-atom {
+  color: #569cd6;
+}
+
+.code-editor.cm-enabled .cm-def,
+.code-editor.cm-enabled .cm-property,
+.code-editor.cm-enabled .cm-variable,
+.code-editor.cm-enabled .cm-variable-2,
+.code-editor.cm-enabled .cm-variable-3,
+.code-editor.cm-enabled .cm-operator,
+.code-editor.cm-enabled .cm-bracket {
+  color: #d4d4d4;
 }
 
 #functionCode {

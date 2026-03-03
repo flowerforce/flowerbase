@@ -51,7 +51,7 @@
     endpointTabButtons,
     endpointTabPanels
   } = dom;
-  const { api, parseOptionalJsonValue, highlightJson, escapeHtml, formatTime, safeStringify } = utils;
+  const { api, parseOptionalJsonValue, renderJsonViewer, clearJsonViewer, escapeHtml, formatTime, safeStringify } = utils;
   const { setActiveTab } = helpers;
 
   const ENDPOINT_RESULT_PLACEHOLDER = state.endpointResult;
@@ -76,11 +76,9 @@
   const setEndpointResultContent = (text, highlight = false) => {
     if (!endpointResult) return;
     if (highlight) {
-      endpointResult.classList.add('json-highlight');
-      endpointResult.innerHTML = highlightJson(text || '', { collapsible: true });
+      renderJsonViewer(endpointResult, text || '', { collapsible: true });
     } else {
-      endpointResult.classList.remove('json-highlight');
-      endpointResult.textContent = text || '';
+      clearJsonViewer(endpointResult, text || '');
     }
   };
 
@@ -104,8 +102,7 @@
   const setEndpointDetail = (endpoint) => {
     if (!endpointMeta) return;
     if (!endpoint) {
-      endpointMeta.textContent = 'select an endpoint to inspect';
-      endpointMeta.classList.remove('json-highlight');
+      clearJsonViewer(endpointMeta, 'select an endpoint to inspect');
       if (endpointHint) endpointHint.textContent = 'select an endpoint';
       if (endpointFunctionButton) {
         endpointFunctionButton.classList.add('is-hidden');
@@ -121,9 +118,7 @@
     const route = endpoint.route || '';
     const functionName = endpoint.function_name || 'unknown';
     const status = endpoint.disabled ? 'disabled' : 'active';
-    const jsonPayload = JSON.stringify(endpoint, null, 2) || '';
-    endpointMeta.classList.add('json-highlight');
-    endpointMeta.innerHTML = highlightJson(jsonPayload, { collapsible: true });
+    renderJsonViewer(endpointMeta, endpoint, { collapsible: true });
     if (endpointHint) endpointHint.textContent = status;
     if (endpointMethod) endpointMethod.value = method;
     if (endpointFunctionButton) {

@@ -15,7 +15,7 @@
   dom.refreshTriggers = document.getElementById('refreshTriggers');
 
   const { triggerList, triggerDetail, triggerFunctionButton, refreshTriggers } = dom;
-  const { api, highlightJson } = utils;
+  const { api, renderJsonViewer } = utils;
   const { setActiveTab } = helpers;
 
   const buildTriggerFunctionMap = (items) => {
@@ -71,8 +71,7 @@
       });
     }
     if (triggerDetail) {
-      triggerDetail.classList.add('json-highlight');
-      triggerDetail.innerHTML = highlightJson(JSON.stringify(entry, null, 2) || '', { collapsible: true });
+      renderJsonViewer(triggerDetail, entry, { collapsible: true });
     }
     if (triggerFunctionButton) {
       if (fnName) {
