@@ -7,7 +7,6 @@ import {
   ChangeStreamOptions,
   ClientSession,
   ClientSessionOptions,
-  Collection,
   Document,
   EventsDescription,
   FindOneAndUpdateOptions,
@@ -22,6 +21,7 @@ import { buildRulesMeta } from '../../monitoring/utils'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
 import { emitServiceEvent } from '../monitoring'
+import { CHANGESTREAM } from '../../constants'
 import {
   CRUD_OPERATIONS,
   GetOperatorsFunction,
@@ -997,7 +997,7 @@ const getOperators: GetOperatorsFunction = (
      * This allows fine-grained control over what change events a user can observe, based on roles and filters.
      */
     watch: (pipelineOrOptions = [], options) => {
-      const changestreamCollection = mongo.changestream.client.db(dbName).collection(collName)
+      const changestreamCollection = mongo[CHANGESTREAM].client.db(dbName).collection(collName)
       try {
         const {
           pipeline,

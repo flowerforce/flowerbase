@@ -85,9 +85,14 @@ export const AUTH_CONFIG = {
   }
 }
 
-
-
 export const S3_CONFIG = {
   ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
   SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY
 }
+
+/**
+ * Name of the MongoDB client to use for change streams.
+ * This may be a separate instance because streams do not work
+ * when the main client has auto encryption enabled.
+ */
+export const CHANGESTREAM = "changestream"

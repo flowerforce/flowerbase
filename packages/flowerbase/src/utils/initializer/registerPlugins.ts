@@ -92,13 +92,13 @@ const getRegisterConfig = async ({
     methods: ['POST', 'GET']
   }
 
-  const autoEncryption: FastifyMongodbOptions["autoEncryption"] = mongodbEncryptionConfig ?
-    await setupMongoDbCSFLE({
+  const autoEncryption = mongodbEncryptionConfig
+    ? await setupMongoDbCSFLE({
       mongodbUrl,
       schemas: encryptionSchemas,
-      ...mongodbEncryptionConfig,
-    }) : undefined
-
+      ...mongodbEncryptionConfig
+    })
+    : undefined
 
   const baseConfig = [
     {
@@ -112,16 +112,25 @@ const getRegisterConfig = async ({
       options: {
         url: mongodbUrl,
         forceClose: true,
-        autoEncryption, // Auto-encryption is not supported for change streams
+        autoEncryption
       } satisfies FastifyMongodbOptions
     },
-    {
+    /**
+     * When auto-encryption is active, add another MongoDB client with bypass for change streams.
+     * The $changeStream operator does not support automatic encryption, only decryption.
+     * @see https://www.mongodb.com/docs/manual/core/csfle/reference/supported-operations
+     */
+    autoEncryption && {
       pluginName: 'fastifyMongodb',
       plugin: fastifyMongodb,
       options: {
-        name: 'changestream',
+        name: "changestream",
         url: mongodbUrl,
         forceClose: true,
+        autoEncryption: {
+          ...autoEncryption,
+          bypassAutoEncryption: true
+        }
       } satisfies FastifyMongodbOptions
     },
     {
@@ -179,5 +188,5 @@ const getRegisterConfig = async ({
     } as RegisterConfig)
   }
 
-  return baseConfig
+  return baseConfig.filter(Boolean)
 }

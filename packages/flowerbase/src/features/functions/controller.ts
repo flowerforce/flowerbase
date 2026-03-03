@@ -4,6 +4,7 @@ import type { FastifyRequest } from 'fastify'
 import type { Document } from 'mongodb'
 import { services } from '../../services'
 import { GenerateContext } from '../../utils/context'
+import { CHANGESTREAM } from '../../constants'
 import { Base64Function, FunctionCallBase64Dto, FunctionCallDto } from './dtos'
 import { FunctionController } from './interface'
 import { executeQuery } from './utils'
@@ -241,7 +242,7 @@ export const functionsController: FunctionController = async (
     const streamKey = `${database}::${collection}`
     const subscriberId = `${Date.now()}-${watchSubscriberCounter++}`
     const extraFilter = parseWatchFilter(watchArgs)
-    const mongoClient = app.mongo.changestream.client
+    const mongoClient = app.mongo[CHANGESTREAM].client
 
     let hub = sharedWatchStreams.get(streamKey)
     if (!hub) {
