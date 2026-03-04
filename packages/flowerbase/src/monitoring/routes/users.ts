@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { ObjectId } from 'mongodb'
 import { loadAuthConfig, loadCustomUserData, PASSWORD_RULES } from '../../auth/utils'
-import { AUTH_CONFIG, DB_NAME } from '../../constants'
+import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME } from '../../constants'
 import handleUserRegistration from '../../shared/handleUserRegistration'
 import { PROVIDER } from '../../shared/models/handleUserRegistration.model'
 import { hashPassword } from '../../utils/crypto'
@@ -47,7 +47,8 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
     const resolvedAuthLimit = Math.min(Number.isFinite(parsedAuthLimit) && parsedAuthLimit > 0 ? parsedAuthLimit : 100, 500)
     const resolvedCustomLimit = Math.min(Number.isFinite(parsedCustomLimit) && parsedCustomLimit > 0 ? parsedCustomLimit : 25, 500)
     const resolvedCustomPage = Math.max(Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1, 1)
-    const db = app.mongo.client.db(DB_NAME)
+    const authDb = app.mongo.client.db(AUTH_DB_NAME)
+    const customDb = app.mongo.client.db(DB_NAME)
     const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
     const userCollection = AUTH_CONFIG.userCollection
 
@@ -69,7 +70,7 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
           ]
         }
         : {}
-      const authItems = await db
+      const authItems = await authDb
         .collection(authCollection)
         .find(authFilter)
         .sort({ createdAt: -1, _id: -1 })
@@ -94,11 +95,11 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
           ]
         }
         : {}
-      const total = await db.collection(userCollection).countDocuments(customFilter)
+      const total = await customDb.collection(userCollection).countDocuments(customFilter)
       const totalPages = Math.max(1, Math.ceil(total / Math.max(resolvedCustomLimit, 1)))
       const page = Math.min(resolvedCustomPage, totalPages)
       const skip = Math.max(0, (page - 1) * resolvedCustomLimit)
-      const customItems = await db
+      const customItems = await customDb
         .collection(userCollection)
         .find(customFilter)
         .sort({ createdAt: -1, _id: -1 })
@@ -193,7 +194,7 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
       return { error: passwordError }
     }
 
-    const db = app.mongo.client.db(DB_NAME)
+    const db = app.mongo.client.db(AUTH_DB_NAME)
     const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
     const selector: Record<string, unknown> = {}
 
@@ -231,7 +232,7 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
   app.patch(`${prefix}/api/users/:id/status`, async (req, reply) => {
     const params = req.params as { id: string }
     const body = req.body as { disabled?: boolean; status?: string; email?: string }
-    const db = app.mongo.client.db(DB_NAME)
+    const db = app.mongo.client.db(AUTH_DB_NAME)
     const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
     const selector: Record<string, unknown> = {}
 

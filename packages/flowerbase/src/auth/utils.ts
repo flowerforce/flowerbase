@@ -122,6 +122,7 @@ export enum AUTH_ERRORS {
 
 export interface AuthConfig {
   auth_collection?: string
+  auth_database?: string
   'api-key': ApiKey
   'local-userpass': LocalUserpass
   'custom-function': CustomFunction

@@ -1,6 +1,6 @@
 import { ObjectId } from 'bson'
 import { FastifyInstance } from 'fastify'
-import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../constants'
+import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME, DEFAULT_CONFIG } from '../constants'
 import { StateManager } from '../state'
 import { hashToken } from '../utils/crypto'
 import { SessionCreatedDto } from './dtos'
@@ -23,11 +23,12 @@ type UnauthorizedSessionReply = typeof unauthorizedSessionError
 export async function authController(app: FastifyInstance) {
   const { authCollection, userCollection, refreshTokensCollection } = AUTH_CONFIG
 
-  const db = app.mongo.client.db(DB_NAME)
+  const authDb = app.mongo.client.db(AUTH_DB_NAME)
+  const customUserDb = app.mongo.client.db(DB_NAME)
   const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
 
   try {
-    await db.collection(refreshTokensCollection).createIndex(
+    await authDb.collection(refreshTokensCollection).createIndex(
       { expiresAt: 1 },
       { expireAfterSeconds: 0 }
     )
@@ -36,7 +37,7 @@ export async function authController(app: FastifyInstance) {
   }
 
   try {
-    await db.collection(authCollection).createIndex(
+    await authDb.collection(authCollection).createIndex(
       { email: 1 },
       {
         unique: true
@@ -63,12 +64,12 @@ export async function authController(app: FastifyInstance) {
     if (req.user.typ !== 'access') {
       throw new Error('Access token required')
     }
-    const authUser = await db
+    const authUser = await authDb
       .collection<Record<string, unknown>>(authCollection)
       .findOne({ _id: ObjectId.createFromHexString(req.user.id) })
 
     const customData = userCollection && AUTH_CONFIG.user_id_field
-      ? await db
+      ? await customUserDb
         .collection<Record<string, unknown>>(userCollection)
         .findOne({ [AUTH_CONFIG.user_id_field]: req.user.id })
       : null
@@ -117,7 +118,7 @@ export async function authController(app: FastifyInstance) {
       }
       const refreshToken = authHeader.slice('Bearer '.length).trim()
       const refreshTokenHash = hashToken(refreshToken)
-      const storedToken = await db.collection(refreshTokensCollection).findOne({
+      const storedToken = await authDb.collection(refreshTokensCollection).findOne({
         tokenHash: refreshTokenHash,
         revokedAt: null,
         expiresAt: { $gt: new Date() }
@@ -127,7 +128,7 @@ export async function authController(app: FastifyInstance) {
         return
       }
 
-      const auth_user = await db
+      const auth_user = await authDb
         ?.collection(authCollection)
         .findOne({ _id: new this.mongo.ObjectId(req.user.sub) })
 
@@ -137,7 +138,7 @@ export async function authController(app: FastifyInstance) {
       }
 
       const user = userCollection && AUTH_CONFIG.user_id_field
-        ? (await db!.collection(userCollection).findOne({ [AUTH_CONFIG.user_id_field]: req.user.sub }))
+        ? (await customUserDb.collection(userCollection).findOne({ [AUTH_CONFIG.user_id_field]: req.user.sub }))
         : {}
 
       res.status(201)
@@ -175,7 +176,7 @@ export async function authController(app: FastifyInstance) {
       const refreshTokenHash = hashToken(refreshToken)
       const now = new Date()
       const expiresAt = new Date(Date.now() + refreshTokenTtlMs)
-      const updateResult = await db.collection(refreshTokensCollection).findOneAndUpdate(
+      const updateResult = await authDb.collection(refreshTokensCollection).findOneAndUpdate(
         { tokenHash: refreshTokenHash },
         {
           $set: {
@@ -197,7 +198,7 @@ export async function authController(app: FastifyInstance) {
       }
 
       if (userId && authCollection) {
-        await db.collection(authCollection).updateOne(
+        await authDb.collection(authCollection).updateOne(
           { _id: userId },
           { $set: { lastLogoutAt: now } }
         )

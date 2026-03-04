@@ -1,5 +1,5 @@
 import { ObjectId } from "bson"
-import { AUTH_CONFIG, DB_NAME } from "../constants"
+import { AUTH_CONFIG, AUTH_DB_NAME } from "../constants"
 import { emitServiceEvent } from "../services/monitoring"
 import { HandleUserDeletion } from "./models/handleUserDeletion.model"
 
@@ -33,7 +33,7 @@ const handleUserDeletion: HandleUserDeletion = (app, opt) => async ({ id, email 
 
         const { authCollection } = AUTH_CONFIG
         const mongo = app?.mongo
-        const db = mongo.client.db(DB_NAME)
+        const db = mongo.client.db(AUTH_DB_NAME)
         const collection = db.collection<Record<string, unknown>>(authCollection!)
         let query: Record<string, unknown>
 

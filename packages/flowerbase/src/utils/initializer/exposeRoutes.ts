@@ -2,7 +2,7 @@ import { uptime } from 'node:process'
 import { FastifyInstance } from 'fastify'
 import { RegistrationDto } from '../../auth/providers/local-userpass/dtos'
 import { AUTH_ENDPOINTS, REGISTRATION_SCHEMA } from '../../auth/utils'
-import { API_VERSION, AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../constants'
+import { API_VERSION, AUTH_CONFIG, AUTH_DB_NAME, DEFAULT_CONFIG } from '../../constants'
 import { PROVIDER } from '../../shared/models/handleUserRegistration.model'
 import { hashPassword } from '../crypto'
 
@@ -46,7 +46,7 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
       schema: REGISTRATION_SCHEMA
     }, async function (req, res) {
       const { authCollection } = AUTH_CONFIG
-      const db = fastify.mongo.client.db(DB_NAME)
+      const db = fastify.mongo.client.db(AUTH_DB_NAME)
       const { email, password } = req.body
       const hashedPassword = await hashPassword(password)
       const now = new Date()
