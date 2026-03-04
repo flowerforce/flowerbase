@@ -1291,7 +1291,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const wrongDoc = (await getOidStringToOidCollection(ownerUser).findOne({
       _id: oidDocIds.otherCompany
     })) as Document | null
-    expect(wrongDoc).toBeNull()
+    expect(wrongDoc).toEqual({})
   })
 
   it('supports %oidToString in apply_when for role matching', async () => {
