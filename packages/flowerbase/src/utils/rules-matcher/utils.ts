@@ -1,9 +1,59 @@
+import { ObjectId } from 'bson'
 import _get from 'lodash/get'
-import _intersection from 'lodash/intersection'
 import _trimStart from 'lodash/trimStart'
 import { Operators, RulesMatcherUtils, RulesObject } from './interface'
 
 const EMPTY_STRING_REGEXP = /^\s*$/
+const HEX_24_REGEXP = /^[a-fA-F0-9]{24}$/
+
+const toObjectIdHex = (value: unknown): string | null => {
+  if (value instanceof ObjectId) {
+    return value.toHexString()
+  }
+
+  if (typeof value === 'string') {
+    if (!HEX_24_REGEXP.test(value) || !ObjectId.isValid(value)) {
+      return null
+    }
+    return new ObjectId(value).toHexString()
+  }
+
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const maybeObjectId = value as { _bsontype?: string; toHexString?: () => string }
+  if (maybeObjectId._bsontype === 'ObjectId' && typeof maybeObjectId.toHexString === 'function') {
+    const hex = maybeObjectId.toHexString()
+    return HEX_24_REGEXP.test(hex) ? hex.toLowerCase() : null
+  }
+
+  return null
+}
+
+const areSemanticallyEqual = (left: unknown, right: unknown): boolean => {
+  const leftOid = toObjectIdHex(left)
+  const rightOid = toObjectIdHex(right)
+
+  if (leftOid || rightOid) {
+    return leftOid !== null && rightOid !== null && leftOid === rightOid
+  }
+
+  return left === right
+}
+
+const includesWithSemanticEquality = (value: unknown, candidate: unknown): boolean =>
+  rulesMatcherUtils
+    .forceArray(candidate)
+    .some((item) =>
+      rulesMatcherUtils
+        .forceArray(value)
+        .some((sourceItem) =>
+          rulesMatcherUtils.forceArray(item).some((candidateItem) =>
+            areSemanticallyEqual(sourceItem, candidateItem)
+          )
+        )
+    )
 
 /**
  * Defines a utility object named rulesMatcherUtils, which contains various helper functions used for processing rules and data in a rule-matching context.
@@ -24,10 +74,10 @@ const rulesMatcherUtils: RulesMatcherUtils = {
     const valueRef =
       value && String(value).indexOf('$ref:') === 0
         ? _get(
-            data,
-            rulesMatcherUtils.getPath(value.replace('$ref:', ''), prefix),
-            undefined
-          )
+          data,
+          rulesMatcherUtils.getPath(value.replace('$ref:', ''), prefix),
+          undefined
+        )
         : value
 
     if (!operators[op]) {
@@ -230,9 +280,9 @@ const rulesMatcherUtils: RulesMatcherUtils = {
 export const operators: Operators = {
   $exists: (a, b) => !rulesMatcherUtils.isEmpty(a) === b,
 
-  $eq: (a, b) => a === b,
+  $eq: (a, b) => areSemanticallyEqual(a, b),
 
-  $ne: (a, b) => a !== b,
+  $ne: (a, b) => !areSemanticallyEqual(a, b),
 
   $gt: (a, b) => rulesMatcherUtils.forceNumber(a) > parseFloat(b),
 
@@ -250,39 +300,35 @@ export const operators: Operators = {
 
   $strLte: (a, b) => String(a || '').length <= parseFloat(b),
 
-  $in: (a, b) =>
-    rulesMatcherUtils
-      .forceArray(b)
-      .some(
-        (c) =>
-          _intersection(rulesMatcherUtils.forceArray(a), rulesMatcherUtils.forceArray(c))
-            .length
-      ),
+  $in: (a, b) => includesWithSemanticEquality(a, b),
 
-  $nin: (a, b) =>
-    !rulesMatcherUtils
-      .forceArray(b)
-      .some(
-        (c) =>
-          _intersection(rulesMatcherUtils.forceArray(a), rulesMatcherUtils.forceArray(c))
-            .length
-      ),
+  $nin: (a, b) => !includesWithSemanticEquality(a, b),
 
   $all: (a, b) =>
-    rulesMatcherUtils
-      .forceArray(b)
-      .every(
-        (c) =>
-          _intersection(rulesMatcherUtils.forceArray(a), rulesMatcherUtils.forceArray(c))
-            .length
-      ),
+    rulesMatcherUtils.forceArray(b).every((candidate) =>
+      rulesMatcherUtils
+        .forceArray(a)
+        .some((value) =>
+          rulesMatcherUtils.forceArray(candidate).some((item) => areSemanticallyEqual(value, item))
+        )
+    ),
 
   $size: (a, b) => Array.isArray(a) && a.length === parseFloat(b),
 
   $regex: (a, b, opt) =>
     rulesMatcherUtils
       .forceArray(b)
-      .some((c) => (c instanceof RegExp ? c.test(a) : new RegExp(c, opt).test(a)))
+      .some((c) => (c instanceof RegExp ? c.test(a) : new RegExp(c, opt).test(a))),
+
+  '%stringToOid': (a, b) => {
+    const converted = toObjectIdHex(b)
+    return converted !== null && areSemanticallyEqual(a, converted)
+  },
+
+  '%oidToString': (a, b) => {
+    const converted = toObjectIdHex(b)
+    return converted !== null && areSemanticallyEqual(a, converted)
+  }
 }
 
 // export default operators

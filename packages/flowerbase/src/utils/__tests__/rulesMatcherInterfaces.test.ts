@@ -22,6 +22,8 @@ describe('Enums and Types', () => {
     expect(RulesOperators.$nin).toBe('$nin')
     expect(RulesOperators.$all).toBe('$all')
     expect(RulesOperators.$regex).toBe('$regex')
+    expect(RulesOperators['%stringToOid']).toBe('%stringToOid')
+    expect(RulesOperators['%oidToString']).toBe('%oidToString')
   })
 
   it('should validate RulesOperatorsInArray type', () => {

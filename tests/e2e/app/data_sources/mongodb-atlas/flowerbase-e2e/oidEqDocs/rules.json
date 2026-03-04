@@ -1,0 +1,18 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "oidEqDocs",
+  "filters": [],
+  "roles": [
+    {
+      "name": "companyMatchWithEq",
+      "apply_when": {
+        "_id": "%%user.custom_data.company"
+      },
+      "insert": false,
+      "delete": false,
+      "search": true,
+      "read": true,
+      "write": false
+    }
+  ]
+}

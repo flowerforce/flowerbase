@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb'
 import rulesMatcherUtils from '../rules-matcher/utils'
 
 describe('rule function', () => {
@@ -45,5 +46,43 @@ describe('rule function', () => {
     expect(() => {
       rulesMatcherUtils.rule(missingOperatorBlock, mockData, mockOptions)
     }).toThrow('Error missing operator:$notFoundOperator')
+  })
+
+  it('should support %stringToOid with $ref values', () => {
+    const companyId = new ObjectId()
+    const data = {
+      user: {
+        _id: companyId
+      },
+      auth: {
+        company: companyId.toHexString()
+      }
+    }
+
+    const result = rulesMatcherUtils.rule({ _id: { '%stringToOid': '$ref:auth.company' } }, data, {
+      prefix: 'user'
+    })
+
+    expect(result.valid).toBe(true)
+    expect(result.name).toBe('user._id___%stringToOid')
+  })
+
+  it('should support %oidToString with $ref values', () => {
+    const authId = new ObjectId()
+    const data = {
+      user: {
+        authId: authId.toHexString()
+      },
+      auth: {
+        id: authId
+      }
+    }
+
+    const result = rulesMatcherUtils.rule({ authId: { '%oidToString': '$ref:auth.id' } }, data, {
+      prefix: 'user'
+    })
+
+    expect(result.valid).toBe(true)
+    expect(result.name).toBe('user.authId___%oidToString')
   })
 })
