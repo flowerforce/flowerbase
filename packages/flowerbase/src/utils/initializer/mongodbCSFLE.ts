@@ -193,6 +193,7 @@ export const setupMongoDbCSFLE = async (
 
   const keyVaultNamespace = `${requiredConfig.keyVaultDb}.${requiredConfig.keyVaultCollection}`
   const keyVaultClient = new MongoClient(config.mongodbUrl, {
+    maxPoolSize: 1,
     autoEncryption: {
       keyVaultNamespace,
       kmsProviders,
