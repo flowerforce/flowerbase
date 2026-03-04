@@ -108,15 +108,20 @@ export async function customFunctionController(app: FastifyInstance) {
           ...(user || {})
         }
       }
+      const now = new Date()
       const refreshToken = this.createRefreshToken(currentUserData)
       const refreshTokenHash = hashToken(refreshToken)
       await authDb.collection(refreshTokensCollection).insertOne({
         userId: authUser._id,
         tokenHash: refreshTokenHash,
-        createdAt: new Date(),
+        createdAt: now,
         expiresAt: new Date(Date.now() + refreshTokenTtlMs),
         revokedAt: null
       })
+      await authDb.collection(authCollection!).updateOne(
+        { _id: authUser._id },
+        { $set: { lastLoginAt: now } }
+      )
       return {
         access_token: this.createAccessToken(currentUserData),
         refresh_token: refreshToken,
