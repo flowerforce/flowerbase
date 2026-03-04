@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { ObjectId } from 'mongodb'
-import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../constants'
+import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME, DEFAULT_CONFIG } from '../constants'
 import type { Rules } from '../features/rules/interface'
 import { getValidRule } from '../services/mongodb-atlas/utils'
 import { checkApplyWhen } from '../utils/roles/machines/utils'
@@ -380,7 +380,8 @@ export const resolveUserContext = async (
   if (!userId) return undefined
   const normalizedUserId = userId.trim()
 
-  const db = app.mongo.client.db(DB_NAME)
+  const authDb = app.mongo.client.db(AUTH_DB_NAME)
+  const customDb = app.mongo.client.db(DB_NAME)
   const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
   const userCollection = AUTH_CONFIG.userCollection
   const userIdField = AUTH_CONFIG.user_id_field ?? 'id'
@@ -388,14 +389,14 @@ export const resolveUserContext = async (
   const authSelector = isObjectId
     ? { _id: new ObjectId(normalizedUserId) }
     : { id: normalizedUserId }
-  const authUser = await db.collection(authCollection).findOne(authSelector)
+  const authUser = await authDb.collection(authCollection).findOne(authSelector)
 
   let customUser: Record<string, unknown> | null = null
   if (userCollection) {
     const customSelector = { [userIdField]: normalizedUserId }
-    customUser = await db.collection(userCollection).findOne(customSelector)
+    customUser = await customDb.collection(userCollection).findOne(customSelector)
     if (!customUser && isObjectId) {
-      customUser = await db.collection(userCollection).findOne({ _id: new ObjectId(normalizedUserId) })
+      customUser = await customDb.collection(userCollection).findOne({ _id: new ObjectId(normalizedUserId) })
     }
   }
 

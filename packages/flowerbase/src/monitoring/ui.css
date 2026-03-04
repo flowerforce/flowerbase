@@ -486,11 +486,15 @@ button.danger {
 
 .event-row {
   display: grid;
-  grid-template-columns: 86px 90px 70px 160px 160px 1fr;
+  grid-template-columns: 170px 90px 70px 160px 160px 1fr;
   gap: 8px;
   padding: 4px 6px;
   border-bottom: 1px dashed rgba(26, 47, 34, 0.6);
   cursor: pointer;
+}
+
+.event-row > div:first-child {
+  white-space: nowrap;
 }
 
 .event-row.event-header {

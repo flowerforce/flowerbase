@@ -1,4 +1,4 @@
-import { AUTH_CONFIG, DB_NAME } from '../../constants'
+import { AUTH_CONFIG, AUTH_DB_NAME } from '../../constants'
 import { services } from '../../services'
 import { Function, Functions } from '../functions/interface'
 import { ActivateTriggersParams } from './dtos'
@@ -36,7 +36,7 @@ export const activateTriggers = async ({
             config: {
               isAutoTrigger: true,
               collection: AUTH_CONFIG.authCollection ?? 'auth_users',
-              database: DB_NAME,
+              database: AUTH_DB_NAME,
               full_document: true,
               full_document_before_change: false,
               match: {},

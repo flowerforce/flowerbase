@@ -26,7 +26,7 @@
     wsStatus,
     clearEvents
   } = dom;
-  const { formatTime, renderJsonViewer, clearJsonViewer } = utils;
+  const { formatDateTime, highlightJson } = utils;
   const { setActiveTab } = helpers;
 
   const isOptionsEvent = (event) => {
@@ -141,7 +141,7 @@
       row.className = 'event-row';
       row.dataset.id = event.id;
       const typeClass = event.type === 'error' ? 'error' : (event.type === 'warn' ? 'warn' : '');
-      row.innerHTML = '<div>' + formatTime(event.ts) + '</div>' +
+      row.innerHTML = '<div>' + formatDateTime(event.ts) + '</div>' +
         '<div class="event-type ' + typeClass + '">' + (event.type || '-') + '</div>' +
         '<div class="event-run" title="' + (runMode || '-') + '">' + (runMode || '-') + '</div>' +
         '<div class="event-invoked" title="' + (invokedFrom || '-') + '">' + (invokedFrom || '-') + '</div>' +

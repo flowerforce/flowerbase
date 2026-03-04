@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { ObjectId } from 'mongodb'
-import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
+import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
 import handleUserRegistration from '../../../shared/handleUserRegistration'
 import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
 import { StateManager } from '../../../state'
@@ -44,7 +44,8 @@ export async function localUserPassController(app: FastifyInstance) {
   const { authCollection, userCollection, user_id_field } = AUTH_CONFIG
   const { resetPasswordCollection } = AUTH_CONFIG
   const { refreshTokensCollection } = AUTH_CONFIG
-  const db = app.mongo.client.db(DB_NAME)
+  const authDb = app.mongo.client.db(AUTH_DB_NAME)
+  const customUserDb = app.mongo.client.db(DB_NAME)
   const resetPasswordTtlSeconds = DEFAULT_CONFIG.RESET_PASSWORD_TTL_SECONDS
   const rateLimitWindowMs = DEFAULT_CONFIG.AUTH_RATE_LIMIT_WINDOW_MS
   const loginMaxAttempts = DEFAULT_CONFIG.AUTH_LOGIN_MAX_ATTEMPTS
@@ -54,7 +55,7 @@ export async function localUserPassController(app: FastifyInstance) {
   const resolveLocalUserpassProvider = () => AUTH_CONFIG.authProviders?.['local-userpass']
 
   try {
-    await db.collection(resetPasswordCollection).createIndex(
+    await authDb.collection(resetPasswordCollection).createIndex(
       { createdAt: 1 },
       { expireAfterSeconds: resetPasswordTtlSeconds }
     )
@@ -63,7 +64,7 @@ export async function localUserPassController(app: FastifyInstance) {
   }
 
   try {
-    await db.collection(refreshTokensCollection).createIndex(
+    await authDb.collection(refreshTokensCollection).createIndex(
       { expiresAt: 1 },
       { expireAfterSeconds: 0 }
     )
@@ -76,7 +77,7 @@ export async function localUserPassController(app: FastifyInstance) {
     extraArguments?: unknown[]
   ) => {
     const { resetPasswordConfig } = AUTH_CONFIG
-    const authUser = await db.collection(authCollection!).findOne({
+    const authUser = await authDb.collection(authCollection!).findOne({
       email
     })
 
@@ -87,7 +88,7 @@ export async function localUserPassController(app: FastifyInstance) {
     const token = generateToken()
     const tokenId = generateToken()
 
-    await db
+    await authDb
       ?.collection(resetPasswordCollection)
       .updateOne(
         { email },
@@ -194,7 +195,7 @@ export async function localUserPassController(app: FastifyInstance) {
         return
       }
 
-      const existing = await db.collection(authCollection!).findOne({
+      const existing = await authDb.collection(authCollection!).findOne({
         confirmationToken: req.body.token,
         confirmationTokenId: req.body.tokenId
       }) as { _id: ObjectId; status?: string } | null
@@ -205,7 +206,7 @@ export async function localUserPassController(app: FastifyInstance) {
       }
 
       if (existing.status !== 'confirmed') {
-        await db.collection(authCollection!).updateOne(
+        await authDb.collection(authCollection!).updateOne(
           { _id: existing._id },
           {
             $set: { status: 'confirmed' },
@@ -241,7 +242,7 @@ export async function localUserPassController(app: FastifyInstance) {
         res.status(429).send({ message: 'Too many requests' })
         return
       }
-      const authUser = await db.collection(authCollection!).findOne({
+      const authUser = await authDb.collection(authCollection!).findOne({
         email: req.body.username
       })
 
@@ -260,7 +261,7 @@ export async function localUserPassController(app: FastifyInstance) {
 
       const user =
         user_id_field && userCollection
-          ? await db!
+          ? await customUserDb
             .collection(userCollection)
             .findOne({ [user_id_field]: authUser._id.toString() })
           : {}
@@ -284,7 +285,7 @@ export async function localUserPassController(app: FastifyInstance) {
 
       const refreshToken = this.createRefreshToken(userWithCustomData)
       const refreshTokenHash = hashToken(refreshToken)
-      await db.collection(refreshTokensCollection).insertOne({
+      await authDb.collection(refreshTokensCollection).insertOne({
         userId: authUser._id,
         tokenHash: refreshTokenHash,
         createdAt: new Date(),
@@ -382,7 +383,7 @@ export async function localUserPassController(app: FastifyInstance) {
       }
       const { token, tokenId, password } = req.body
 
-      const resetRequest = await db
+      const resetRequest = await authDb
         ?.collection(resetPasswordCollection)
         .findOne({ token, tokenId })
 
@@ -396,11 +397,11 @@ export async function localUserPassController(app: FastifyInstance) {
         Date.now() - createdAt.getTime() > resetPasswordTtlSeconds * 1000
 
       if (isExpired) {
-        await db?.collection(resetPasswordCollection).deleteOne({ _id: resetRequest._id })
+        await authDb?.collection(resetPasswordCollection).deleteOne({ _id: resetRequest._id })
         throw new Error(AUTH_ERRORS.INVALID_RESET_PARAMS)
       }
       const hashedPassword = await hashPassword(password)
-      await db.collection(authCollection!).updateOne(
+      await authDb.collection(authCollection!).updateOne(
         { email: resetRequest.email },
         {
           $set: {
@@ -409,7 +410,7 @@ export async function localUserPassController(app: FastifyInstance) {
         }
       )
 
-      await db?.collection(resetPasswordCollection).deleteOne({ _id: resetRequest._id })
+      await authDb?.collection(resetPasswordCollection).deleteOne({ _id: resetRequest._id })
     }
   )
 }
