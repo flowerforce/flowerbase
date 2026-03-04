@@ -162,7 +162,7 @@ const resolveKeyAliases = (schema: EncryptionSchemaProperty, dataKeys: DataKey[]
   return mappedSchema
 }
 
-const buildSchemaMap = (schemas: EncryptionSchemas, dataKeys: DataKey[]) => {
+export const buildSchemaMap = (schemas: EncryptionSchemas, dataKeys: DataKey[]) => {
   return Object.entries(schemas).reduce((acc, [key, schema]) => {
     acc[key] = resolveKeyAliases(schema, dataKeys)
     return acc
