@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify'
-import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
+import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
 import { hashToken } from '../../../utils/crypto'
@@ -16,7 +16,8 @@ export async function customFunctionController(app: FastifyInstance) {
 
   const functionsList = StateManager.select('functions')
   const services = StateManager.select('services')
-  const db = app.mongo.client.db(DB_NAME)
+  const authDb = app.mongo.client.db(AUTH_DB_NAME)
+  const customUserDb = app.mongo.client.db(DB_NAME)
   const { authCollection, refreshTokensCollection, userCollection, user_id_field } = AUTH_CONFIG
   const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
 
@@ -83,7 +84,7 @@ export async function customFunctionController(app: FastifyInstance) {
         return
       }
 
-      const authUser = await db.collection(authCollection!).findOne({ email: authResult.id })
+      const authUser = await authDb.collection(authCollection!).findOne({ email: authResult.id })
       if (!authUser) {
         reply.code(401).send({ message: 'Unauthorized' })
         return
@@ -91,7 +92,7 @@ export async function customFunctionController(app: FastifyInstance) {
 
       const user =
         user_id_field && userCollection
-          ? await db
+          ? await customUserDb
             .collection(userCollection)
             .findOne({ [user_id_field]: authUser._id.toString() })
           : {}
@@ -109,7 +110,7 @@ export async function customFunctionController(app: FastifyInstance) {
       }
       const refreshToken = this.createRefreshToken(currentUserData)
       const refreshTokenHash = hashToken(refreshToken)
-      await db.collection(refreshTokensCollection).insertOne({
+      await authDb.collection(refreshTokensCollection).insertOne({
         userId: authUser._id,
         tokenHash: refreshTokenHash,
         createdAt: new Date(),

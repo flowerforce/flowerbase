@@ -1,7 +1,7 @@
 import fastifyJwt from '@fastify/jwt'
 import fp from 'fastify-plugin'
 import { Document, ObjectId, WithId } from 'mongodb'
-import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../constants'
+import { AUTH_CONFIG, AUTH_DB_NAME, DEFAULT_CONFIG } from '../../constants'
 
 type Options = {
   secret: string
@@ -51,7 +51,7 @@ export default fp(async function (fastify, opts: Options) {
       return
     }
 
-    const db = fastify.mongo?.client?.db(DB_NAME)
+    const db = fastify.mongo?.client?.db(AUTH_DB_NAME)
     if (!db) {
       fastify.log.warn('Mongo client unavailable while checking logout state')
       return

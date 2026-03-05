@@ -1,6 +1,6 @@
 import { ObjectId } from 'bson'
 import { FastifyInstance } from 'fastify'
-import { AUTH_CONFIG, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
+import { AUTH_CONFIG, AUTH_DB_NAME, DEFAULT_CONFIG } from '../../../constants'
 import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
 import { hashToken } from '../../../utils/crypto'
 import { AUTH_ENDPOINTS } from '../../utils'
@@ -12,7 +12,7 @@ import { LoginDto } from './dtos'
  * @param {FastifyInstance} app - The Fastify instance.
  */
 export async function anonUserController(app: FastifyInstance) {
-  const db = app.mongo.client.db(DB_NAME)
+  const db = app.mongo.client.db(AUTH_DB_NAME)
   const { authCollection, refreshTokensCollection } = AUTH_CONFIG
   const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
   const anonUserTtlSeconds = DEFAULT_CONFIG.ANON_USER_TTL_SECONDS
