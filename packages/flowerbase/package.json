@@ -14,7 +14,8 @@
   "scripts": {
     "test": "npx jest",
     "build": "rm -rf dist/ && tsc",
-    "start": "node dist/src/index.ts"
+    "start": "node dist/src/index.ts",
+    "tsc:noemit": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
