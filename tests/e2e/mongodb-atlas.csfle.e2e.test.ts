@@ -92,7 +92,14 @@ const isEncryptedBinary = (value: unknown): value is Binary =>
 
 const binaryHex = (value: Binary) => Buffer.from(value.buffer).toString('hex')
 
-describe('MongoDB CSFLE (e2e)', () => {
+const hasCryptSharedLib = !!process.env.MONGO_CRYPT_SHARED_LIB_PATH?.trim()
+const describeCSFLE = hasCryptSharedLib ? describe : describe.skip
+
+if (!hasCryptSharedLib) {
+  console.warn('[csfle-e2e] Skipped: MONGO_CRYPT_SHARED_LIB_PATH is not set')
+}
+
+describeCSFLE('MongoDB CSFLE (e2e)', () => {
   let rawClient: MongoClient
   let appInstance: FastifyInstance | undefined
   let originalMainPath: string | undefined
