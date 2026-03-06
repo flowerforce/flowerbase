@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb'
 import { operators } from '../rules-matcher/utils'
 
 describe('operators', () => {
@@ -8,10 +9,15 @@ describe('operators', () => {
   it('should check equals values', () => {
     expect(operators.$eq('a', 'a')).toBe(true)
     expect(!operators.$eq('a', 'b')).toBe(true)
+    const id = new ObjectId()
+    expect(operators.$eq(id, id.toHexString())).toBe(true)
+    expect(operators.$eq(id, new ObjectId(id.toHexString()))).toBe(true)
   })
   it('should check different values', () => {
     expect(operators.$ne('a', 'a')).toBe(false)
     expect(operators.$ne('a', 'b')).toBe(true)
+    const id = new ObjectId()
+    expect(operators.$ne(id, id.toHexString())).toBe(false)
   })
   it('should check string length values', () => {
     // test $strGt
@@ -69,6 +75,8 @@ describe('operators', () => {
     expect(operators.$in([3, 4], [3, 4, 5])).toBe(true)
     expect(operators.$in([3, 6], [3, 4, 5])).toBe(true)
     expect(operators.$in({ name: 'ciao' }, [{ name: 'ciao' }, 4, 5])).toBe(false)
+    const id = new ObjectId()
+    expect(operators.$in(id, [id.toHexString()])).toBe(true)
   })
   it("should check if a value isn't in an array", () => {
     expect(operators.$nin(2, [3])).toBe(true)
@@ -76,6 +84,8 @@ describe('operators', () => {
     expect(operators.$nin([3, 4], [3, 4, 5])).toBe(false)
     expect(operators.$nin([3, 6], [3, 4, 5])).toBe(false)
     expect(operators.$nin({ name: 'ciao' }, [{ name: 'ciao' }, 4, 5])).toBe(true)
+    const id = new ObjectId()
+    expect(operators.$nin(id, [id.toHexString()])).toBe(false)
   })
   it('should find all values in an array', () => {
     expect(operators.$all(2, [3])).toBe(false)
@@ -85,6 +95,8 @@ describe('operators', () => {
     expect(operators.$all([3, 6], [3, 4, 5])).toBe(false)
     expect(operators.$all({ name: 'ciao' }, [{ name: 'ciao' }, 4, 5])).toBe(false)
     expect(operators.$all([{ name: 'ciao' }, 4, 5], [{ name: 'ciao' }, 4, 5])).toBe(false)
+    const id = new ObjectId()
+    expect(operators.$all([id], [id.toHexString()])).toBe(true)
   })
   it('should check array size', () => {
     expect(operators.$size([1, 2, 3], 3)).toBe(true)
@@ -99,5 +111,17 @@ describe('operators', () => {
     const numberRegex = /^\d+$/
     expect(operators.$regex('1234567890', numberRegex)).toBe(true)
     expect(operators.$regex('12345r', numberRegex)).toBe(false)
+  })
+
+  it('should support %stringToOid conversion operator', () => {
+    const id = new ObjectId()
+    expect(operators['%stringToOid'](id, id.toHexString())).toBe(true)
+    expect(operators['%stringToOid'](id, 'not-an-object-id')).toBe(false)
+  })
+
+  it('should support %oidToString conversion operator', () => {
+    const id = new ObjectId()
+    expect(operators['%oidToString'](id.toHexString(), id)).toBe(true)
+    expect(operators['%oidToString']('not-matching', id)).toBe(false)
   })
 })

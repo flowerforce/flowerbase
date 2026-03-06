@@ -1,0 +1,20 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "oidToStringDocs",
+  "filters": [],
+  "roles": [
+    {
+      "name": "authOwnerByOidToString",
+      "apply_when": {
+        "ownerAuthId": {
+          "%oidToString": "%%user._id"
+        }
+      },
+      "insert": false,
+      "delete": false,
+      "search": true,
+      "read": true,
+      "write": false
+    }
+  ]
+}

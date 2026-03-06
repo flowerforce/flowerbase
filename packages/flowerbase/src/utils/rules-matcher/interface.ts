@@ -331,6 +331,8 @@ export type Operators = {
    * @returns
    */
   $regex: OperatorsFunction
+  '%stringToOid': OperatorsFunction
+  '%oidToString': OperatorsFunction
 }
 
 export enum RulesOperators {
@@ -349,7 +351,9 @@ export enum RulesOperators {
   $nin = '$nin',
   $all = '$all',
   $size = '$size',
-  $regex = '$regex'
+  $regex = '$regex',
+  '%stringToOid' = '%stringToOid',
+  '%oidToString' = '%oidToString'
 }
 
 export type RulesOperatorsInArray<T> = Partial<{
