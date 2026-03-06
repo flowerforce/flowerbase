@@ -15,6 +15,7 @@
   if (state.functionUserMap === undefined) state.functionUserMap = {};
   if (state.functionUserQuery === undefined) state.functionUserQuery = '';
   if (state.__functionUserTimer === undefined) state.__functionUserTimer = null;
+  if (state.functionCodeEditor === undefined) state.functionCodeEditor = null;
 
   dom.functionList = document.getElementById('functionList');
   dom.functionSelected = document.getElementById('functionSelected');
@@ -22,7 +23,6 @@
   dom.functionUserInput = document.getElementById('functionUserInput');
   dom.functionUserList = document.getElementById('functionUserList');
   dom.functionRunMode = document.getElementById('functionRunMode');
-  dom.functionEditor = document.getElementById('functionEditor');
   dom.functionCode = document.getElementById('functionCode');
   dom.functionHighlight = document.getElementById('functionHighlight');
   dom.functionGutter = document.getElementById('functionGutter');
@@ -42,7 +42,6 @@
     functionUserInput,
     functionUserList,
     functionRunMode,
-    functionEditor,
     functionCode,
     functionHighlight,
     functionGutter,
@@ -59,9 +58,31 @@
   const { setActiveTab } = helpers;
 
   const HISTORY_LIMIT = 30;
+  const getCodeEditor = () => state.functionCodeEditor;
+
+  const getFunctionCodeValue = () => {
+    const editor = getCodeEditor();
+    if (editor && typeof editor.getValue === 'function') {
+      return editor.getValue() || '';
+    }
+    return functionCode ? (functionCode.value || '') : '';
+  };
+
+  const setFunctionCodeValue = (value) => {
+    const next = value || '';
+    const editor = getCodeEditor();
+    if (editor && typeof editor.setValue === 'function') {
+      editor.setValue(next);
+      editor.execCommand('goDocStart');
+      return;
+    }
+    if (functionCode) {
+      functionCode.value = next;
+    }
+  };
 
   const syncFunctionEditorScroll = () => {
-    if (!functionCode) return;
+    if (!functionCode || getCodeEditor()) return;
     if (functionHighlight) {
       functionHighlight.scrollTop = functionCode.scrollTop;
       functionHighlight.scrollLeft = functionCode.scrollLeft;
@@ -72,6 +93,11 @@
   };
 
   const updateFunctionEditor = () => {
+    const editor = getCodeEditor();
+    if (editor) {
+      if (typeof editor.refresh === 'function') editor.refresh();
+      return;
+    }
     if (!functionCode) return;
     const code = functionCode.value || '';
     if (functionHighlight) {
@@ -191,10 +217,10 @@
   };
 
   const isFunctionCodeModified = (name) => {
-    if (!name || !functionCode) return false;
+    if (!name) return false;
     const base = state.functionCodeCache[name];
     if (typeof base !== 'string') return false;
-    return functionCode.value !== base;
+    return getFunctionCodeValue() !== base;
   };
 
   const updateFunctionModifiedState = () => {
@@ -207,10 +233,10 @@
   };
 
   const loadFunctionCode = async () => {
-    if (!functionCode) return;
+    if (!functionCode && !getCodeEditor()) return;
     const name = state.selectedFunction;
     if (!name) {
-      functionCode.value = '';
+      setFunctionCodeValue('');
       updateFunctionEditor();
       updateFunctionModifiedState();
       return;
@@ -219,7 +245,7 @@
       const data = await api('/functions/' + encodeURIComponent(name));
       const baseCode = data && data.code ? data.code : '';
       state.functionCodeCache[name] = baseCode;
-      functionCode.value = baseCode;
+      setFunctionCodeValue(baseCode);
       updateFunctionEditor();
     } catch (err) {
       console.error(err);
@@ -228,8 +254,8 @@
   };
 
   const applyFunctionOverride = (code) => {
-    if (!functionCode) return;
-    functionCode.value = code || '';
+    if (!functionCode && !getCodeEditor()) return;
+    setFunctionCodeValue(code || '');
     updateFunctionEditor();
     updateFunctionModifiedState();
   };
@@ -237,10 +263,8 @@
   const clearFunctionOverride = () => {
     const name = state.selectedFunction;
     if (!name) return;
-    if (functionCode) {
-      functionCode.value = state.functionCodeCache[name] || '';
-      updateFunctionEditor();
-    }
+    setFunctionCodeValue(state.functionCodeCache[name] || '');
+    updateFunctionEditor();
     updateFunctionModifiedState();
   };
 
@@ -396,71 +420,40 @@
     renderFunctionUserOptions(options);
   };
 
+  const initCodeEditor = () => {
+    if (!functionCode) return;
+    const codeEditor = typeof window !== 'undefined' ? window.CodeMirror : null;
+    if (!codeEditor || typeof codeEditor.fromTextArea !== 'function') return;
+    const editor = codeEditor.fromTextArea(functionCode, {
+      mode: 'javascript',
+      lineNumbers: true,
+      lineWrapping: false,
+      tabSize: 2,
+      indentUnit: 2,
+      foldGutter: true,
+      gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
+    });
+    state.functionCodeEditor = editor;
+    const wrapper = editor.getWrapperElement();
+    if (wrapper) wrapper.classList.add('monit-code-editor');
+    const host = functionCode.closest('.code-editor');
+    if (host) host.classList.add('cm-enabled');
+    editor.on('change', () => {
+      updateFunctionModifiedState();
+    });
+  };
+
   const init = () => {
     if (refreshFunctions) refreshFunctions.addEventListener('click', loadFunctions);
+    initCodeEditor();
 
-    if (functionCode) {
+    if (functionCode && !getCodeEditor()) {
       functionCode.addEventListener('input', () => {
         updateFunctionEditor();
         updateFunctionModifiedState();
       });
       functionCode.addEventListener('scroll', () => {
         syncFunctionEditorScroll();
-      });
-      functionCode.addEventListener('keydown', (event) => {
-        if (event.key !== 'Tab') return;
-        event.preventDefault();
-        const indent = '  ';
-        const value = functionCode.value || '';
-        const start = functionCode.selectionStart || 0;
-        const end = functionCode.selectionEnd || 0;
-        const hasSelection = start !== end;
-        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-        if (!hasSelection && !event.shiftKey) {
-          const nextValue = value.slice(0, start) + indent + value.slice(end);
-          functionCode.value = nextValue;
-          const cursor = start + indent.length;
-          functionCode.selectionStart = cursor;
-          functionCode.selectionEnd = cursor;
-          updateFunctionEditor();
-          return;
-        }
-
-        const lineEndIndex = value.indexOf('\n', end);
-        const blockEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
-        const block = value.slice(lineStart, blockEnd);
-        const lines = block.split('\n');
-        if (!event.shiftKey) {
-          const newLines = lines.map((line) => indent + line);
-          const newBlock = newLines.join('\n');
-          const nextValue = value.slice(0, lineStart) + newBlock + value.slice(blockEnd);
-          functionCode.value = nextValue;
-          functionCode.selectionStart = start + indent.length;
-          functionCode.selectionEnd = end + indent.length * lines.length;
-          updateFunctionEditor();
-          return;
-        }
-
-        const removedCounts = lines.map((line) => {
-          if (line.startsWith(indent)) return indent.length;
-          if (line.startsWith('\t')) return 1;
-          if (line.startsWith(' ')) return 1;
-          return 0;
-        });
-        const newLines = lines.map((line, index) => {
-          const remove = removedCounts[index];
-          return remove > 0 ? line.slice(remove) : line;
-        });
-        const newBlock = newLines.join('\n');
-        const nextValue = value.slice(0, lineStart) + newBlock + value.slice(blockEnd);
-        functionCode.value = nextValue;
-        const removedTotal = removedCounts.reduce((acc, count) => acc + count, 0);
-        const removedFirst = removedCounts[0] || 0;
-        const nextStart = Math.max(lineStart, start - removedFirst);
-        const nextEnd = Math.max(nextStart, end - removedTotal);
-        functionCode.selectionStart = nextStart;
-        functionCode.selectionEnd = nextEnd;
-        updateFunctionEditor();
       });
     }
 
@@ -606,7 +599,7 @@
           const userId = selectedUser
             ? String(selectedUser.id || (selectedUser.auth && selectedUser.auth._id) || '')
             : fallbackUserId;
-          const liveCode = functionCode ? functionCode.value || '' : '';
+          const liveCode = getFunctionCodeValue();
           const overrideCode = liveCode.trim() ? liveCode : undefined;
           const data = await api('/functions/invoke', {
             method: 'POST',
