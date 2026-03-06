@@ -183,8 +183,7 @@
     state.selectedId = event.id;
     state.selectedEvent = event;
     const text = JSON.stringify(event, null, 2) || '';
-    eventDetail.classList.add('json-highlight');
-    eventDetail.innerHTML = highlightJson(text);
+    renderJsonViewer(eventDetail, text, { collapsible: true });
     const functionData = getFunctionEventData(event);
     if (functionData && eventFunctionButton) {
       eventFunctionButton.classList.remove('is-hidden');
@@ -247,8 +246,7 @@
     typeFilter.value = '';
     state.events = [];
     state.selectedEvent = null;
-    eventDetail.classList.remove('json-highlight');
-    eventDetail.textContent = 'select an event to inspect payload';
+    clearJsonViewer(eventDetail, 'select an event to inspect payload');
     if (eventFunctionButton) {
       eventFunctionButton.classList.add('is-hidden');
       eventFunctionButton.textContent = 'use in invoke';

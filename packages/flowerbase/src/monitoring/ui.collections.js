@@ -91,7 +91,7 @@
     collectionTabButtons,
     collectionTabPanels
   } = dom;
-  const { api, parseJsonObject, highlightJson, safeStringify } = utils;
+  const { api, parseJsonObject, highlightJson, renderJsonViewer, clearJsonViewer, safeStringify } = utils;
 
   const TABLE_TRUNCATE_LIMIT = 200;
 
@@ -337,22 +337,21 @@
     const highlight = state.collectionResultHighlight;
     if (payload === null || payload === undefined) {
       collectionResult.classList.remove('table-view', 'json-highlight');
-      collectionResult.textContent = '';
+      clearJsonViewer(collectionResult, '');
       return;
     }
     if (state.collectionResultView === 'table') {
+      clearJsonViewer(collectionResult, '');
       renderCollectionTable(payload);
       return;
     }
     collectionResult.classList.remove('table-view');
     if (highlight) {
       const text = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
-      collectionResult.classList.add('json-highlight');
-      collectionResult.innerHTML = highlightJson(text || '');
+      renderJsonViewer(collectionResult, text || '', { collapsible: true });
       return;
     }
-    collectionResult.classList.remove('json-highlight');
-    collectionResult.textContent = typeof payload === 'string' ? payload : String(payload ?? '');
+    clearJsonViewer(collectionResult, typeof payload === 'string' ? payload : String(payload ?? ''));
   };
 
   const setCollectionResult = (value, highlight) => {
@@ -365,12 +364,10 @@
     if (!collectionRules) return;
     if (highlight) {
       const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-      collectionRules.classList.add('json-highlight');
-      collectionRules.innerHTML = highlightJson(text || '');
+      renderJsonViewer(collectionRules, text || '', { collapsible: true });
       return;
     }
-    collectionRules.classList.remove('json-highlight');
-    collectionRules.textContent = typeof value === 'string' ? value : String(value ?? '');
+    clearJsonViewer(collectionRules, typeof value === 'string' ? value : String(value ?? ''));
   };
 
   const updateCollectionModeView = () => {
