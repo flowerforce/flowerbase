@@ -1,5 +1,9 @@
 import { ObjectId } from 'mongodb'
-import { mapWatchFilterToChangeStreamMatch, mapWatchFilterToDocumentQuery } from '../controller'
+import {
+  mapWatchFilterToChangeStreamMatch,
+  mapWatchFilterToDocumentQuery,
+  shouldSkipReadabilityLookupForChange
+} from '../controller'
 
 describe('watch filter mapping', () => {
   it('keeps change-event fields untouched and prefixes only document fields', () => {
@@ -112,5 +116,11 @@ describe('watch filter mapping', () => {
     const documentQuery = mapWatchFilterToDocumentQuery(input) as Record<string, unknown>
     expect(documentQuery._id).toEqual(id)
     expect(documentQuery.operationType).toBeUndefined()
+  })
+
+  it('skips readability lookup only for delete change events', () => {
+    expect(shouldSkipReadabilityLookupForChange({ operationType: 'delete' } as any)).toBe(true)
+    expect(shouldSkipReadabilityLookupForChange({ operationType: 'update' } as any)).toBe(false)
+    expect(shouldSkipReadabilityLookupForChange({ operationType: 'insert' } as any)).toBe(false)
   })
 })
