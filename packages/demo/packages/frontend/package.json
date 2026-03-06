@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@flowerforce/flowerbase-client": "file:../../../flowerbase-client",
+    "@flowerforce/flowerbase-client": "0.1.1-beta.0",
     "@hookform/resolvers": "^5.0.1",
     "framer-motion": "^12.15.0",
     "parallax-js": "^3.1.0",
