@@ -10,10 +10,10 @@ type TaskTableProps = {
 }
 
 const COLUMN_TITLES_COLORS = {
-  backlog: "danger",   
-  todo: "warning",     
-  progress: "info",    
-  done: "success",    
+    backlog: "danger",
+    todo: "warning",
+    progress: "info",
+    done: "success",
 } as const;
 
 export const TaskTable = ({ todos, handleDelete }: TaskTableProps) => {
@@ -22,7 +22,7 @@ export const TaskTable = ({ todos, handleDelete }: TaskTableProps) => {
         return <Tag value={rowData.status} severity={severity} />;
     };
 
-    return <DataTable className="w-full overflow-y-scroll flex-1" value={todos} tableStyle={{ width: '100%',}} responsiveLayout="scroll">
+    return <DataTable className="w-full overflow-y-scroll flex-1" value={todos} tableStyle={{ width: '100%', }} responsiveLayout="scroll">
         <Column field="title" header="Title" />
         <Column field="status" header="Status" body={statusTemplate} />
         <Column

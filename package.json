@@ -73,6 +73,7 @@
     "jest-environment-node": "^29.4.1",
     "markdownlint-cli2": "^0.15.0",
     "mongodb": "^6.21.0",
+    "mongodb-client-encryption": "^6.5.0",
     "nx": "19.4.1",
     "prettier": "^3.2.5",
     "rimraf": "^5.0.7",

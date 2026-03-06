@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { MongoClient, ObjectId } from 'mongodb'
-import { initialize } from '../../packages/flowerbase/src'
+import { initialize, type InitializeConfig } from '../../packages/flowerbase/src'
 import { DEFAULT_CONFIG } from '../../packages/flowerbase/src/constants'
 import { StateManager } from '../../packages/flowerbase/src/state'
 
@@ -23,6 +23,7 @@ type SetupDeps<TUser> = {
   setAppInstance: (app: FastifyInstance | undefined) => void
   setOriginalMainPath: (mainPath: string | undefined) => void
   onBeforeEach: () => Promise<void>
+  initializeOverrides?: Partial<InitializeConfig>
 }
 
 export const registerMongoAtlasE2eSetup = <TUser>({
@@ -43,7 +44,8 @@ export const registerMongoAtlasE2eSetup = <TUser>({
   setClient,
   setAppInstance,
   setOriginalMainPath,
-  onBeforeEach
+  onBeforeEach,
+  initializeOverrides
 }: SetupDeps<TUser>) => {
   beforeAll(async () => {
     DEFAULT_CONFIG.AUTH_REGISTER_MAX_ATTEMPTS = 1000
@@ -90,7 +92,8 @@ export const registerMongoAtlasE2eSetup = <TUser>({
       jwtSecret: 'e2e-secret',
       port: 0,
       host: '127.0.0.1',
-      basePath: APP_ROOT
+      basePath: APP_ROOT,
+      ...initializeOverrides
     })
 
     const appInstance = StateManager.select('app')

@@ -1,19 +1,9 @@
-import fs from 'fs'
 import path from 'node:path'
-import { readJsonContent } from '../../utils'
+import { readJsonContent, recursivelyCollectFiles } from '../../utils'
 import { Rules, RulesConfig } from './interface'
 
 export const loadRules = async (rootDir = process.cwd()): Promise<Rules> => {
   const rulesRoot = path.join(rootDir, 'data_sources', 'mongodb-atlas')
-  const recursivelyCollectFiles = (dir: string): string[] => {
-    return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-      const fullPath = path.join(dir, entry.name)
-      if (entry.isDirectory()) {
-        return recursivelyCollectFiles(fullPath)
-      }
-      return entry.isFile() ? [fullPath] : []
-    })
-  }
   const files = recursivelyCollectFiles(rulesRoot)
   const rulesFiles = files.filter((x) => (x as string).endsWith('rules.json'))
 

@@ -7,7 +7,6 @@ import {
   ChangeStreamOptions,
   ClientSession,
   ClientSessionOptions,
-  Collection,
   Document,
   EventsDescription,
   FindOneAndUpdateOptions,
@@ -22,6 +21,7 @@ import { buildRulesMeta } from '../../monitoring/utils'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
 import { emitServiceEvent } from '../monitoring'
+import { CHANGESTREAM } from '../../constants'
 import {
   CRUD_OPERATIONS,
   GetOperatorsFunction,
@@ -388,9 +388,10 @@ const areUpdatedFieldsAllowed = (
 }
 
 const getOperators: GetOperatorsFunction = (
-  collection,
-  { rules, collName, user, run_as_system, monitoringOrigin }
+  mongo,
+  { rules, dbName, collName, user, run_as_system, monitoringOrigin }
 ) => {
+  const collection = mongo.client.db(dbName).collection(collName)
   const normalizedRules: Rules = rules ?? ({} as Rules)
   const collectionRules = normalizedRules[collName]
   const filters = collectionRules?.filters ?? []
@@ -996,6 +997,7 @@ const getOperators: GetOperatorsFunction = (
      * This allows fine-grained control over what change events a user can observe, based on roles and filters.
      */
     watch: (pipelineOrOptions = [], options) => {
+      const changestreamCollection = mongo[CHANGESTREAM].client.db(dbName).collection(collName)
       try {
         const {
           pipeline,
@@ -1025,7 +1027,7 @@ const getOperators: GetOperatorsFunction = (
 
           const formattedPipeline = [firstStep, ...extraMatches, ...pipeline].filter(Boolean) as Document[]
 
-          const result = collection.watch(formattedPipeline, watchOptions)
+          const result = changestreamCollection.watch(formattedPipeline, watchOptions)
           const originalOn = result.on.bind(result)
 
           /**
@@ -1107,7 +1109,7 @@ const getOperators: GetOperatorsFunction = (
         }
 
         // System mode: no filtering applied
-        const result = collection.watch([...extraMatches, ...pipeline], watchOptions)
+        const result = changestreamCollection.watch([...extraMatches, ...pipeline], watchOptions)
         emitMongoEvent('watch')
         return result
       } catch (error) {
@@ -1387,15 +1389,10 @@ const MongodbAtlas: MongodbAtlasFunction = (
   db: (dbName: string) => {
     return {
       collection: (collName: string) => {
-        const mongoClient = app.mongo.client as unknown as {
-          db: (database: string) => {
-            collection: (name: string) => Collection<Document>
-          }
-        }
-        const collection: Collection<Document> = mongoClient.db(dbName).collection(collName)
-        return getOperators(collection, {
-          rules,
+        return getOperators(app.mongo, {
+          dbName,
           collName,
+          rules,
           user,
           run_as_system,
           monitoringOrigin: monitoring?.invokedFrom

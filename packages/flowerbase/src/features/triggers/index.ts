@@ -1,4 +1,4 @@
-import { AUTH_CONFIG, AUTH_DB_NAME } from '../../constants'
+import { AUTH_CONFIG, AUTH_DB_NAME, CHANGESTREAM } from '../../constants'
 import { services } from '../../services'
 import { Function, Functions } from '../functions/interface'
 import { ActivateTriggersParams } from './dtos'
@@ -18,6 +18,10 @@ export const activateTriggers = async ({
 }: ActivateTriggersParams) => {
   console.log('START ACTIVATION TRIGGERS')
   try {
+    // Ensure the changestream MongoDB client exist, or use the main client
+    if (!fastify.mongo[CHANGESTREAM]) {
+      fastify.mongo[CHANGESTREAM] = fastify.mongo
+    }
     const triggersToActivate = [...triggersList]
     if (AUTH_CONFIG.on_user_creation_function_name) {
       const alreadyDeclared = triggersToActivate.some(
