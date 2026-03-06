@@ -1814,6 +1814,52 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       await watch.close()
     }
   })
+
+  it('emits delete watch event when filter combines insert branch and delete branch', async () => {
+    const accountId = ownerUser.custom_data?.key
+    const requestId = new ObjectId()
+    const documentId = new ObjectId()
+    const watch = await openWatchConnection({
+      user: ownerUser,
+      collection: UPLOADS_COLLECTION,
+      filter: {
+        $or: [
+          {
+            operationType: 'insert',
+            'fullDocument.publisher': accountId,
+            'fullDocument.requestId': requestId
+          },
+          {
+            operationType: 'delete'
+          }
+        ]
+      }
+    })
+
+    try {
+      await client
+        .db(DB_NAME)
+        .collection(UPLOADS_COLLECTION)
+        .insertOne({
+          _id: documentId,
+          publisher: accountId,
+          status: 'pending'
+        })
+
+      await watch.expectNoEvent()
+
+      await client
+        .db(DB_NAME)
+        .collection(UPLOADS_COLLECTION)
+        .deleteOne({ _id: documentId })
+
+      const event = await watch.nextEvent()
+      expect(event.operationType).toBe('delete')
+      expect(String(event.documentKey?._id)).toBe(String(documentId))
+    } finally {
+      await watch.close()
+    }
+  })
   afterAll(async () => {
     await appInstance?.close()
     await client.close()

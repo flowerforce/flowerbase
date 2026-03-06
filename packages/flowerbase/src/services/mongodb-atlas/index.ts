@@ -79,6 +79,12 @@ const findOptionKeys = new Set([
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
+const isTraversablePlainObject = (value: unknown): value is Record<string, unknown> => {
+  if (!isPlainObject(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
 const looksLikeFindOptions = (value: unknown) => {
   if (!isPlainObject(value)) return false
   return Object.keys(value).some((key) => findOptionKeys.has(key))
@@ -140,22 +146,91 @@ const normalizeFindOneAndUpdateOptions = (
 const buildAndQuery = (clauses: MongoFilter<Document>[]): MongoFilter<Document> =>
   clauses.length ? { $and: clauses } : {}
 
-const toWatchMatchFilter = (value: unknown): unknown => {
+const watchChangeEventRootKeys = new Set([
+  '_id',
+  'operationType',
+  'clusterTime',
+  'txnNumber',
+  'lsid',
+  'ns',
+  'documentKey',
+  'fullDocument',
+  'updateDescription'
+])
+
+const isWatchChangeEventPath = (key: string) => {
+  if (watchChangeEventRootKeys.has(key)) return true
+  return (
+    key.startsWith('ns.') ||
+    key.startsWith('documentKey.') ||
+    key.startsWith('fullDocument.') ||
+    key.startsWith('updateDescription.')
+  )
+}
+
+const isWatchOpaqueChangeEventObjectKey = (key: string) =>
+  key === 'ns' || key === 'documentKey' || key === 'fullDocument' || key === 'updateDescription'
+
+export const toWatchMatchFilter = (value: unknown): unknown => {
   if (Array.isArray(value)) {
     return value.map((item) => toWatchMatchFilter(item))
   }
 
-  if (!isPlainObject(value)) return value
+  if (!isTraversablePlainObject(value)) return value
 
   return Object.entries(value).reduce<Record<string, unknown>>((acc, [key, current]) => {
     if (key.startsWith('$')) {
       acc[key] = toWatchMatchFilter(current)
       return acc
     }
+
+    if (isWatchOpaqueChangeEventObjectKey(key)) {
+      acc[key] = current
+      return acc
+    }
+
+    if (isWatchChangeEventPath(key)) {
+      acc[key] = toWatchMatchFilter(current)
+      return acc
+    }
+
     acc[`fullDocument.${key}`] = toWatchMatchFilter(current)
     return acc
   }, {})
 }
+
+const isDeleteOperationValue = (value: unknown): boolean => {
+  if (typeof value === 'string') return value.toLowerCase() === 'delete'
+  if (isPlainObject(value) && Array.isArray((value as { $in?: unknown[] }).$in)) {
+    return (value as { $in: unknown[] }).$in.some((entry) => isDeleteOperationValue(entry))
+  }
+  if (Array.isArray(value)) {
+    return value.some((entry) => isDeleteOperationValue(entry))
+  }
+  return false
+}
+
+const hasDeleteOperationType = (value: unknown): boolean => {
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasDeleteOperationType(entry))
+  }
+
+  if (!isTraversablePlainObject(value)) return false
+
+  return Object.entries(value).some(([key, current]) => {
+    if (key === 'operationType') {
+      return isDeleteOperationValue(current)
+    }
+    return hasDeleteOperationType(current)
+  })
+}
+
+export const watchPipelineRequestsDelete = (pipeline: Document[]) =>
+  pipeline.some((stage) => {
+    if (!isTraversablePlainObject(stage)) return false
+    const match = (stage as { $match?: unknown }).$match
+    return hasDeleteOperationType(match)
+  })
 
 type RealmCompatibleWatchOptions = Document & {
   filter?: MongoFilter<Document>
@@ -1017,15 +1092,26 @@ const getOperators: GetOperatorsFunction = (
             (condition) => toWatchMatchFilter(condition) as MongoFilter<Document>
           )
 
+          const requestedPipeline = [...extraMatches, ...pipeline]
+          const allowDeleteBypass = watchPipelineRequestsDelete(requestedPipeline)
           const firstStep = watchFormattedQuery.length
             ? {
-              $match: {
-                $and: watchFormattedQuery
-              }
+              $match: allowDeleteBypass
+                ? {
+                  $or: [
+                    {
+                      $and: watchFormattedQuery
+                    },
+                    { operationType: 'delete' }
+                  ]
+                }
+                : {
+                  $and: watchFormattedQuery
+                }
             }
             : undefined
 
-          const formattedPipeline = [firstStep, ...extraMatches, ...pipeline].filter(Boolean) as Document[]
+          const formattedPipeline = [firstStep, ...requestedPipeline].filter(Boolean) as Document[]
 
           const result = changestreamCollection.watch(formattedPipeline, watchOptions)
           const originalOn = result.on.bind(result)
