@@ -145,7 +145,9 @@ export const TaskBoard = ({
                                         }
                                         subTitle={`Created on: ${new Date(todo.createdAt).toLocaleDateString()}`}
                                         className="shadow-md"
-                                    />
+                                    >
+                                        {todo.secureNote && <span>{todo.secureNote}</span>}
+                                    </Card>
                                 </div>
                             ))}
                         </div>

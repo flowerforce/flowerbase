@@ -1,0 +1,39 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "csfleRecords",
+  "schema": {
+    "bsonType": "object",
+    "encryptMetadata": {
+      "keyAlias": "root-key"
+    },
+    "properties": {
+      "deterministicSecret": {
+        "encrypt": {
+          "bsonType": "string",
+          "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+        }
+      },
+      "randomSecret": {
+        "encrypt": {
+          "bsonType": "string",
+          "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
+        }
+      },
+      "nestedObject": {
+        "bsonType": "object",
+        "encryptMetadata": {
+          "keyAlias": "nested-key"
+        },
+        "properties": {
+          "deepSecret": {
+            "encrypt": {
+              "bsonType": "string",
+              "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Random",
+              "keyAlias": "deep-key"
+            }
+          }
+        }
+      }
+    }
+  }
+}

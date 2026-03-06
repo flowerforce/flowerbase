@@ -1,6 +1,5 @@
 import 'fastify'
 import type { FastifyJWT } from '@fastify/jwt'
-import { Db, MongoClient } from 'mongodb'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -10,13 +9,5 @@ declare module 'fastify' {
 
   interface FastifyContextConfig {
     rawBody?: boolean
-  }
-
-  interface FastifyInstance {
-    mongo?: {
-      client: MongoClient
-      db?: Db
-      ObjectId: typeof import('mongodb').ObjectId
-    }
   }
 }

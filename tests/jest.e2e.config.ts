@@ -15,10 +15,10 @@ if (!process.env.FLOWERBASE_APP_PATH) {
 const config: Config.InitialOptions = {
   rootDir: path.resolve(__dirname, '../'),
   preset: 'ts-jest',
-  globals: {
-    'ts-jest': {
+  transform: {
+    "^.+\\.tsx?$": ['ts-jest', {
       tsconfig: '<rootDir>/tests/tsconfig.json'
-    }
+    }],
   },
   setupFiles: ['<rootDir>/tests/jest.setup.ts'],
   setupFilesAfterEnv: ['<rootDir>/tests/jest.e2e.progress.ts'],

@@ -14,7 +14,8 @@
   "scripts": {
     "test": "npx jest",
     "build": "rm -rf dist/ && tsc",
-    "start": "node dist/src/index.ts"
+    "start": "node dist/src/index.ts",
+    "tsc:noemit": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
@@ -30,6 +31,7 @@
     "@fastify/swagger-ui": "^5.2.3",
     "@fastify/websocket": "^11.2.0",
     "bson": "^6.8.0",
+    "codemirror": "^5.65.16",
     "dotenv": "^16.4.7",
     "fastify": "^5.0.0",
     "fastify-plugin": "^5.0.1",
