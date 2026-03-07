@@ -50,6 +50,7 @@ export async function anonUserController(app: FastifyInstance) {
         email: anonEmail,
         status: 'confirmed',
         createdAt: now,
+        lastLoginAt: now,
         custom_data: {},
         identities: [
           {

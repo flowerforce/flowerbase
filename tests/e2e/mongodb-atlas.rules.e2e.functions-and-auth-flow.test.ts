@@ -1028,7 +1028,10 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const registrationBody = registration.json() as { userId?: string }
     expect(registrationBody.userId).toBeDefined()
 
-    const creationEvent = await waitForTriggerEvent(registrationBody.userId!)
+    const creationEvent = await waitForTriggerEventType(
+      registrationBody.userId!,
+      'on_user_creation'
+    )
     expect(creationEvent).toBeDefined()
     expect(creationEvent?.type).toBe('on_user_creation')
     expect(creationEvent?.email).toBe('autoconfirm-trigger@example.com')
@@ -1058,7 +1061,10 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const loginBody = login.json() as { user_id?: string }
     expect(loginBody.user_id).toBeDefined()
 
-    const creationEvent = await waitForTriggerEvent(loginBody.user_id!)
+    const creationEvent = await waitForTriggerEventType(
+      loginBody.user_id!,
+      'on_user_creation'
+    )
     expect(creationEvent).toBeDefined()
     expect(creationEvent?.type).toBe('on_user_creation')
     expect(creationEvent?.email).toBe('trigger-user@example.com')
@@ -1175,6 +1181,39 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     )
     expect(logoutEvent).toBeDefined()
     expect(logoutEvent?.email).toBe(email)
+  })
+
+  it('fires login trigger when auth user logs in', async () => {
+    const email = 'login-trigger@example.com'
+    const password = 'login-pass'
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email,
+        password
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: email,
+        password
+      }
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as { user_id?: string }
+    expect(loginBody.user_id).toBeDefined()
+
+    const loginEvent = await waitForTriggerEventType(
+      loginBody.user_id!,
+      'on_user_login'
+    )
+    expect(loginEvent).toBeDefined()
+    expect(loginEvent?.email).toBe(email)
   })
 
   it('fires provider-filtered create trigger for local-userpass only', async () => {
@@ -1321,6 +1360,64 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const localEvent = await waitForProviderTriggerEventType(
       loginBody.user_id!,
       'auth_provider_logout_local-userpass'
+    )
+    expect(localEvent).toBeNull()
+  })
+
+  it('fires provider-filtered login trigger for local-userpass only', async () => {
+    const email = 'provider-local-login@example.com'
+    const password = 'login-pass'
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email,
+        password
+      }
+    })
+    expect(registration.statusCode).toBe(201)
+
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/login`,
+      payload: {
+        username: email,
+        password
+      }
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as { user_id?: string }
+    expect(loginBody.user_id).toBeDefined()
+
+    const localEvent = await waitForProviderTriggerEventType(
+      loginBody.user_id!,
+      'auth_provider_login_local-userpass'
+    )
+    expect(localEvent).toBeDefined()
+    const anonEvent = await waitForProviderTriggerEventType(
+      loginBody.user_id!,
+      'auth_provider_login_anon-user'
+    )
+    expect(anonEvent).toBeNull()
+  })
+
+  it('fires provider-filtered login trigger for anon-user only', async () => {
+    const login = await appInstance!.inject({
+      method: 'POST',
+      url: `${ANON_AUTH_BASE_URL}/login`
+    })
+    expect(login.statusCode).toBe(200)
+    const loginBody = login.json() as { user_id?: string }
+    expect(loginBody.user_id).toBeDefined()
+
+    const anonEvent = await waitForProviderTriggerEventType(
+      loginBody.user_id!,
+      'auth_provider_login_anon-user'
+    )
+    expect(anonEvent).toBeDefined()
+    const localEvent = await waitForProviderTriggerEventType(
+      loginBody.user_id!,
+      'auth_provider_login_local-userpass'
     )
     expect(localEvent).toBeNull()
   })
