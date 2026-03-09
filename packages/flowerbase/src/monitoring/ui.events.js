@@ -26,7 +26,7 @@
     wsStatus,
     clearEvents
   } = dom;
-  const { formatDateTime, highlightJson } = utils;
+  const { formatDateTime, renderJsonViewer, clearJsonViewer } = utils;
   const { setActiveTab } = helpers;
 
   const isOptionsEvent = (event) => {
