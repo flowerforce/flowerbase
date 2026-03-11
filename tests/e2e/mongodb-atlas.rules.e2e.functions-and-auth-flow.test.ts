@@ -639,6 +639,32 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     ])
   })
 
+  it('propagates run_as_system through context.functions.execute', async () => {
+    const token = getTokenFor(ownerUser)
+    expect(token).toBeDefined()
+
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      payload: {
+        name: 'systemOrchestratorListAuthUsers',
+        arguments: []
+      }
+    })
+
+    expect(response.statusCode).toBe(200)
+    const body = EJSON.deserialize(response.json()) as { users: Array<{ email: string }> }
+    expect(body.users).toHaveLength(3)
+    expect(body.users.map((user) => user.email).sort()).toEqual([
+      'auth-admin@example.com',
+      'auth-guest@example.com',
+      'auth-owner@example.com'
+    ])
+  })
+
   it('blocks run_as_system=false function from accessing auth_users', async () => {
     const token = getTokenFor(ownerUser)
     expect(token).toBeDefined()
