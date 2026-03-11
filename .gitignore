@@ -29,6 +29,4 @@ logs
 # Environment variables
 .env*
 dist
-.nx/cache
-.nx/workspace-data
 .tsc-e2e

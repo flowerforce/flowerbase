@@ -66,7 +66,7 @@
     openCreateUser,
     closeCreateUser
   } = dom;
-  const { api, formatDateTime, highlightJson } = utils;
+  const { api, formatDateTime, renderJsonViewer, clearJsonViewer } = utils;
   const { setActiveTab } = helpers;
 
   const USER_DETAIL_PLACEHOLDER = 'select a user to inspect';
@@ -92,23 +92,19 @@
   const setUserDetailContent = (entry) => {
     if (!userDetail) return;
     if (!entry) {
-      userDetail.classList.remove('json-highlight');
-      userDetail.textContent = USER_DETAIL_PLACEHOLDER;
+      clearJsonViewer(userDetail, USER_DETAIL_PLACEHOLDER);
       return;
     }
-    userDetail.classList.add('json-highlight');
-    userDetail.innerHTML = highlightJson(JSON.stringify(entry, null, 2) || '');
+    renderJsonViewer(userDetail, entry, { collapsible: true });
   };
 
   const setUserConfigContent = (element, value, placeholder) => {
     if (!element) return;
     if (!value) {
-      element.classList.remove('json-highlight');
-      element.textContent = placeholder;
+      clearJsonViewer(element, placeholder);
       return;
     }
-    element.classList.add('json-highlight');
-    element.innerHTML = highlightJson(JSON.stringify(value, null, 2) || '');
+    renderJsonViewer(element, value, { collapsible: true });
   };
 
   const renderUserConfig = () => {

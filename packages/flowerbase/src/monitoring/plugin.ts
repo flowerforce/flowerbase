@@ -2,6 +2,7 @@ import fastifyWebsocket from '@fastify/websocket'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import fp from 'fastify-plugin'
 import '@fastify/websocket'
+import fs from 'fs'
 import { DEFAULT_CONFIG } from '../constants'
 import { StateManager } from '../state'
 import { registerCollectionRoutes } from './routes/collections'
@@ -313,6 +314,38 @@ const createMonitoringPlugin = fp(async (
       const js = raw.replace(/__MONIT_BASE__/g, prefix)
       reply.header('Cache-Control', 'no-store')
       reply.type('application/javascript').send(js)
+    })
+  })
+
+  const resolveCodeMirrorAsset = (internalPath: string) => {
+    try {
+      return require.resolve(`codemirror/${internalPath}`)
+    } catch {
+      return ''
+    }
+  }
+
+  const codemirrorAssets: Record<string, string> = {
+    'codemirror.js': resolveCodeMirrorAsset('lib/codemirror.js'),
+    'codemirror.css': resolveCodeMirrorAsset('lib/codemirror.css'),
+    'javascript.js': resolveCodeMirrorAsset('mode/javascript/javascript.js'),
+    'foldcode.js': resolveCodeMirrorAsset('addon/fold/foldcode.js'),
+    'foldgutter.js': resolveCodeMirrorAsset('addon/fold/foldgutter.js'),
+    'brace-fold.js': resolveCodeMirrorAsset('addon/fold/brace-fold.js'),
+    'comment-fold.js': resolveCodeMirrorAsset('addon/fold/comment-fold.js'),
+    'foldgutter.css': resolveCodeMirrorAsset('addon/fold/foldgutter.css')
+  }
+
+  Object.entries(codemirrorAssets).forEach(([assetName, relativePath]) => {
+    app.get(`${prefix}/vendor/codemirror/${assetName}`, async (_req, reply) => {
+      const assetPath = relativePath || ''
+      if (!assetPath || !fs.existsSync(assetPath)) {
+        reply.code(404).send(`${assetName} not found`)
+        return
+      }
+      const asset = fs.readFileSync(assetPath, 'utf8')
+      reply.header('Cache-Control', 'no-store')
+      reply.type(assetName.endsWith('.css') ? 'text/css' : 'application/javascript').send(asset)
     })
   })
 

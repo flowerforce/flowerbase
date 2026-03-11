@@ -16,6 +16,9 @@ const DB_NAME = 'flowerbase-e2e'
 const TODO_COLLECTION = 'todos'
 const USER_COLLECTION = 'users'
 const TEAM_DOCS_COLLECTION = 'teamDocs'
+const OID_EQ_COLLECTION = 'oidEqDocs'
+const OID_STRING_TO_OID_COLLECTION = 'oidStringToOidDocs'
+const OID_TO_STRING_COLLECTION = 'oidToStringDocs'
 const ACTIVITIES_COLLECTION = 'activities'
 const COUNTERS_COLLECTION = 'counters'
 const UPLOADS_COLLECTION = 'uploads'
@@ -43,6 +46,7 @@ type TestUser = User & {
   custom_data?: {
     key?: string
     accountRole?: string
+    company?: string
     workspaces: string[]
     adminIn?: string[]
   }
@@ -63,6 +67,10 @@ const userIds = {
 const projectIds = {
   ownerProject: new ObjectId('000000000000000000000020'),
   guestProject: new ObjectId('000000000000000000000021')
+}
+const oidDocIds = {
+  ownerCompany: new ObjectId('000000000000000000000040'),
+  otherCompany: new ObjectId('000000000000000000000041')
 }
 const teamDocIds = {
   collaboratorDoc: new ObjectId('000000000000000000000022')
@@ -102,6 +110,7 @@ const ownerUser: TestUser = {
   custom_data: {
     role: 'owner',
     accountRole: 'collaborator',
+    company: oidDocIds.ownerCompany.toHexString(),
     key: 'publisher-owner',
     workspaces: ['workspace-1'],
     adminIn: ['workspace-1']
@@ -113,6 +122,7 @@ const guestUser: TestUser = {
   role: 'guest',
   custom_data: {
     role: 'guest',
+    company: oidDocIds.otherCompany.toHexString(),
     key: 'publisher-guest',
     workspaces: ['workspace-2'],
     adminIn: []
@@ -124,6 +134,7 @@ const adminUser: TestUser = {
   role: 'admin',
   custom_data: {
     role: 'admin',
+    company: new ObjectId('000000000000000000000042').toHexString(),
     key: 'publisher-admin',
     workspaces: ['workspace-1', 'workspace-2'],
     adminIn: ['workspace-1', 'workspace-2']
@@ -259,6 +270,11 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
 const getTodosCollection = (user: TestUser | null) => createCollectionProxy(TODO_COLLECTION, user)
 const getUsersCollection = (user: TestUser | null) => createCollectionProxy(USER_COLLECTION, user)
 const getTeamDocsCollection = (user: TestUser | null) => createCollectionProxy(TEAM_DOCS_COLLECTION, user)
+const getOidEqCollection = (user: TestUser | null) => createCollectionProxy(OID_EQ_COLLECTION, user)
+const getOidStringToOidCollection = (user: TestUser | null) =>
+  createCollectionProxy(OID_STRING_TO_OID_COLLECTION, user)
+const getOidToStringCollection = (user: TestUser | null) =>
+  createCollectionProxy(OID_TO_STRING_COLLECTION, user)
 const getAuthUsersCollection = (user: TestUser | null) => createCollectionProxy(AUTH_USERS_COLLECTION, user)
 const getProjectsCollection = (user: TestUser | null) => createCollectionProxy('projects', user)
 const getActivityLogsCollection = (user: TestUser | null) => createCollectionProxy('activityLogs', user)
@@ -347,6 +363,9 @@ const resetCollections = async () => {
     db.collection(TODO_COLLECTION).deleteMany({}),
     db.collection(USER_COLLECTION).deleteMany({}),
     db.collection(TEAM_DOCS_COLLECTION).deleteMany({}),
+    db.collection(OID_EQ_COLLECTION).deleteMany({}),
+    db.collection(OID_STRING_TO_OID_COLLECTION).deleteMany({}),
+    db.collection(OID_TO_STRING_COLLECTION).deleteMany({}),
     db.collection('projects').deleteMany({}),
     db.collection('activityLogs').deleteMany({}),
     db.collection(ACTIVITIES_COLLECTION).deleteMany({}),
@@ -424,6 +443,41 @@ const resetCollections = async () => {
       roles: ['editor'],
       email: 'collaborator@example.com',
       status: 'active'
+    }
+  ])
+
+  await db.collection(OID_EQ_COLLECTION).insertMany([
+    {
+      _id: oidDocIds.ownerCompany,
+      name: 'Owner company doc'
+    },
+    {
+      _id: oidDocIds.otherCompany,
+      name: 'Other company doc'
+    }
+  ])
+
+  await db.collection(OID_STRING_TO_OID_COLLECTION).insertMany([
+    {
+      _id: oidDocIds.ownerCompany,
+      name: 'Owner company doc'
+    },
+    {
+      _id: oidDocIds.otherCompany,
+      name: 'Other company doc'
+    }
+  ])
+
+  await db.collection(OID_TO_STRING_COLLECTION).insertMany([
+    {
+      _id: new ObjectId('000000000000000000000043'),
+      ownerAuthId: ownerUser.id,
+      name: 'Owned by owner auth id'
+    },
+    {
+      _id: new ObjectId('000000000000000000000044'),
+      ownerAuthId: guestUser.id,
+      name: 'Owned by guest auth id'
     }
   ])
 
@@ -1217,6 +1271,39 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(ownerProject).toHaveProperty('secretNotes', 'top secret')
   })
 
+  it('matches role apply_when when document _id is ObjectId and %%user.custom_data.company is string', async () => {
+    const ownerDocs = await getOidEqCollection(ownerUser).find({}).toArray()
+    expect(ownerDocs).toHaveLength(1)
+    expect((ownerDocs[0] as Document)._id).toEqual(oidDocIds.ownerCompany)
+
+    const guestDocs = await getOidEqCollection(guestUser).find({}).toArray()
+    expect(guestDocs).toHaveLength(1)
+    expect((guestDocs[0] as Document)._id).toEqual(oidDocIds.otherCompany)
+  })
+
+  it('supports %stringToOid in apply_when for role matching', async () => {
+    const ownerDoc = (await getOidStringToOidCollection(ownerUser).findOne({
+      _id: oidDocIds.ownerCompany
+    })) as Document | null
+    expect(ownerDoc).not.toBeNull()
+    expect(ownerDoc?._id).toEqual(oidDocIds.ownerCompany)
+
+    const wrongDoc = (await getOidStringToOidCollection(ownerUser).findOne({
+      _id: oidDocIds.otherCompany
+    })) as Document | null
+    expect(wrongDoc).toEqual({})
+  })
+
+  it('supports %oidToString in apply_when for role matching', async () => {
+    const ownerDocs = await getOidToStringCollection(ownerUser).find({}).toArray()
+    expect(ownerDocs).toHaveLength(1)
+    expect((ownerDocs[0] as Document).ownerAuthId).toBe(ownerUser.id)
+
+    const guestDocs = await getOidToStringCollection(guestUser).find({}).toArray()
+    expect(guestDocs).toHaveLength(1)
+    expect((guestDocs[0] as Document).ownerAuthId).toBe(guestUser.id)
+  })
+
   it('returns only active activity logs for non-admin roles', async () => {
     const logs = (await getActivityLogsCollection(ownerUser).find({}).toArray()) as ActivityLogDoc[]
     expect(logs.every((log) => log.status === 'active')).toBe(true)
@@ -1723,6 +1810,52 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       expect(event.operationType).toBe('update')
       expect(String(event.documentKey?._id)).toBe(String(uploadIds.owner))
       expect((event.fullDocument as UploadDoc | undefined)?.status).toBe('processing')
+    } finally {
+      await watch.close()
+    }
+  })
+
+  it('emits delete watch event when filter combines insert branch and delete branch', async () => {
+    const accountId = ownerUser.custom_data?.key
+    const requestId = new ObjectId()
+    const documentId = new ObjectId()
+    const watch = await openWatchConnection({
+      user: ownerUser,
+      collection: UPLOADS_COLLECTION,
+      filter: {
+        $or: [
+          {
+            operationType: 'insert',
+            'fullDocument.publisher': accountId,
+            'fullDocument.requestId': requestId
+          },
+          {
+            operationType: 'delete'
+          }
+        ]
+      }
+    })
+
+    try {
+      await client
+        .db(DB_NAME)
+        .collection(UPLOADS_COLLECTION)
+        .insertOne({
+          _id: documentId,
+          publisher: accountId,
+          status: 'pending'
+        })
+
+      await watch.expectNoEvent()
+
+      await client
+        .db(DB_NAME)
+        .collection(UPLOADS_COLLECTION)
+        .deleteOne({ _id: documentId })
+
+      const event = await watch.nextEvent()
+      expect(event.operationType).toBe('delete')
+      expect(String(event.documentKey?._id)).toBe(String(documentId))
     } finally {
       await watch.close()
     }

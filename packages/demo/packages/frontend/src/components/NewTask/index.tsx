@@ -10,6 +10,7 @@ import { app, db } from "../../api/client";
 const TaskSchema = z.object({
     title: z.string().min(3, "Title is required"),
     status: z.string().nonempty("Status is required"),
+    secureNote: z.string().optional(),
 });
 
 type TaskFormData = z.infer<typeof TaskSchema>;
@@ -40,13 +41,14 @@ export const NewTask = ({ onClose }: NewTaskProps) => {
         },
     });
 
-    const onSubmit = useCallback(async (data: TaskFormData) => {
+    const onSubmit = useCallback(async ({ secureNote, ...data }: TaskFormData) => {
         try {
             await db().collection("todos").insertOne({
                 ...data,
                 userId: app.currentUser!.id,
                 createdAt: new Date(),
                 updatedAt: new Date(),
+                ...(!!secureNote && { secureNote })
             });
             onClose();
         } catch (e) {
@@ -90,6 +92,23 @@ export const NewTask = ({ onClose }: NewTaskProps) => {
                     <small className="p-error">{errors.status.message}</small>
                 )}
             </div>
+
+            <div className="flex flex-column">
+                <label htmlFor="status" className="font-bold mb-2">
+                    Secret note (encrypted)
+                </label>
+                <InputText
+                    id="secureNote"
+                    {...register("secureNote")}
+                    className={errors.secureNote ? "p-invalid" : ""}
+                    aria-invalid={errors.secureNote ? "true" : "false"}
+                    placeholder="Enter a secret note"
+                />
+                {errors.secureNote && (
+                    <small className="p-error">{errors.secureNote.message}</small>
+                )}
+            </div>
+
 
             <div className="flex gap-2">
                 <Button

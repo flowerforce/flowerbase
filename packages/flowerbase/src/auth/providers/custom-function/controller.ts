@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify'
+import { ObjectId } from 'mongodb'
 import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME, DEFAULT_CONFIG } from '../../../constants'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
@@ -55,7 +56,7 @@ export async function customFunctionController(app: FastifyInstance) {
         id
       } = req
 
-      type CustomFunctionAuthResult = { id?: string }
+      type CustomFunctionAuthResult = { id?: string; email?: string }
       const authResult = await GenerateContext({
         args: [
           req.body
@@ -84,10 +85,29 @@ export async function customFunctionController(app: FastifyInstance) {
         return
       }
 
-      const authUser = await authDb.collection(authCollection!).findOne({ email: authResult.id })
+      const email = authResult.email ?? authResult.id
+      let authUser = await authDb.collection(authCollection!).findOne({ email })
       if (!authUser) {
-        reply.code(401).send({ message: 'Unauthorized' })
-        return
+        const authUserId = new ObjectId()
+        await authDb.collection(authCollection!).insertOne({
+          _id: authUserId,
+          email,
+          status: 'confirmed',
+          createdAt: new Date(),
+          custom_data: {},
+          identities: [
+            {
+              id: authResult.id.toString(),
+              provider_id: authResult.id.toString(),
+              provider_type: 'custom-function',
+              provider_data: { email }
+            }
+          ]
+        })
+        authUser = {
+          _id: authUserId,
+          email
+        }
       }
 
       const user =

@@ -315,6 +315,9 @@ const isReadableDocumentResult = (value: unknown) =>
   !Array.isArray(value) &&
   Object.keys(value as Record<string, unknown>).length > 0
 
+export const shouldSkipReadabilityLookupForChange = (change: Document) =>
+  change.operationType === 'delete'
+
 /**
  * > Creates a pre handler for every query
  * @param app -> the fastify instance
@@ -523,6 +526,11 @@ export const functionsController: FunctionController = async (
             (change as { documentKey?: { _id?: unknown } })?.documentKey?._id ??
             (change as { fullDocument?: { _id?: unknown } })?.fullDocument?._id
           if (typeof docId === 'undefined') return
+
+          if (shouldSkipReadabilityLookupForChange(change)) {
+            subscriberRes.write(`data: ${serializeEjson(change)}\n\n`)
+            return
+          }
 
           const readQuery = subscriber.documentFilter
             ? ({ $and: [subscriber.documentFilter, { _id: docId }] } as Document)

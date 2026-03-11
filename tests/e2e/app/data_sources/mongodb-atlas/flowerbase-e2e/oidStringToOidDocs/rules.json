@@ -1,0 +1,20 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "oidStringToOidDocs",
+  "filters": [],
+  "roles": [
+    {
+      "name": "companyMatchWithStringToOid",
+      "apply_when": {
+        "_id": {
+          "%stringToOid": "%%user.custom_data.company"
+        }
+      },
+      "insert": false,
+      "delete": false,
+      "search": true,
+      "read": true,
+      "write": false
+    }
+  ]
+}

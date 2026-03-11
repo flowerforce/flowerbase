@@ -1,5 +1,5 @@
 import cors from '@fastify/cors'
-import fastifyMongodb from '@fastify/mongodb'
+import fastifyMongodb, { FastifyMongodbOptions } from '@fastify/mongodb'
 import { FastifyInstance } from 'fastify'
 import fastifyRawBody from 'fastify-raw-body'
 import { CorsConfig } from '../../'
@@ -10,7 +10,9 @@ import { customFunctionController } from '../../auth/providers/custom-function/c
 import { localUserPassController } from '../../auth/providers/local-userpass/controller'
 import { API_VERSION, DEFAULT_CONFIG } from '../../constants'
 import { Functions } from '../../features/functions/interface'
+import { EncryptionSchemas } from '../../features/encryption/interface'
 import monitoringPlugin from '../../monitoring/plugin'
+import { setupMongoDbCSFLE, MongoDbEncryptionConfig } from './mongodbCSFLE'
 
 type RegisterFunction = FastifyInstance['register']
 type RegisterParameters = Parameters<RegisterFunction>
@@ -21,6 +23,8 @@ type RegisterPluginsParams = {
   jwtSecret: string
   functionsList: Functions
   corsConfig?: CorsConfig
+  encryptionSchemas?: EncryptionSchemas
+  mongodbEncryptionConfig?: MongoDbEncryptionConfig
 }
 
 type RegisterConfig = {
@@ -41,14 +45,18 @@ export const registerPlugins = async ({
   mongodbUrl,
   jwtSecret,
   functionsList,
-  corsConfig
+  corsConfig,
+  mongodbEncryptionConfig,
+  encryptionSchemas
 }: RegisterPluginsParams) => {
   try {
     const registersConfig = await getRegisterConfig({
       mongodbUrl,
       jwtSecret,
       corsConfig,
-      functionsList
+      functionsList,
+      mongodbEncryptionConfig,
+      encryptionSchemas
     })
 
     registersConfig.forEach(({ plugin, options, pluginName }) => {
@@ -75,14 +83,22 @@ export const registerPlugins = async ({
 const getRegisterConfig = async ({
   mongodbUrl,
   jwtSecret,
-  corsConfig
-}: Pick<RegisterPluginsParams, 'jwtSecret' | 'mongodbUrl' | 'functionsList' | 'corsConfig'>): Promise<
-  RegisterConfig[]
-> => {
+  corsConfig,
+  encryptionSchemas,
+  mongodbEncryptionConfig,
+}: Omit<RegisterPluginsParams, "register">): Promise<RegisterConfig[]> => {
   const corsOptions = corsConfig ?? {
     origin: '*',
     methods: ['POST', 'GET']
   }
+
+  const autoEncryption = mongodbEncryptionConfig
+    ? await setupMongoDbCSFLE({
+      mongodbUrl,
+      schemas: encryptionSchemas,
+      ...mongodbEncryptionConfig
+    })
+    : undefined
 
   const baseConfig = [
     {
@@ -94,9 +110,28 @@ const getRegisterConfig = async ({
       pluginName: 'fastifyMongodb',
       plugin: fastifyMongodb,
       options: {
+        url: mongodbUrl,
         forceClose: true,
-        url: mongodbUrl
-      }
+        autoEncryption
+      } satisfies FastifyMongodbOptions
+    },
+    /**
+     * When auto-encryption is active, add another MongoDB client with bypass for change streams.
+     * The $changeStream operator does not support automatic encryption, only decryption.
+     * @see https://www.mongodb.com/docs/manual/core/csfle/reference/supported-operations
+     */
+    autoEncryption && {
+      pluginName: 'fastifyMongodb',
+      plugin: fastifyMongodb,
+      options: {
+        name: "changestream",
+        url: mongodbUrl,
+        forceClose: true,
+        autoEncryption: {
+          ...autoEncryption,
+          bypassAutoEncryption: true
+        }
+      } satisfies FastifyMongodbOptions
     },
     {
       pluginName: 'jwtAuthPlugin',
@@ -153,5 +188,5 @@ const getRegisterConfig = async ({
     } as RegisterConfig)
   }
 
-  return baseConfig
+  return baseConfig.filter(Boolean)
 }

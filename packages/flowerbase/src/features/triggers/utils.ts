@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'node:path'
 import cron from 'node-cron'
-import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME } from '../../constants'
+import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME, CHANGESTREAM } from '../../constants'
 import { createEventId, sanitize } from '../../monitoring/utils'
 import { StateManager } from '../../state'
 import { readJsonContent } from '../../utils'
@@ -247,7 +247,7 @@ const handleAuthenticationTrigger = async ({
   const { database, isAutoTrigger, operation_types = [], operation_type } = config
   const providerFilter = normalizeProviders(config.providers ?? [])
   const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
-  const collection = app.mongo.client.db(database || AUTH_DB_NAME).collection(authCollection)
+  const collection = app.mongo[CHANGESTREAM].client.db(database || AUTH_DB_NAME).collection(authCollection)
   const operationCandidates = operation_type ? mapOpInverse[operation_type] : operation_types
   const normalizedOps = normalizeOperationTypes(operationCandidates)
   const baseMeta = {
@@ -712,7 +712,7 @@ const handleDataBaseTrigger = async ({
 
   const normalizedOperations = normalizeOperationTypes(operation_types)
 
-  const collection = app.mongo.client.db(database).collection(collectionName)
+  const collection = app.mongo[CHANGESTREAM].client.db(database).collection(collectionName)
   const pipeline = [
     {
       $match: {

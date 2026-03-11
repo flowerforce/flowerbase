@@ -18,6 +18,7 @@ export interface Todo {
   userId: number;
   title: string;
   status: "backlog" | "todo" | "progress" | "done";
+  secureNote?: string;
   createdAt: string
   updatedAt: string
 }
