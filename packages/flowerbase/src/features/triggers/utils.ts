@@ -172,6 +172,7 @@ const handleCronTrigger = async ({
 const mapOpInverse = {
   CREATE: ['insert', 'update', 'replace'],
   DELETE: ['delete'],
+  LOGIN: ['insert', 'update'],
   LOGOUT: ['update'],
 }
 
@@ -306,6 +307,8 @@ const handleAuthenticationTrigger = async ({
     const isUpdate = operationType === 'update'
     const isReplace = operationType === 'replace'
     const isDelete = operationType === 'delete'
+    const isLoginInsert = isInsert && !!(fullDocument as Record<string, unknown> | null)?.lastLoginAt
+    const isLoginUpdate = isUpdate && !!updatedFields && 'lastLoginAt' in updatedFields
     const isLogoutUpdate = isUpdate && !!updatedFields && 'lastLogoutAt' in updatedFields
 
     let confirmedCandidate = false
@@ -390,6 +393,63 @@ const handleAuthenticationTrigger = async ({
           triggerType,
           functionName,
           meta: { ...baseMeta, event: 'LOGOUT' },
+          error
+        })
+        console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
+      }
+      return
+    }
+
+    if (operation_type === 'LOGIN') {
+      if (!isLoginInsert && !isLoginUpdate) {
+        return
+      }
+      let loginDocument = fullDocument ?? confirmedDocument
+      if (!loginDocument && documentKey?._id) {
+        loginDocument = await collection.findOne({
+          _id: documentKey._id
+        }) as Record<string, unknown> | null
+      }
+      if (!matchesProviderFilter(loginDocument, providerFilter)) {
+        return
+      }
+      const userData = buildUserData(loginDocument)
+      if (!userData) {
+        return
+      }
+      const op = {
+        operationType: 'LOGIN',
+        fullDocument,
+        fullDocumentBeforeChange,
+        documentKey,
+        updateDescription
+      }
+      try {
+        emitTriggerEvent({
+          status: 'fired',
+          triggerName,
+          triggerType,
+          functionName,
+          meta: { ...baseMeta, event: 'LOGIN' }
+        })
+        await GenerateContext({
+          args: [{ user: userData, ...op }],
+          app,
+          rules: StateManager.select("rules"),
+          user: {},  // TODO from currentUser ??
+          currentFunction: triggerHandler,
+          functionName,
+          functionsList,
+          services,
+          runAsSystem: true
+        })
+      } catch (error) {
+        emitTriggerEvent({
+          status: 'error',
+          triggerName,
+          triggerType,
+          functionName,
+          meta: { ...baseMeta, event: 'LOGIN' },
           error
         })
         console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
