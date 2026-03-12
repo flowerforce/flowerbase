@@ -24,7 +24,7 @@ type Config = {
   isAutoTrigger?: boolean
   match: Record<string, unknown>
   operation_types: string[]
-  operation_type?: 'CREATE' | 'DELETE' | 'LOGOUT'
+  operation_type?: 'CREATE' | 'DELETE' | 'LOGIN' | 'LOGOUT'
   providers?: string[]
   project: Record<string, unknown>
   service_name: string
