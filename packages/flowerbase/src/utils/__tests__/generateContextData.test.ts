@@ -79,7 +79,11 @@ describe('generateContextData', () => {
     mockErrorLog.mockRestore()
 
     context.functions.execute('test')
-    expect(GenerateContextSyncMock).toHaveBeenCalled()
+    expect(GenerateContextSyncMock).toHaveBeenCalledWith(expect.objectContaining({
+      currentFunction,
+      functionName: 'test',
+      runAsSystem: currentFunction.run_as_system
+    }))
 
     const token = jwt.sign(
       { sub: 'user', role: 'admin' },

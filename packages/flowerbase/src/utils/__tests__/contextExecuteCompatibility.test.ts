@@ -4,7 +4,7 @@ import { Functions } from '../../features/functions/interface'
 const mockServices = {
   api: jest.fn().mockReturnValue({}),
   aws: jest.fn().mockReturnValue({}),
-  'mongodb-atlas': jest.fn().mockReturnValue({})
+  'mongodb-atlas': jest.fn((_app, options) => options ?? {})
 } as any
 
 describe('context.functions.execute compatibility', () => {
@@ -75,6 +75,32 @@ describe('context.functions.execute compatibility', () => {
             return session.client.sessionPool.client === session
           }
         `
+      }
+    } as Functions
+
+    const result = GenerateContextSync({
+      args: [],
+      app: {} as any,
+      rules: {} as any,
+      user: {} as any,
+      currentFunction: functionsList.caller,
+      functionsList,
+      services: mockServices,
+      functionName: 'caller'
+    })
+
+    expect(result).toBe(true)
+  })
+
+  it('propagates run_as_system to child functions executed through context.functions.execute', () => {
+    const functionsList = {
+      caller: {
+        run_as_system: true,
+        code: 'module.exports = function() { return context.functions.execute("target") }'
+      },
+      target: {
+        run_as_system: false,
+        code: 'module.exports = function() { return context.services.get("mongodb-atlas").run_as_system }'
       }
     } as Functions
 

@@ -205,16 +205,17 @@ export const generateContextData = ({
       https: getService('api'),
       functions: {
         execute: (name: keyof typeof functionsList, ...args: Arguments) => {
-          const currentFunction = functionsList[name] as Function
+          const targetFunction = functionsList[name] as Function
           return GenerateContextSync({
             args,
             app,
             rules,
             user,
-            currentFunction,
+            currentFunction: targetFunction,
             functionName: String(name),
             functionsList,
             services,
+            runAsSystem: currentFunction.run_as_system,
             deserializeArgs: false
           })
         }
