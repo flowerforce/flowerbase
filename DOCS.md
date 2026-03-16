@@ -191,10 +191,18 @@ exports = function(payload, response) {
   const userId = context.user.id;
   const users = context.services.get("mongodb-atlas").db("appDB").collection("users");
 
+  response.setHeader("Content-Type", "application/json");
+  response.setHeader("Cache-Control", "no-store");
   return users.findOne({ ownerId: userId });
 };
 
 ```
+
+The `response` object available in HTTP endpoint handlers supports:
+
+- `response.setStatusCode(code)`
+- `response.setHeader(name, value)`
+- `response.setBody(body)`
 ---
 
 **Flowerbase** brings the power of MongoDB Realm’s serverless architecture into your own development environment, providing a familiar, declarative, and modular way to define backend logic and access control.
