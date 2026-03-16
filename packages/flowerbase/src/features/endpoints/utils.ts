@@ -138,6 +138,9 @@ export const generateHandler = ({
         setStatusCode: (code: number) => {
           res.status(code)
         },
+        setHeader: (name: string, value: string | number | readonly string[]) => {
+          res.header(name, value)
+        },
         setBody: (body: unknown) => {
           customResponseBody.data = body
         }
