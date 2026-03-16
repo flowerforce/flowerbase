@@ -65,6 +65,11 @@ export const filterDocumentByFieldPermissions = async (
   const additionalFields = context.role.additional_fields
 
   for (const [key, value] of Object.entries(source)) {
+    if (mode === 'read' && key === '_id') {
+      document[key] = value
+      continue
+    }
+
     const fieldPermission = fields[key]
     const permission = fieldPermission ?? getAdditionalFieldPermission(additionalFields, key)
     let allowed = options?.defaultAllow === true
