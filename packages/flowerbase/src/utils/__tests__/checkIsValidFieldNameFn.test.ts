@@ -32,8 +32,7 @@ describe('checkIsValidFieldNameFn', () => {
 
     const result = await checkIsValidFieldNameFn(context)
     expect(result).toEqual({
-      name: 'Alice',
-      email: 'alice@example.com'
+      name: 'Alice'
     })
   })
 
@@ -56,8 +55,33 @@ describe('checkIsValidFieldNameFn', () => {
 
     const result = await checkIsValidFieldNameFn(context)
     expect(result).toEqual({
-      phone: '123456789',
-      address: 'Unknown'
+      phone: '123456789'
+    })
+  })
+
+  it('keeps fields readable when top-level read is true and the field only defines write rules', async () => {
+    const mockedRole = {
+      name: 'test',
+      apply_when: { '%%true': true },
+      read: true,
+      fields: {
+        avatar: { write: false },
+        name: { write: true }
+      }
+    } as Role
+    const context = {
+      user: mockUser,
+      role: mockedRole,
+      params: {
+        type: 'read',
+        cursor: { avatar: 'avatar.png', name: 'Alice' }
+      }
+    } as MachineContext
+
+    const result = await checkIsValidFieldNameFn(context)
+    expect(result).toEqual({
+      avatar: 'avatar.png',
+      name: 'Alice'
     })
   })
 
