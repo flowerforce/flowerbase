@@ -1,0 +1,21 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "internalContacts",
+  "filters": [],
+  "roles": [
+    {
+      "name": "Internal",
+      "apply_when": {
+        "%%user.custom_data.type": "internal"
+      },
+      "fields": {
+        "name": {
+          "write": true
+        },
+        "address": {
+          "write": true
+        }
+      }
+    }
+  ]
+}

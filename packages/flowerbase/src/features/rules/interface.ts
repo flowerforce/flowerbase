@@ -1,4 +1,6 @@
 import { Document } from 'mongodb'
+export type PermissionExpression = boolean | Record<string, unknown>
+
 export interface Filter {
   name: string
   query: Record<string, unknown>
@@ -9,11 +11,11 @@ export type Projection = Record<string, 0 | 1>
 export interface Role {
   name: string
   apply_when: Record<string, unknown>
-  insert: boolean
-  delete: boolean
-  search: boolean
-  read: boolean
-  write: boolean
+  insert: PermissionExpression
+  delete: PermissionExpression
+  search: PermissionExpression
+  read: PermissionExpression
+  write: PermissionExpression
 }
 
 export interface RulesConfig {
@@ -21,7 +23,6 @@ export interface RulesConfig {
   collection: string
   filters: Filter[]
   roles: Role[]
-
 }
 
 export type Rules = Record<string, RulesConfig>
@@ -38,21 +39,21 @@ export type AggregationPipelineStage =
   | { $unionWith: UnionWithStage }
 
 export interface LookupStage {
-  from: string;
-  localField?: string;
-  foreignField?: string;
-  as: string;
-  let?: Record<string, unknown>;
-  pipeline?: AggregationPipelineStage[];
+  from: string
+  localField?: string
+  foreignField?: string
+  as: string
+  let?: Record<string, unknown>
+  pipeline?: AggregationPipelineStage[]
 }
 
 export type AggregationPipeline = Document[]
 
 export type UnionWithStage = string | UnionWithNestedStage
-type UnionWithNestedStage = { coll: string, pipeline: AggregationPipelineStage[] }
+type UnionWithNestedStage = { coll: string; pipeline: AggregationPipelineStage[] }
 
 export enum STAGES_TO_SEARCH {
-  LOOKUP = "$lookup",
-  UNION_WITH = "$unionWith",
-  FACET = "$facet"
+  LOOKUP = '$lookup',
+  UNION_WITH = '$unionWith',
+  FACET = '$facet'
 }

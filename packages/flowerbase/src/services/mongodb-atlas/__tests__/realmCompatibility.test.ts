@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb'
 import MongoDbAtlas from '..'
-import { Role, Rules } from '../../../features/rules/interface'
+import { Rules } from '../../../features/rules/interface'
 
 const createAppWithCollection = (collection: Record<string, unknown>) => ({
   mongo: {
@@ -12,12 +12,12 @@ const createAppWithCollection = (collection: Record<string, unknown>) => ({
   }
 })
 
-const createRules = (roleOverrides: Partial<Role> = {}): Rules => ({
+const createRules = (overrides: Partial<Rules[keyof Rules]> = {}): Rules => ({
   todos: {
     database: 'db',
     collection: 'todos',
-    filters: [],
-    roles: [
+    filters: overrides.filters ?? [],
+    roles: overrides.roles ?? [
       {
         name: 'owner',
         apply_when: {},
@@ -25,10 +25,10 @@ const createRules = (roleOverrides: Partial<Role> = {}): Rules => ({
         delete: true,
         search: true,
         read: true,
-        write: true,
-        ...roleOverrides
+        write: true
       }
-    ]
+    ],
+    ...overrides
   }
 })
 
@@ -266,6 +266,204 @@ describe('mongodb-atlas Realm compatibility', () => {
 
     expect(result).toEqual(doc)
     expect(findOne).toHaveBeenCalledWith({}, undefined)
+  })
+
+  it('keeps write-only field permissions readable in findOne responses', async () => {
+    const doc = {
+      _id: new ObjectId(),
+      name: 'HQ',
+      address: 'Main Street 1'
+    }
+    const findOne = jest.fn().mockResolvedValue(doc)
+    const collection = {
+      collectionName: 'todos',
+      findOne
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules({
+        roles: [
+          {
+            name: 'internal',
+            apply_when: {},
+            insert: true,
+            delete: true,
+            search: true,
+            read: true,
+            write: true,
+            fields: {
+              name: { write: true },
+              address: { write: true }
+            }
+          } as any
+        ]
+      }),
+      user: { id: 'user-1', custom_data: { type: 'internal' } }
+    }).db('db').collection('todos')
+
+    const result = await operators.findOne({ _id: doc._id })
+
+    expect(result).toEqual(doc)
+  })
+
+  it('keeps write-only field permissions readable in find responses', async () => {
+    const doc = {
+      _id: new ObjectId(),
+      name: 'HQ',
+      address: 'Main Street 1'
+    }
+    const cursor = {
+      toArray: jest.fn().mockResolvedValue([doc]),
+      sort: jest.fn(),
+      skip: jest.fn(),
+      limit: jest.fn()
+    }
+    const find = jest.fn().mockReturnValue(cursor)
+    const collection = {
+      collectionName: 'todos',
+      find
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules({
+        roles: [
+          {
+            name: 'internal',
+            apply_when: {},
+            insert: true,
+            delete: true,
+            search: true,
+            read: true,
+            write: true,
+            fields: {
+              name: { write: true },
+              address: { write: true }
+            }
+          } as any
+        ]
+      }),
+      user: { id: 'user-1', custom_data: { type: 'internal' } }
+    }).db('db').collection('todos')
+
+    const result = await operators.find({ _id: doc._id }).toArray()
+
+    expect(result).toEqual([doc])
+  })
+
+  it('supports Realm-style field access where write implies read without explicit top-level read', async () => {
+    const doc = {
+      _id: new ObjectId(),
+      name: 'HQ',
+      address: 'Main Street 1',
+      city: 'Rome'
+    }
+    const findOne = jest.fn().mockResolvedValue(doc)
+    const collection = {
+      collectionName: 'todos',
+      findOne
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules({
+        roles: [
+          {
+            name: 'Internal',
+            apply_when: { '%%user.custom_data.type': 'internal' },
+            fields: {
+              name: { write: true },
+              address: { write: true }
+            }
+          } as any
+        ]
+      }),
+      user: { id: 'user-1', custom_data: { type: 'internal' } }
+    }).db('db').collection('todos')
+
+    const result = await operators.findOne({ _id: doc._id })
+
+    expect(result).toEqual({
+      _id: doc._id,
+      name: 'HQ',
+      address: 'Main Street 1'
+    })
+  })
+
+  it('supports Realm-style field access with explicit field-level read without top-level read', async () => {
+    const doc = {
+      _id: new ObjectId(),
+      name: 'HQ',
+      address: 'Main Street 1',
+      city: 'Rome'
+    }
+    const findOne = jest.fn().mockResolvedValue(doc)
+    const collection = {
+      collectionName: 'todos',
+      findOne
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules({
+        roles: [
+          {
+            name: 'Internal',
+            apply_when: { '%%user.custom_data.type': 'internal' },
+            fields: {
+              name: { read: true },
+              address: { read: true }
+            }
+          } as any
+        ]
+      }),
+      user: { id: 'user-1', custom_data: { type: 'internal' } }
+    }).db('db').collection('todos')
+
+    const result = await operators.findOne({ _id: doc._id })
+
+    expect(result).toEqual({
+      _id: doc._id,
+      name: 'HQ',
+      address: 'Main Street 1'
+    })
+  })
+
+  it('keeps top-level read access even when fields only define write rules', async () => {
+    const doc = {
+      _id: new ObjectId(),
+      userId: 'user-1',
+      email: 'owner@example.com',
+      workspaces: ['workspace-1'],
+      avatar: 'owner.png',
+      name: 'Owner name',
+      tags: ['owner'],
+      updatedAt: new Date('2026-03-17T10:00:00.000Z')
+    }
+    const findOne = jest.fn().mockResolvedValue(doc)
+    const collection = {
+      collectionName: 'todos',
+      findOne
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules({
+        roles: [
+          {
+            name: 'all',
+            apply_when: { '%%true': true },
+            insert: false,
+            delete: false,
+            search: true,
+            read: true,
+            fields: {
+              avatar: { write: false },
+              name: { write: true },
+              tags: { write: false },
+              updatedAt: { write: true }
+            },
+            additional_fields: {}
+          } as any
+        ]
+      }),
+      user: { id: 'user-1', custom_data: { workspaces: ['workspace-1'] } }
+    }).db('db').collection('todos')
+
+    const result = await operators.findOne({ _id: doc._id })
+
+    expect(result).toEqual(doc)
   })
 
   it('returns insertMany insertedIds as an array', async () => {

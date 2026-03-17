@@ -35,10 +35,8 @@ const canReadField = async (
   context: Pick<MachineContext, 'params' | 'user'>,
   permission?: FieldPermissionExpression
 ) => {
-  if (!permission) return false
-  const read = await evaluateExpression(context.params, permission.read, context.user)
-  if (read) return true
-  return await evaluateExpression(context.params, permission.write, context.user)
+  if (!permission || typeof permission.read === 'undefined') return undefined
+  return await evaluateExpression(context.params, permission.read, context.user)
 }
 
 const canWriteField = async (
@@ -67,14 +65,25 @@ export const filterDocumentByFieldPermissions = async (
   const additionalFields = context.role.additional_fields
 
   for (const [key, value] of Object.entries(source)) {
+    if (mode === 'read' && key === '_id') {
+      document[key] = value
+      continue
+    }
+
     const fieldPermission = fields[key]
     const permission = fieldPermission ?? getAdditionalFieldPermission(additionalFields, key)
     let allowed = options?.defaultAllow === true
     if (permission) {
-      allowed =
-        mode === 'read'
-          ? await canReadField(context, permission)
-          : await canWriteField(context, permission)
+      if (mode === 'read') {
+        const readAllowed = await canReadField(context, permission)
+        if (typeof readAllowed !== 'undefined') {
+          allowed = readAllowed
+        } else if (!allowed && typeof permission.write !== 'undefined') {
+          allowed = await canWriteField(context, permission)
+        }
+      } else {
+        allowed = await canWriteField(context, permission)
+      }
     }
 
     if (allowed) {

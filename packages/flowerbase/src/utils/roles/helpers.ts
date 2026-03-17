@@ -17,7 +17,9 @@ const normalizeUserRole = (user?: MachineContext['user']) => {
     typeof candidate.custom_data === 'object' && candidate.custom_data !== null
       ? (candidate.custom_data as Record<string, unknown>).role
       : undefined
-  return typeof customRole === 'string' ? ({ ...candidate, role: customRole } as MachineContext['user']) : user
+  return typeof customRole === 'string'
+    ? ({ ...candidate, role: customRole } as MachineContext['user'])
+    : user
 }
 
 export const evaluateExpression = async (
@@ -31,12 +33,15 @@ export const evaluateExpression = async (
   const value = {
     ...params.expansions,
     ...params.cursor,
+    '%%root': params.cursor,
+    '%%prevRoot': params.expansions?.['%%prevRoot'],
     '%%user': normalizedUser,
-    '%%true': true
+    '%%true': true,
+    '%%false': false
   }
   const conditions = expandQuery(expression, value)
-  const complexCondition = Object.entries(conditions as Record<string, any>).find(([key]) =>
-    functionsConditions.includes(key)
+  const complexCondition = Object.entries(conditions as Record<string, any>).find(
+    ([key]) => functionsConditions.includes(key)
   )
   return complexCondition
     ? await evaluateComplexExpression(complexCondition, params, normalizedUser)
@@ -75,7 +80,7 @@ const evaluateComplexExpression = async (
   const response = await GenerateContext({
     args: expandedArguments,
     app,
-    rules: StateManager.select("rules"),
+    rules: StateManager.select('rules'),
     user: normalizedUser,
     currentFunction,
     functionName: name,

@@ -23,7 +23,10 @@ const toObjectIdHex = (value: unknown): string | null => {
   }
 
   const maybeObjectId = value as { _bsontype?: string; toHexString?: () => string }
-  if (maybeObjectId._bsontype === 'ObjectId' && typeof maybeObjectId.toHexString === 'function') {
+  if (
+    maybeObjectId._bsontype === 'ObjectId' &&
+    typeof maybeObjectId.toHexString === 'function'
+  ) {
     const hex = maybeObjectId.toHexString()
     return HEX_24_REGEXP.test(hex) ? hex.toLowerCase() : null
   }
@@ -49,11 +52,21 @@ const includesWithSemanticEquality = (value: unknown, candidate: unknown): boole
       rulesMatcherUtils
         .forceArray(value)
         .some((sourceItem) =>
-          rulesMatcherUtils.forceArray(item).some((candidateItem) =>
-            areSemanticallyEqual(sourceItem, candidateItem)
-          )
+          rulesMatcherUtils
+            .forceArray(item)
+            .some((candidateItem) => areSemanticallyEqual(sourceItem, candidateItem))
         )
     )
+
+const resolveRefPath = (data: unknown, refPath: string, prefix?: string): unknown => {
+  const exactMatch = _get(data, refPath, undefined)
+
+  if (exactMatch !== undefined) {
+    return exactMatch
+  }
+
+  return _get(data, rulesMatcherUtils.getPath(refPath, prefix), undefined)
+}
 
 /**
  * Defines a utility object named rulesMatcherUtils, which contains various helper functions used for processing rules and data in a rule-matching context.
@@ -73,11 +86,7 @@ const rulesMatcherUtils: RulesMatcherUtils = {
     const { op, value, opt } = rulesMatcherUtils.getDefaultRule(valueBlock[path])
     const valueRef =
       value && String(value).indexOf('$ref:') === 0
-        ? _get(
-          data,
-          rulesMatcherUtils.getPath(value.replace('$ref:', ''), prefix),
-          undefined
-        )
+        ? resolveRefPath(data, value.replace('$ref:', ''), prefix)
         : value
 
     if (!operators[op]) {
@@ -107,7 +116,9 @@ const rulesMatcherUtils: RulesMatcherUtils = {
     const res = rulesMatcherUtils.getPath(path, prefix)
     const { value } = rulesMatcherUtils.getDefaultRule(valueBlock[path])
     if (value && String(value).indexOf('$ref:') === 0) {
-      keys[rulesMatcherUtils.getPath(value.replace('$ref:', ''), prefix)] = true
+      const refPath = value.replace('$ref:', '')
+      keys[refPath] = true
+      keys[rulesMatcherUtils.getPath(refPath, prefix)] = true
     }
 
     return (keys[res] = true)
@@ -279,6 +290,7 @@ const rulesMatcherUtils: RulesMatcherUtils = {
  */
 export const operators: Operators = {
   $exists: (a, b) => !rulesMatcherUtils.isEmpty(a) === b,
+  '%exists': (a, b) => !rulesMatcherUtils.isEmpty(a) === b,
 
   $eq: (a, b) => areSemanticallyEqual(a, b),
 
@@ -305,13 +317,17 @@ export const operators: Operators = {
   $nin: (a, b) => !includesWithSemanticEquality(a, b),
 
   $all: (a, b) =>
-    rulesMatcherUtils.forceArray(b).every((candidate) =>
-      rulesMatcherUtils
-        .forceArray(a)
-        .some((value) =>
-          rulesMatcherUtils.forceArray(candidate).some((item) => areSemanticallyEqual(value, item))
-        )
-    ),
+    rulesMatcherUtils
+      .forceArray(b)
+      .every((candidate) =>
+        rulesMatcherUtils
+          .forceArray(a)
+          .some((value) =>
+            rulesMatcherUtils
+              .forceArray(candidate)
+              .some((item) => areSemanticallyEqual(value, item))
+          )
+      ),
 
   $size: (a, b) => Array.isArray(a) && a.length === parseFloat(b),
 

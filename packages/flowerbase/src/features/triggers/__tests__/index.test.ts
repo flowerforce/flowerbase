@@ -9,9 +9,9 @@ jest.mock('../../../constants', () => ({
 
 jest.mock('../utils', () => ({
   TRIGGER_HANDLERS: {
-    SCHEDULED: jest.fn(async () => {}),
-    DATABASE: jest.fn(async () => {}),
-    AUTHENTICATION: jest.fn(async () => {})
+    SCHEDULED: jest.fn(async () => { }),
+    DATABASE: jest.fn(async () => { }),
+    AUTHENTICATION: jest.fn(async () => { })
   }
 }))
 
@@ -27,7 +27,9 @@ describe('activateTriggers', () => {
     }
 
     await activateTriggers({
-      fastify: {} as never,
+      fastify: {
+        mongo: {}
+      } as any,
       functionsList,
       triggersList: [
         {
