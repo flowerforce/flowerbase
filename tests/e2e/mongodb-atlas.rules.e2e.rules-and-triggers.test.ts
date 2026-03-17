@@ -23,6 +23,8 @@ const ACTIVITIES_COLLECTION = 'activities'
 const COUNTERS_COLLECTION = 'counters'
 const UPLOADS_COLLECTION = 'uploads'
 const INSERT_ONLY_COLLECTION = 'insertOnlyDocs'
+const INTERNAL_CONTACTS_COLLECTION = 'internalContacts'
+const INTERNAL_READ_CONTACTS_COLLECTION = 'internalReadContacts'
 const TRIGGER_ITEMS_INSERT_COLLECTION = 'trigger_items_insert'
 const TRIGGER_ITEMS_UPDATE_COLLECTION = 'trigger_items_update'
 const TRIGGER_ITEMS_DELETE_COLLECTION = 'trigger_items_delete'
@@ -45,6 +47,7 @@ type TestUser = User & {
   role?: string
   email: string
   custom_data?: {
+    type?: string
     key?: string
     accountRole?: string
     company?: string
@@ -109,6 +112,7 @@ const ownerUser: TestUser = {
   role: 'owner',
   custom_data: {
     role: 'owner',
+    type: 'internal',
     accountRole: 'collaborator',
     company: oidDocIds.ownerCompany.toHexString(),
     key: 'publisher-owner',
@@ -122,6 +126,7 @@ const guestUser: TestUser = {
   role: 'guest',
   custom_data: {
     role: 'guest',
+    type: 'guest',
     company: oidDocIds.otherCompany.toHexString(),
     key: 'publisher-guest',
     workspaces: ['workspace-2'],
@@ -134,6 +139,7 @@ const adminUser: TestUser = {
   role: 'admin',
   custom_data: {
     role: 'admin',
+    type: 'admin',
     company: new ObjectId('000000000000000000000042').toHexString(),
     key: 'publisher-admin',
     workspaces: ['workspace-1', 'workspace-2'],
@@ -312,6 +318,10 @@ const getUploadsCollection = (user: TestUser | null) =>
   createCollectionProxy(UPLOADS_COLLECTION, user)
 const getInsertOnlyCollection = (user: TestUser | null) =>
   createCollectionProxy(INSERT_ONLY_COLLECTION, user)
+const getInternalContactsCollection = (user: TestUser | null) =>
+  createCollectionProxy(INTERNAL_CONTACTS_COLLECTION, user)
+const getInternalReadContactsCollection = (user: TestUser | null) =>
+  createCollectionProxy(INTERNAL_READ_CONTACTS_COLLECTION, user)
 
 const registerAccessToken = (user: TestUser, authId: ObjectId) => {
   if (!appInstance) {
@@ -403,6 +413,8 @@ const resetCollections = async () => {
     db.collection(COUNTERS_COLLECTION).deleteMany({}),
     db.collection(UPLOADS_COLLECTION).deleteMany({}),
     db.collection(INSERT_ONLY_COLLECTION).deleteMany({}),
+    db.collection(INTERNAL_CONTACTS_COLLECTION).deleteMany({}),
+    db.collection(INTERNAL_READ_CONTACTS_COLLECTION).deleteMany({}),
     db.collection(AUTH_USERS_COLLECTION).deleteMany({}),
     db.collection(AUTH_CONFIG.refreshTokensCollection).deleteMany({}),
     db.collection(RESET_PASSWORD_COLLECTION).deleteMany({}),
@@ -629,6 +641,24 @@ const resetCollections = async () => {
       _id: uploadIds.guest,
       publisher: guestUser.custom_data?.key,
       status: 'pending'
+    }
+  ])
+
+  await db.collection(INTERNAL_CONTACTS_COLLECTION).insertMany([
+    {
+      _id: new ObjectId('000000000000000000000350'),
+      name: 'Internal HQ',
+      address: 'Via Roma 1',
+      phone: '+39-123456'
+    }
+  ])
+
+  await db.collection(INTERNAL_READ_CONTACTS_COLLECTION).insertMany([
+    {
+      _id: new ObjectId('000000000000000000000351'),
+      name: 'Read HQ',
+      address: 'Via Milano 2',
+      phone: '+39-654321'
     }
   ])
 
@@ -1680,6 +1710,55 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       _id: uploadIds.owner
     })) as UploadDoc | null
     expect(updated?.status).toBe('canceled')
+  })
+
+  it('keeps write-only fields readable in find and findOne responses', async () => {
+    const found = (await getUploadsCollection(ownerUser).find({}).toArray()) as UploadDoc[]
+    expect(found).toHaveLength(1)
+    expect(found[0]).toMatchObject({
+      _id: uploadIds.owner,
+      publisher: ownerUser.custom_data?.key,
+      status: 'pending'
+    })
+
+    const single = (await getUploadsCollection(ownerUser).findOne({
+      _id: uploadIds.owner
+    })) as UploadDoc | null
+    expect(single).toMatchObject({
+      _id: uploadIds.owner,
+      publisher: ownerUser.custom_data?.key,
+      status: 'pending'
+    })
+  })
+
+  it('keeps readable the exact Internal role shape with only write permissions on name and address', async () => {
+    const found = (await getInternalContactsCollection(ownerUser).find({}).toArray()) as Document[]
+    expect(found).toHaveLength(1)
+    expect(found[0]).toEqual({
+      name: 'Internal HQ',
+      address: 'Via Roma 1'
+    })
+
+    const single = await getInternalContactsCollection(ownerUser).findOne({})
+    expect(single).toEqual({
+      name: 'Internal HQ',
+      address: 'Via Roma 1'
+    })
+  })
+
+  it('keeps readable the exact Internal role shape with only read permissions on name and address', async () => {
+    const found = (await getInternalReadContactsCollection(ownerUser).find({}).toArray()) as Document[]
+    expect(found).toHaveLength(1)
+    expect(found[0]).toEqual({
+      name: 'Read HQ',
+      address: 'Via Milano 2'
+    })
+
+    const single = await getInternalReadContactsCollection(ownerUser).findOne({})
+    expect(single).toEqual({
+      name: 'Read HQ',
+      address: 'Via Milano 2'
+    })
   })
 
   it('triggers activityLogs stream and saves the log', async () => {
