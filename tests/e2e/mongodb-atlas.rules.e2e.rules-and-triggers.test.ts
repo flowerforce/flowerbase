@@ -1346,12 +1346,37 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   it('returns only allowed fields when read is undefined and field-level read is configured', async () => {
     const docs = (await getTeamDocsCollection(ownerUser).find({}).toArray()) as TeamDoc[]
     expect(docs).toHaveLength(1)
-    expect(docs[0]).toEqual({ roles: ['editor'] })
+    expect(docs[0]).toEqual({
+      _id: teamDocIds.collaboratorDoc,
+      roles: ['editor']
+    })
 
     const singleDoc = (await getTeamDocsCollection(ownerUser).findOne({
       _id: teamDocIds.collaboratorDoc
     })) as TeamDoc | null
-    expect(singleDoc).toEqual({ roles: ['editor'] })
+    expect(singleDoc).toEqual({
+      _id: teamDocIds.collaboratorDoc,
+      roles: ['editor']
+    })
+  })
+
+  it('keeps users fields readable when top-level read is true and fields only define write rules', async () => {
+    const ownerRecord = (await getUsersCollection(ownerUser).findOne({
+      _id: userIds.owner
+    })) as UserDoc | null
+
+    expect(ownerRecord).toEqual({
+      _id: userIds.owner,
+      userId: ownerUser.id,
+      id: authUserIds.owner.toString(),
+      email: 'owner@example.com',
+      password: 'top-secret',
+      workspaces: ['workspace-1'],
+      avatar: 'owner.png',
+      name: 'Owner name',
+      tags: ['owner'],
+      updatedAt: expect.any(Date)
+    })
   })
 
   it('allows owners to update their project summary via function rules', async () => {
@@ -1735,12 +1760,14 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const found = (await getInternalContactsCollection(ownerUser).find({}).toArray()) as Document[]
     expect(found).toHaveLength(1)
     expect(found[0]).toEqual({
+      _id: new ObjectId('000000000000000000000350'),
       name: 'Internal HQ',
       address: 'Via Roma 1'
     })
 
     const single = await getInternalContactsCollection(ownerUser).findOne({})
     expect(single).toEqual({
+      _id: new ObjectId('000000000000000000000350'),
       name: 'Internal HQ',
       address: 'Via Roma 1'
     })
@@ -1750,12 +1777,14 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const found = (await getInternalReadContactsCollection(ownerUser).find({}).toArray()) as Document[]
     expect(found).toHaveLength(1)
     expect(found[0]).toEqual({
+      _id: new ObjectId('000000000000000000000351'),
       name: 'Read HQ',
       address: 'Via Milano 2'
     })
 
     const single = await getInternalReadContactsCollection(ownerUser).findOne({})
     expect(single).toEqual({
+      _id: new ObjectId('000000000000000000000351'),
       name: 'Read HQ',
       address: 'Via Milano 2'
     })

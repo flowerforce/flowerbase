@@ -68,23 +68,40 @@ describe('checkIsValidFieldNameFn', () => {
       read: true,
       fields: {
         avatar: { write: false },
-        name: { write: true }
-      }
+        name: { write: true },
+        tags: { write: false },
+        updatedAt: { write: true }
+      },
+      additional_fields: {}
     } as Role
     const context = {
       user: mockUser,
       role: mockedRole,
       params: {
         type: 'read',
-        cursor: { _id: mockId, avatar: 'avatar.png', name: 'Alice' }
+        cursor: {
+          _id: mockId,
+          userId: 'user-1',
+          email: 'alice@example.com',
+          workspaces: ['workspace-1'],
+          avatar: 'avatar.png',
+          name: 'Alice',
+          tags: ['owner'],
+          updatedAt: new Date('2026-03-17T10:00:00.000Z')
+        }
       }
     } as MachineContext
 
     const result = await checkIsValidFieldNameFn(context)
     expect(result).toEqual({
       _id: mockId,
+      userId: 'user-1',
+      email: 'alice@example.com',
+      workspaces: ['workspace-1'],
       avatar: 'avatar.png',
-      name: 'Alice'
+      name: 'Alice',
+      tags: ['owner'],
+      updatedAt: new Date('2026-03-17T10:00:00.000Z')
     })
   })
 
