@@ -32,8 +32,8 @@ describe('checkIsValidFieldNameFn', () => {
 
     const result = await checkIsValidFieldNameFn(context)
     expect(result).toEqual({
-      name: 'Alice',
-      email: 'alice@example.com'
+      _id: mockId,
+      name: 'Alice'
     })
   })
 
@@ -56,8 +56,58 @@ describe('checkIsValidFieldNameFn', () => {
 
     const result = await checkIsValidFieldNameFn(context)
     expect(result).toEqual({
-      phone: '123456789',
-      address: 'Unknown'
+      _id: mockId,
+      phone: '123456789'
+    })
+  })
+
+  it('keeps fields readable when top-level read is true and the field only defines write rules', async () => {
+    const mockedRole = {
+      name: 'test',
+      apply_when: { '%%true': true },
+      read: true,
+      fields: {
+        avatar: { write: false },
+        name: { write: true }
+      }
+    } as Role
+    const context = {
+      user: mockUser,
+      role: mockedRole,
+      params: {
+        type: 'read',
+        cursor: { _id: mockId, avatar: 'avatar.png', name: 'Alice' }
+      }
+    } as MachineContext
+
+    const result = await checkIsValidFieldNameFn(context)
+    expect(result).toEqual({
+      _id: mockId,
+      avatar: 'avatar.png',
+      name: 'Alice'
+    })
+  })
+
+  it('always keeps _id in read results even when no field read rule is defined', async () => {
+    const mockedRole = {
+      name: 'test',
+      apply_when: { '%%true': true },
+      fields: {
+        name: { read: true }
+      }
+    } as Role
+    const context = {
+      user: mockUser,
+      role: mockedRole,
+      params: {
+        type: 'read',
+        cursor: { _id: mockId, email: 'alice@example.com' }
+      }
+    } as MachineContext
+
+    const result = await checkIsValidFieldNameFn(context)
+    expect(result).toEqual({
+      _id: mockId
     })
   })
 
@@ -122,6 +172,8 @@ describe('checkIsValidFieldNameFn', () => {
     } as MachineContext
 
     const result = await checkIsValidFieldNameFn(context)
-    expect(result).toEqual({})
+    expect(result).toEqual({
+      _id: mockId
+    })
   })
 })
