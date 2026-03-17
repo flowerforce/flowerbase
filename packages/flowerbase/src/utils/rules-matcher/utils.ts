@@ -58,6 +58,16 @@ const includesWithSemanticEquality = (value: unknown, candidate: unknown): boole
         )
     )
 
+const resolveRefPath = (data: unknown, refPath: string, prefix?: string): unknown => {
+  const exactMatch = _get(data, refPath, undefined)
+
+  if (exactMatch !== undefined) {
+    return exactMatch
+  }
+
+  return _get(data, rulesMatcherUtils.getPath(refPath, prefix), undefined)
+}
+
 /**
  * Defines a utility object named rulesMatcherUtils, which contains various helper functions used for processing rules and data in a rule-matching context.
  */
@@ -76,11 +86,7 @@ const rulesMatcherUtils: RulesMatcherUtils = {
     const { op, value, opt } = rulesMatcherUtils.getDefaultRule(valueBlock[path])
     const valueRef =
       value && String(value).indexOf('$ref:') === 0
-        ? _get(
-            data,
-            rulesMatcherUtils.getPath(value.replace('$ref:', ''), prefix),
-            undefined
-          )
+        ? resolveRefPath(data, value.replace('$ref:', ''), prefix)
         : value
 
     if (!operators[op]) {
@@ -110,7 +116,9 @@ const rulesMatcherUtils: RulesMatcherUtils = {
     const res = rulesMatcherUtils.getPath(path, prefix)
     const { value } = rulesMatcherUtils.getDefaultRule(valueBlock[path])
     if (value && String(value).indexOf('$ref:') === 0) {
-      keys[rulesMatcherUtils.getPath(value.replace('$ref:', ''), prefix)] = true
+      const refPath = value.replace('$ref:', '')
+      keys[refPath] = true
+      keys[rulesMatcherUtils.getPath(refPath, prefix)] = true
     }
 
     return (keys[res] = true)
