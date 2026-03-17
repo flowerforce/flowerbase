@@ -331,6 +331,7 @@ export type Operators = {
    * @returns
    */
   $regex: OperatorsFunction
+  '%exists': OperatorsFunction
   '%stringToOid': OperatorsFunction
   '%oidToString': OperatorsFunction
 }
@@ -352,6 +353,7 @@ export enum RulesOperators {
   $all = '$all',
   $size = '$size',
   $regex = '$regex',
+  '%exists' = '%exists',
   '%stringToOid' = '%stringToOid',
   '%oidToString' = '%oidToString'
 }

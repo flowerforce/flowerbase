@@ -44,7 +44,8 @@ const debugServices = process.env.DEBUG_SERVICES === 'true'
 
 const logDebug = (message: string, payload?: unknown) => {
   if (!debugRules) return
-  const formatted = payload && typeof payload === 'object' ? JSON.stringify(payload) : payload
+  const formatted =
+    payload && typeof payload === 'object' ? JSON.stringify(payload) : payload
   console.log(`[rules-debug] ${message}`, formatted ?? '')
 }
 
@@ -119,7 +120,9 @@ const resolveFindArgs = (
   }
 }
 
-const normalizeInsertManyResult = <T extends { insertedIds?: Record<string, unknown> }>(result: T) => {
+const normalizeInsertManyResult = <T extends { insertedIds?: Record<string, unknown> }>(
+  result: T
+) => {
   if (!result?.insertedIds || Array.isArray(result.insertedIds)) return result
   return {
     ...result,
@@ -133,7 +136,10 @@ const normalizeFindOneAndUpdateOptions = (
   if (!options) return undefined
 
   const { returnNewDocument, ...rest } = options
-  if (typeof returnNewDocument !== 'boolean' || typeof rest.returnDocument !== 'undefined') {
+  if (
+    typeof returnNewDocument !== 'boolean' ||
+    typeof rest.returnDocument !== 'undefined'
+  ) {
     return rest
   }
 
@@ -142,6 +148,10 @@ const normalizeFindOneAndUpdateOptions = (
     returnDocument: returnNewDocument ? 'after' : 'before'
   }
 }
+
+const getValidationExpansions = (prevRoot?: Document | null) => ({
+  '%%prevRoot': prevRoot
+})
 
 const buildAndQuery = (clauses: MongoFilter<Document>[]): MongoFilter<Document> =>
   clauses.length ? { $and: clauses } : {}
@@ -169,7 +179,10 @@ const isWatchChangeEventPath = (key: string) => {
 }
 
 const isWatchOpaqueChangeEventObjectKey = (key: string) =>
-  key === 'ns' || key === 'documentKey' || key === 'fullDocument' || key === 'updateDescription'
+  key === 'ns' ||
+  key === 'documentKey' ||
+  key === 'fullDocument' ||
+  key === 'updateDescription'
 
 export const toWatchMatchFilter = (value: unknown): unknown => {
   if (Array.isArray(value)) {
@@ -202,7 +215,9 @@ export const toWatchMatchFilter = (value: unknown): unknown => {
 const isDeleteOperationValue = (value: unknown): boolean => {
   if (typeof value === 'string') return value.toLowerCase() === 'delete'
   if (isPlainObject(value) && Array.isArray((value as { $in?: unknown[] }).$in)) {
-    return (value as { $in: unknown[] }).$in.some((entry) => isDeleteOperationValue(entry))
+    return (value as { $in: unknown[] }).$in.some((entry) =>
+      isDeleteOperationValue(entry)
+    )
   }
   if (Array.isArray(value)) {
     return value.some((entry) => isDeleteOperationValue(entry))
@@ -242,7 +257,8 @@ const resolveWatchArgs = (
   options?: RealmCompatibleWatchOptions
 ) => {
   const inputPipeline = Array.isArray(pipelineOrOptions) ? pipelineOrOptions : []
-  const rawOptions = (Array.isArray(pipelineOrOptions) ? options : pipelineOrOptions) ?? {}
+  const rawOptions =
+    (Array.isArray(pipelineOrOptions) ? options : pipelineOrOptions) ?? {}
 
   if (!isPlainObject(rawOptions)) {
     return {
@@ -265,10 +281,7 @@ const resolveWatchArgs = (
   if (Array.isArray(ids)) {
     extraMatches.push({
       $match: {
-        $or: [
-          { 'documentKey._id': { $in: ids } },
-          { 'fullDocument._id': { $in: ids } }
-        ]
+        $or: [{ 'documentKey._id': { $in: ids } }, { 'fullDocument._id': { $in: ids } }]
       }
     })
   }
@@ -293,14 +306,19 @@ const matchesPullCondition = (item: unknown, operand: unknown) => {
   if (!isPlainObject(operand)) return isEqual(item, operand)
   if (hasOperatorExpressions(operand)) {
     if (Array.isArray((operand as { $in?: unknown }).$in)) {
-      return ((operand as { $in: unknown[] }).$in).some((candidate) => isEqual(candidate, item))
+      return (operand as { $in: unknown[] }).$in.some((candidate) =>
+        isEqual(candidate, item)
+      )
     }
     return false
   }
   return Object.entries(operand).every(([key, value]) => isEqual(get(item, key), value))
 }
 
-const applyDocumentUpdateOperators = (baseDocument: Document, update: Document): Document => {
+const applyDocumentUpdateOperators = (
+  baseDocument: Document,
+  update: Document
+): Document => {
   const updated = cloneDeep(baseDocument)
 
   for (const [operator, payload] of Object.entries(update)) {
@@ -333,8 +351,11 @@ const applyDocumentUpdateOperators = (baseDocument: Document, update: Document):
         Object.entries(payload).forEach(([path, value]) => {
           const currentValue = get(updated, path)
           const targetArray = Array.isArray(currentValue) ? [...currentValue] : []
-          if (isPlainObject(value) && Array.isArray((value as { $each?: unknown[] }).$each)) {
-            targetArray.push(...((value as { $each: unknown[] }).$each))
+          if (
+            isPlainObject(value) &&
+            Array.isArray((value as { $each?: unknown[] }).$each)
+          ) {
+            targetArray.push(...(value as { $each: unknown[] }).$each)
           } else {
             targetArray.push(value)
           }
@@ -361,7 +382,9 @@ const applyDocumentUpdateOperators = (baseDocument: Document, update: Document):
         Object.entries(payload).forEach(([path, value]) => {
           const currentValue = get(updated, path)
           if (!Array.isArray(currentValue)) return
-          const filtered = currentValue.filter((entry) => !matchesPullCondition(entry, value))
+          const filtered = currentValue.filter(
+            (entry) => !matchesPullCondition(entry, value)
+          )
           set(updated, path, filtered)
         })
         break
@@ -397,7 +420,10 @@ const applyDocumentUpdateOperators = (baseDocument: Document, update: Document):
           const currentValue = get(updated, path)
           const comparableCurrent = currentValue as any
           const comparableValue = value as any
-          if (typeof currentValue === 'undefined' || comparableCurrent > comparableValue) {
+          if (
+            typeof currentValue === 'undefined' ||
+            comparableCurrent > comparableValue
+          ) {
             set(updated, path, value)
           }
         })
@@ -407,7 +433,10 @@ const applyDocumentUpdateOperators = (baseDocument: Document, update: Document):
           const currentValue = get(updated, path)
           const comparableCurrent = currentValue as any
           const comparableValue = value as any
-          if (typeof currentValue === 'undefined' || comparableCurrent < comparableValue) {
+          if (
+            typeof currentValue === 'undefined' ||
+            comparableCurrent < comparableValue
+          ) {
             set(updated, path, value)
           }
         })
@@ -532,13 +561,17 @@ const getOperators: GetOperatorsFunction = (
         const resolvedOptions =
           projection || normalizedOptions
             ? {
-              ...(normalizedOptions ?? {}),
-              ...(projection ? { projection } : {})
-            }
+                ...(normalizedOptions ?? {}),
+                ...(projection ? { projection } : {})
+              }
             : undefined
         const resolvedQuery = query ?? {}
         if (!run_as_system) {
-          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.READ
+          )
           // Apply access control filters to the query
           const formattedQuery = getFormattedQuery(filters, resolvedQuery, user)
           logDebug('update formattedQuery', {
@@ -556,7 +589,10 @@ const getOperators: GetOperatorsFunction = (
           logService('findOne query', { collName, formattedQuery })
           const safeQuery = normalizeQuery(formattedQuery)
           logService('findOne normalizedQuery', { collName, safeQuery })
-          const result = await collection.findOne(buildAndQuery(safeQuery), resolvedOptions)
+          const result = await collection.findOne(
+            buildAndQuery(safeQuery),
+            resolvedOptions
+          )
           logDebug('findOne result', {
             collection: collName,
             result
@@ -572,15 +608,15 @@ const getOperators: GetOperatorsFunction = (
           })
           const { status, document } = winningRole
             ? await checkValidation(
-              winningRole,
-              {
-                type: 'read',
-                roles,
-                cursor: result,
-                expansions: {}
-              },
-              user
-            )
+                winningRole,
+                {
+                  type: 'read',
+                  roles,
+                  cursor: result,
+                  expansions: getValidationExpansions(result)
+                },
+                user
+              )
             : fallbackAccess(result)
 
           // Return validated document or empty object if not permitted
@@ -618,7 +654,11 @@ const getOperators: GetOperatorsFunction = (
     deleteOne: async (query = {}, options) => {
       try {
         if (!run_as_system) {
-          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.DELETE
+          )
           // Apply access control filters
           const formattedQuery = getFormattedQuery(filters, query, user)
 
@@ -633,15 +673,15 @@ const getOperators: GetOperatorsFunction = (
           })
           const { status } = winningRole
             ? await checkValidation(
-              winningRole,
-              {
-                type: 'delete',
-                roles,
-                cursor: result,
-                expansions: {}
-              },
-              user
-            )
+                winningRole,
+                {
+                  type: 'delete',
+                  roles,
+                  cursor: result,
+                  expansions: getValidationExpansions(result)
+                },
+                user
+              )
             : fallbackAccess(result)
 
           if (!status) {
@@ -683,20 +723,24 @@ const getOperators: GetOperatorsFunction = (
     insertOne: async (data, options) => {
       try {
         if (!run_as_system) {
-          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.CREATE)
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.CREATE
+          )
           const winningRole = getWinningRole(data, user, roles)
 
           const { status, document } = winningRole
             ? await checkValidation(
-              winningRole,
-              {
-                type: 'insert',
-                roles,
-                cursor: data,
-                expansions: {}
-              },
-              user
-            )
+                winningRole,
+                {
+                  type: 'insert',
+                  roles,
+                  cursor: data,
+                  expansions: getValidationExpansions()
+                },
+                user
+              )
             : fallbackAccess(data)
 
           if (!status || !isEqual(data, document)) {
@@ -746,8 +790,11 @@ const getOperators: GetOperatorsFunction = (
       try {
         const normalizedData = normalizeUpdatePayload(data as Document)
         if (!run_as_system) {
-
-          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.UPDATE
+          )
           // Apply access control filters
 
           // Normalize _id
@@ -779,23 +826,31 @@ const getOperators: GetOperatorsFunction = (
           // Validate update permissions
           const { status, document } = winningRole
             ? await checkValidation(
-              winningRole,
-              {
-                type: 'write',
-                roles,
-                cursor: docToCheck,
-                expansions: {}
-              },
-              user
-            )
+                winningRole,
+                {
+                  type: 'write',
+                  roles,
+                  cursor: docToCheck,
+                  expansions: getValidationExpansions(result)
+                },
+                user
+              )
             : fallbackAccess(docToCheck)
           // Ensure no unauthorized changes are made
-          const areDocumentsEqual = areUpdatedFieldsAllowed(document, docToCheck, updatedPaths)
+          const areDocumentsEqual = areUpdatedFieldsAllowed(
+            document,
+            docToCheck,
+            updatedPaths
+          )
 
           if (!status || !areDocumentsEqual) {
             throw new Error('Update not permitted')
           }
-          const res = await collection.updateOne(buildAndQuery(safeQuery), normalizedData, options)
+          const res = await collection.updateOne(
+            buildAndQuery(safeQuery),
+            normalizedData,
+            options
+          )
           emitMongoEvent('updateOne')
           return res
         }
@@ -825,7 +880,11 @@ const getOperators: GetOperatorsFunction = (
       try {
         const normalizedOptions = normalizeFindOneAndUpdateOptions(options)
         if (!run_as_system) {
-          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.UPDATE
+          )
           const formattedQuery = getFormattedQuery(filters, query, user)
           const safeQuery = Array.isArray(formattedQuery)
             ? normalizeQuery(formattedQuery)
@@ -846,19 +905,20 @@ const getOperators: GetOperatorsFunction = (
             }
 
             const updateDocument = normalizedData as Document
-            const setOnInsertSeed =
-              isPlainObject(updateDocument.$setOnInsert)
-                ? (updateDocument.$setOnInsert as Document)
-                : {}
+            const setOnInsertSeed = isPlainObject(updateDocument.$setOnInsert)
+              ? (updateDocument.$setOnInsert as Document)
+              : {}
             docToCheck = applyDocumentUpdateOperators(setOnInsertSeed, updateDocument)
             validationType = 'insert'
           } else {
             const [computedDoc] = Array.isArray(normalizedData)
-              ? await collection.aggregate([
-                { $match: buildAndQuery(safeQuery) },
-                { $limit: 1 },
-                ...normalizedData
-              ]).toArray()
+              ? await collection
+                  .aggregate([
+                    { $match: buildAndQuery(safeQuery) },
+                    { $limit: 1 },
+                    ...normalizedData
+                  ])
+                  .toArray()
               : [applyDocumentUpdateOperators(currentDoc, normalizedData as Document)]
             docToCheck = computedDoc
           }
@@ -867,24 +927,34 @@ const getOperators: GetOperatorsFunction = (
 
           const { status, document } = winningRole
             ? await checkValidation(
-              winningRole,
-              {
-                type: validationType,
-                roles,
-                cursor: docToCheck,
-                expansions: {}
-              },
-              user
-            )
+                winningRole,
+                {
+                  type: validationType,
+                  roles,
+                  cursor: docToCheck,
+                  expansions: getValidationExpansions(
+                    validationType === 'insert' ? undefined : currentDoc
+                  )
+                },
+                user
+              )
             : fallbackAccess(docToCheck)
 
-          const areDocumentsEqual = areUpdatedFieldsAllowed(document, docToCheck, updatedPaths)
+          const areDocumentsEqual = areUpdatedFieldsAllowed(
+            document,
+            docToCheck,
+            updatedPaths
+          )
           if (!status || !areDocumentsEqual) {
             throw new Error('Update not permitted')
           }
 
           const updateResult = normalizedOptions
-            ? await collection.findOneAndUpdate(buildAndQuery(safeQuery), normalizedData, normalizedOptions)
+            ? await collection.findOneAndUpdate(
+                buildAndQuery(safeQuery),
+                normalizedData,
+                normalizedOptions
+              )
             : await collection.findOneAndUpdate(buildAndQuery(safeQuery), normalizedData)
           if (!updateResult) {
             emitMongoEvent('findOneAndUpdate')
@@ -894,18 +964,20 @@ const getOperators: GetOperatorsFunction = (
           const readRole = getWinningRole(updateResult, user, roles)
           const readResult = readRole
             ? await checkValidation(
-              readRole,
-              {
-                type: 'read',
-                roles,
-                cursor: updateResult,
-                expansions: {}
-              },
-              user
-            )
+                readRole,
+                {
+                  type: 'read',
+                  roles,
+                  cursor: updateResult,
+                  expansions: getValidationExpansions(updateResult)
+                },
+                user
+              )
             : fallbackAccess(updateResult)
 
-          const sanitizedDoc = readResult.status ? (readResult.document ?? updateResult) : {}
+          const sanitizedDoc = readResult.status
+            ? (readResult.document ?? updateResult)
+            : {}
           emitMongoEvent('findOneAndUpdate')
           return sanitizedDoc
         }
@@ -949,12 +1021,16 @@ const getOperators: GetOperatorsFunction = (
         const resolvedOptions =
           projection || normalizedOptions
             ? {
-              ...(normalizedOptions ?? {}),
-              ...(projection ? { projection } : {})
-            }
+                ...(normalizedOptions ?? {}),
+                ...(projection ? { projection } : {})
+              }
             : undefined
         if (!run_as_system) {
-          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.READ
+          )
           // Pre-query filtering based on access control rules
           const formattedQuery = getFormattedQuery(filters, query, user)
           const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
@@ -982,15 +1058,15 @@ const getOperators: GetOperatorsFunction = (
                 })
                 const { status, document } = winningRole
                   ? await checkValidation(
-                    winningRole,
-                    {
-                      type: 'read',
-                      roles,
-                      cursor: currentDoc,
-                      expansions: {}
-                    },
-                    user
-                  )
+                      winningRole,
+                      {
+                        type: 'read',
+                        roles,
+                        cursor: currentDoc,
+                        expansions: getValidationExpansions(currentDoc)
+                      },
+                      user
+                    )
                   : fallbackAccess(currentDoc)
 
                 return status ? document : undefined
@@ -1015,7 +1091,11 @@ const getOperators: GetOperatorsFunction = (
     count: async (query, options) => {
       try {
         if (!run_as_system) {
-          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.READ
+          )
           const formattedQuery = getFormattedQuery(filters, query, user)
           const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
           logService('count query', { collName, currentQuery })
@@ -1035,7 +1115,11 @@ const getOperators: GetOperatorsFunction = (
     countDocuments: async (query, options) => {
       try {
         if (!run_as_system) {
-          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.READ
+          )
           const formattedQuery = getFormattedQuery(filters, query, user)
           const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
           logService('countDocuments query', { collName, currentQuery })
@@ -1072,13 +1156,18 @@ const getOperators: GetOperatorsFunction = (
      * This allows fine-grained control over what change events a user can observe, based on roles and filters.
      */
     watch: (pipelineOrOptions = [], options) => {
-      const changestreamCollection = mongo[CHANGESTREAM].client.db(dbName).collection(collName)
+      const changestreamCollection = mongo[CHANGESTREAM].client
+        .db(dbName)
+        .collection(collName)
       try {
         const {
           pipeline,
           options: watchOptions,
           extraMatches
-        } = resolveWatchArgs(pipelineOrOptions as Document[] | RealmCompatibleWatchOptions, options as RealmCompatibleWatchOptions)
+        } = resolveWatchArgs(
+          pipelineOrOptions as Document[] | RealmCompatibleWatchOptions,
+          options as RealmCompatibleWatchOptions
+        )
 
         if (!run_as_system) {
           checkDenyOperation(
@@ -1096,22 +1185,24 @@ const getOperators: GetOperatorsFunction = (
           const allowDeleteBypass = watchPipelineRequestsDelete(requestedPipeline)
           const firstStep = watchFormattedQuery.length
             ? {
-              $match: allowDeleteBypass
-                ? {
-                  $or: [
-                    {
+                $match: allowDeleteBypass
+                  ? {
+                      $or: [
+                        {
+                          $and: watchFormattedQuery
+                        },
+                        { operationType: 'delete' }
+                      ]
+                    }
+                  : {
                       $and: watchFormattedQuery
-                    },
-                    { operationType: 'delete' }
-                  ]
-                }
-                : {
-                  $and: watchFormattedQuery
-                }
-            }
+                    }
+              }
             : undefined
 
-          const formattedPipeline = [firstStep, ...requestedPipeline].filter(Boolean) as Document[]
+          const formattedPipeline = [firstStep, ...requestedPipeline].filter(
+            Boolean
+          ) as Document[]
 
           const result = changestreamCollection.watch(formattedPipeline, watchOptions)
           const originalOn = result.on.bind(result)
@@ -1129,29 +1220,29 @@ const getOperators: GetOperatorsFunction = (
 
             const fullDocumentValidation = winningRole
               ? await checkValidation(
-                winningRole,
-                {
-                  type: 'read',
-                  roles,
-                  cursor: fullDocument,
-                  expansions: {}
-                },
-                user
-              )
+                  winningRole,
+                  {
+                    type: 'read',
+                    roles,
+                    cursor: fullDocument,
+                    expansions: getValidationExpansions(fullDocument)
+                  },
+                  user
+                )
               : fallbackAccess(fullDocument)
             const { status, document } = fullDocumentValidation
 
             const { status: updatedFieldsStatus, document: updatedFields } = winningRole
               ? await checkValidation(
-                winningRole,
-                {
-                  type: 'read',
-                  roles,
-                  cursor: updateDescription?.updatedFields,
-                  expansions: {}
-                },
-                user
-              )
+                  winningRole,
+                  {
+                    type: 'read',
+                    roles,
+                    cursor: updateDescription?.updatedFields,
+                    expansions: getValidationExpansions(fullDocument)
+                  },
+                  user
+                )
               : fallbackAccess(updateDescription?.updatedFields)
 
             return {
@@ -1195,7 +1286,10 @@ const getOperators: GetOperatorsFunction = (
         }
 
         // System mode: no filtering applied
-        const result = changestreamCollection.watch([...extraMatches, ...pipeline], watchOptions)
+        const result = changestreamCollection.watch(
+          [...extraMatches, ...pipeline],
+          watchOptions
+        )
         emitMongoEvent('watch')
         return result
       } catch (error) {
@@ -1212,7 +1306,11 @@ const getOperators: GetOperatorsFunction = (
           return cursor
         }
 
-        checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.READ)
+        checkDenyOperation(
+          normalizedRules,
+          collection.collectionName,
+          CRUD_OPERATIONS.READ
+        )
 
         const rulesConfig = collectionRules ?? { filters, roles }
 
@@ -1278,7 +1376,11 @@ const getOperators: GetOperatorsFunction = (
     insertMany: async (documents, options) => {
       try {
         if (!run_as_system) {
-          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.CREATE)
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.CREATE
+          )
           // Validate each document against user's roles
           const filteredItems = await Promise.all(
             documents.map(async (currentDoc) => {
@@ -1286,15 +1388,15 @@ const getOperators: GetOperatorsFunction = (
 
               const { status, document } = winningRole
                 ? await checkValidation(
-                  winningRole,
-                  {
-                    type: 'insert',
-                    roles,
-                    cursor: currentDoc,
-                    expansions: {}
-                  },
-                  user
-                )
+                    winningRole,
+                    {
+                      type: 'insert',
+                      roles,
+                      cursor: currentDoc,
+                      expansions: getValidationExpansions()
+                    },
+                    user
+                  )
                 : fallbackAccess(currentDoc)
 
               return status ? document : undefined
@@ -1324,7 +1426,11 @@ const getOperators: GetOperatorsFunction = (
       try {
         const normalizedData = normalizeUpdatePayload(data as Document)
         if (!run_as_system) {
-          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.UPDATE)
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.UPDATE
+          )
           // Apply access control filters
           const formattedQuery = getFormattedQuery(filters, query, user)
 
@@ -1341,20 +1447,20 @@ const getOperators: GetOperatorsFunction = (
           )
 
           const filteredItems = await Promise.all(
-            docsToCheck.map(async (currentDoc) => {
+            docsToCheck.map(async (currentDoc, index) => {
               const winningRole = getWinningRole(currentDoc, user, roles)
 
               const { status, document } = winningRole
                 ? await checkValidation(
-                  winningRole,
-                  {
-                    type: 'write',
-                    roles,
-                    cursor: currentDoc,
-                    expansions: {}
-                  },
-                  user
-                )
+                    winningRole,
+                    {
+                      type: 'write',
+                      roles,
+                      cursor: currentDoc,
+                      expansions: getValidationExpansions(result[index])
+                    },
+                    user
+                  )
                 : fallbackAccess(currentDoc)
 
               return status ? document : undefined
@@ -1370,7 +1476,11 @@ const getOperators: GetOperatorsFunction = (
             throw new Error('Update not permitted')
           }
 
-          const res = await collection.updateMany({ $and: formattedQuery }, normalizedData, options)
+          const res = await collection.updateMany(
+            { $and: formattedQuery },
+            normalizedData,
+            options
+          )
           emitMongoEvent('updateMany')
           return res
         }
@@ -1400,7 +1510,11 @@ const getOperators: GetOperatorsFunction = (
     deleteMany: async (query = {}, options) => {
       try {
         if (!run_as_system) {
-          checkDenyOperation(normalizedRules, collection.collectionName, CRUD_OPERATIONS.DELETE)
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.DELETE
+          )
           // Apply access control filters
           const formattedQuery = getFormattedQuery(filters, query, user)
 
@@ -1414,15 +1528,15 @@ const getOperators: GetOperatorsFunction = (
 
               const { status, document } = winningRole
                 ? await checkValidation(
-                  winningRole,
-                  {
-                    type: 'delete',
-                    roles,
-                    cursor: currentDoc,
-                    expansions: {}
-                  },
-                  user
-                )
+                    winningRole,
+                    {
+                      type: 'delete',
+                      roles,
+                      cursor: currentDoc,
+                      expansions: getValidationExpansions(currentDoc)
+                    },
+                    user
+                  )
                 : fallbackAccess(currentDoc)
 
               return status ? document : undefined
@@ -1430,9 +1544,9 @@ const getOperators: GetOperatorsFunction = (
           )
 
           // Extract IDs of documents that passed validation
-          const elementsToDelete = (filteredItems.filter(Boolean) as WithId<Document>[]).map(
-            ({ _id }) => _id
-          )
+          const elementsToDelete = (
+            filteredItems.filter(Boolean) as WithId<Document>[]
+          ).map(({ _id }) => _id)
 
           if (!elementsToDelete.length) {
             const result = {

@@ -1,0 +1,23 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "insertOnlyDocs",
+  "filters": [],
+  "roles": [
+    {
+      "name": "insertOnlyOwner",
+      "apply_when": {
+        "%%user.custom_data.role": "owner"
+      },
+      "insert": true,
+      "delete": false,
+      "search": false,
+      "read": false,
+      "write": {
+        "%%prevRoot": {
+          "%exists": false
+        }
+      },
+      "additional_fields": {}
+    }
+  ]
+}

@@ -23,7 +23,10 @@ const toObjectIdHex = (value: unknown): string | null => {
   }
 
   const maybeObjectId = value as { _bsontype?: string; toHexString?: () => string }
-  if (maybeObjectId._bsontype === 'ObjectId' && typeof maybeObjectId.toHexString === 'function') {
+  if (
+    maybeObjectId._bsontype === 'ObjectId' &&
+    typeof maybeObjectId.toHexString === 'function'
+  ) {
     const hex = maybeObjectId.toHexString()
     return HEX_24_REGEXP.test(hex) ? hex.toLowerCase() : null
   }
@@ -49,9 +52,9 @@ const includesWithSemanticEquality = (value: unknown, candidate: unknown): boole
       rulesMatcherUtils
         .forceArray(value)
         .some((sourceItem) =>
-          rulesMatcherUtils.forceArray(item).some((candidateItem) =>
-            areSemanticallyEqual(sourceItem, candidateItem)
-          )
+          rulesMatcherUtils
+            .forceArray(item)
+            .some((candidateItem) => areSemanticallyEqual(sourceItem, candidateItem))
         )
     )
 
@@ -74,10 +77,10 @@ const rulesMatcherUtils: RulesMatcherUtils = {
     const valueRef =
       value && String(value).indexOf('$ref:') === 0
         ? _get(
-          data,
-          rulesMatcherUtils.getPath(value.replace('$ref:', ''), prefix),
-          undefined
-        )
+            data,
+            rulesMatcherUtils.getPath(value.replace('$ref:', ''), prefix),
+            undefined
+          )
         : value
 
     if (!operators[op]) {
@@ -279,6 +282,7 @@ const rulesMatcherUtils: RulesMatcherUtils = {
  */
 export const operators: Operators = {
   $exists: (a, b) => !rulesMatcherUtils.isEmpty(a) === b,
+  '%exists': (a, b) => !rulesMatcherUtils.isEmpty(a) === b,
 
   $eq: (a, b) => areSemanticallyEqual(a, b),
 
@@ -305,13 +309,17 @@ export const operators: Operators = {
   $nin: (a, b) => !includesWithSemanticEquality(a, b),
 
   $all: (a, b) =>
-    rulesMatcherUtils.forceArray(b).every((candidate) =>
-      rulesMatcherUtils
-        .forceArray(a)
-        .some((value) =>
-          rulesMatcherUtils.forceArray(candidate).some((item) => areSemanticallyEqual(value, item))
-        )
-    ),
+    rulesMatcherUtils
+      .forceArray(b)
+      .every((candidate) =>
+        rulesMatcherUtils
+          .forceArray(a)
+          .some((value) =>
+            rulesMatcherUtils
+              .forceArray(candidate)
+              .some((item) => areSemanticallyEqual(value, item))
+          )
+      ),
 
   $size: (a, b) => Array.isArray(a) && a.length === parseFloat(b),
 
