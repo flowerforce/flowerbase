@@ -66,6 +66,33 @@ describe('MongoDB Atlas aggregate helpers', () => {
       expect(hidden).toEqual(expect.arrayContaining(['secret', 'hiddenExtra']))
       expect(hidden).not.toContain('visible')
     })
+
+    it('does not hide fields that are write-only in the rules config', () => {
+      const roles: Role[] = [
+        {
+          name: 'internal',
+          apply_when: {},
+          insert: true,
+          delete: true,
+          search: true,
+          read: true,
+          write: true,
+          fields: {
+            name: { write: true },
+            address: { write: true },
+            secret: { read: false, write: false }
+          }
+        }
+      ]
+
+      const hidden = getHiddenFieldsFromRulesConfig({
+        roles
+      })
+
+      expect(hidden).toContain('secret')
+      expect(hidden).not.toContain('name')
+      expect(hidden).not.toContain('address')
+    })
   })
 
   describe('prependUnsetStage', () => {

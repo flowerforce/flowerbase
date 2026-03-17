@@ -22,6 +22,9 @@ const OID_TO_STRING_COLLECTION = 'oidToStringDocs'
 const ACTIVITIES_COLLECTION = 'activities'
 const COUNTERS_COLLECTION = 'counters'
 const UPLOADS_COLLECTION = 'uploads'
+const INSERT_ONLY_COLLECTION = 'insertOnlyDocs'
+const INTERNAL_CONTACTS_COLLECTION = 'internalContacts'
+const INTERNAL_READ_CONTACTS_COLLECTION = 'internalReadContacts'
 const TRIGGER_ITEMS_INSERT_COLLECTION = 'trigger_items_insert'
 const TRIGGER_ITEMS_UPDATE_COLLECTION = 'trigger_items_update'
 const TRIGGER_ITEMS_DELETE_COLLECTION = 'trigger_items_delete'
@@ -44,6 +47,7 @@ type TestUser = User & {
   role?: string
   email: string
   custom_data?: {
+    type?: string
     key?: string
     accountRole?: string
     company?: string
@@ -51,7 +55,6 @@ type TestUser = User & {
     adminIn?: string[]
   }
 }
-
 
 const todoIds = {
   ownerFirst: new ObjectId('000000000000000000000001'),
@@ -109,6 +112,7 @@ const ownerUser: TestUser = {
   role: 'owner',
   custom_data: {
     role: 'owner',
+    type: 'internal',
     accountRole: 'collaborator',
     company: oidDocIds.ownerCompany.toHexString(),
     key: 'publisher-owner',
@@ -122,6 +126,7 @@ const guestUser: TestUser = {
   role: 'guest',
   custom_data: {
     role: 'guest',
+    type: 'guest',
     company: oidDocIds.otherCompany.toHexString(),
     key: 'publisher-guest',
     workspaces: ['workspace-2'],
@@ -134,6 +139,7 @@ const adminUser: TestUser = {
   role: 'admin',
   custom_data: {
     role: 'admin',
+    type: 'admin',
     company: new ObjectId('000000000000000000000042').toHexString(),
     key: 'publisher-admin',
     workspaces: ['workspace-1', 'workspace-2'],
@@ -175,16 +181,16 @@ const callServiceOperation = async ({
 }: {
   collection: string
   method:
-  | 'find'
-  | 'findOne'
-  | 'count'
-  | 'countDocuments'
-  | 'findOneAndUpdate'
-  | 'deleteOne'
-  | 'deleteMany'
-  | 'insertOne'
-  | 'updateOne'
-  | 'aggregate'
+    | 'find'
+    | 'findOne'
+    | 'count'
+    | 'countDocuments'
+    | 'findOneAndUpdate'
+    | 'deleteOne'
+    | 'deleteMany'
+    | 'insertOne'
+    | 'updateOne'
+    | 'aggregate'
   user: TestUser | null
   query?: Document
   filter?: Document
@@ -235,7 +241,10 @@ const callServiceOperation = async ({
 
   if (response.statusCode >= 400) {
     const body = response.json()
-    const message = body && typeof body === 'object' && 'message' in body ? (body as { message?: string }).message : undefined
+    const message =
+      body && typeof body === 'object' && 'message' in body
+        ? (body as { message?: string }).message
+        : undefined
     throw new Error(message ?? response.payload ?? 'failed to execute service operation')
   }
 
@@ -245,18 +254,34 @@ const callServiceOperation = async ({
 const createCollectionProxy = (collection: string, user: TestUser | null) => ({
   find: (query: Document = {}, projection?: Document, options?: Document) => ({
     toArray: async () =>
-      callServiceOperation({ collection, method: 'find', user, query, projection, options })
+      callServiceOperation({
+        collection,
+        method: 'find',
+        user,
+        query,
+        projection,
+        options
+      })
   }),
   aggregate: (pipeline: Document[] = []) => ({
-    toArray: async () => callServiceOperation({ collection, method: 'aggregate', user, pipeline })
+    toArray: async () =>
+      callServiceOperation({ collection, method: 'aggregate', user, pipeline })
   }),
   findOne: (query: Document = {}, projection?: Document, options?: Document) =>
-    callServiceOperation({ collection, method: 'findOne', user, query, projection, options }),
+    callServiceOperation({
+      collection,
+      method: 'findOne',
+      user,
+      query,
+      projection,
+      options
+    }),
   count: (query: Document = {}, options?: Document) =>
     callServiceOperation({ collection, method: 'count', user, query, options }),
   countDocuments: (query: Document = {}, options?: Document) =>
     callServiceOperation({ collection, method: 'countDocuments', user, query, options }),
-  insertOne: (document: Document) => callServiceOperation({ collection, method: 'insertOne', user, document }),
+  insertOne: (document: Document) =>
+    callServiceOperation({ collection, method: 'insertOne', user, document }),
   updateOne: (query: Document, update: Document) =>
     callServiceOperation({ collection, method: 'updateOne', user, query, update }),
   findOneAndUpdate: (query: Document, update: Document) =>
@@ -264,23 +289,39 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
   deleteOne: (query: Document, options?: Document) =>
     callServiceOperation({ collection, method: 'deleteOne', user, query, options }),
   deleteMany: (query: Document = {}, options?: Document) =>
-    callServiceOperation({ collection, method: 'deleteMany', user, query, options }),
+    callServiceOperation({ collection, method: 'deleteMany', user, query, options })
 })
 
-const getTodosCollection = (user: TestUser | null) => createCollectionProxy(TODO_COLLECTION, user)
-const getUsersCollection = (user: TestUser | null) => createCollectionProxy(USER_COLLECTION, user)
-const getTeamDocsCollection = (user: TestUser | null) => createCollectionProxy(TEAM_DOCS_COLLECTION, user)
-const getOidEqCollection = (user: TestUser | null) => createCollectionProxy(OID_EQ_COLLECTION, user)
+const getTodosCollection = (user: TestUser | null) =>
+  createCollectionProxy(TODO_COLLECTION, user)
+const getUsersCollection = (user: TestUser | null) =>
+  createCollectionProxy(USER_COLLECTION, user)
+const getTeamDocsCollection = (user: TestUser | null) =>
+  createCollectionProxy(TEAM_DOCS_COLLECTION, user)
+const getOidEqCollection = (user: TestUser | null) =>
+  createCollectionProxy(OID_EQ_COLLECTION, user)
 const getOidStringToOidCollection = (user: TestUser | null) =>
   createCollectionProxy(OID_STRING_TO_OID_COLLECTION, user)
 const getOidToStringCollection = (user: TestUser | null) =>
   createCollectionProxy(OID_TO_STRING_COLLECTION, user)
-const getAuthUsersCollection = (user: TestUser | null) => createCollectionProxy(AUTH_USERS_COLLECTION, user)
-const getProjectsCollection = (user: TestUser | null) => createCollectionProxy('projects', user)
-const getActivityLogsCollection = (user: TestUser | null) => createCollectionProxy('activityLogs', user)
-const getActivitiesCollection = (user: TestUser | null) => createCollectionProxy(ACTIVITIES_COLLECTION, user)
-const getCountersCollection = (user: TestUser | null) => createCollectionProxy(COUNTERS_COLLECTION, user)
-const getUploadsCollection = (user: TestUser | null) => createCollectionProxy(UPLOADS_COLLECTION, user)
+const getAuthUsersCollection = (user: TestUser | null) =>
+  createCollectionProxy(AUTH_USERS_COLLECTION, user)
+const getProjectsCollection = (user: TestUser | null) =>
+  createCollectionProxy('projects', user)
+const getActivityLogsCollection = (user: TestUser | null) =>
+  createCollectionProxy('activityLogs', user)
+const getActivitiesCollection = (user: TestUser | null) =>
+  createCollectionProxy(ACTIVITIES_COLLECTION, user)
+const getCountersCollection = (user: TestUser | null) =>
+  createCollectionProxy(COUNTERS_COLLECTION, user)
+const getUploadsCollection = (user: TestUser | null) =>
+  createCollectionProxy(UPLOADS_COLLECTION, user)
+const getInsertOnlyCollection = (user: TestUser | null) =>
+  createCollectionProxy(INSERT_ONLY_COLLECTION, user)
+const getInternalContactsCollection = (user: TestUser | null) =>
+  createCollectionProxy(INTERNAL_CONTACTS_COLLECTION, user)
+const getInternalReadContactsCollection = (user: TestUser | null) =>
+  createCollectionProxy(INTERNAL_READ_CONTACTS_COLLECTION, user)
 
 const registerAccessToken = (user: TestUser, authId: ObjectId) => {
   if (!appInstance) {
@@ -371,6 +412,9 @@ const resetCollections = async () => {
     db.collection(ACTIVITIES_COLLECTION).deleteMany({}),
     db.collection(COUNTERS_COLLECTION).deleteMany({}),
     db.collection(UPLOADS_COLLECTION).deleteMany({}),
+    db.collection(INSERT_ONLY_COLLECTION).deleteMany({}),
+    db.collection(INTERNAL_CONTACTS_COLLECTION).deleteMany({}),
+    db.collection(INTERNAL_READ_CONTACTS_COLLECTION).deleteMany({}),
     db.collection(AUTH_USERS_COLLECTION).deleteMany({}),
     db.collection(AUTH_CONFIG.refreshTokensCollection).deleteMany({}),
     db.collection(RESET_PASSWORD_COLLECTION).deleteMany({}),
@@ -385,9 +429,24 @@ const resetCollections = async () => {
   ])
 
   await db.collection(TODO_COLLECTION).insertMany([
-    { _id: todoIds.ownerFirst, title: 'Owner task 1', userId: ownerUser.id, sensitive: 'redacted' },
-    { _id: todoIds.ownerSecond, title: 'Owner task 2', userId: ownerUser.id, sensitive: 'redacted' },
-    { _id: todoIds.otherUser, title: 'Other user task', userId: guestUser.id, sensitive: 'redacted' }
+    {
+      _id: todoIds.ownerFirst,
+      title: 'Owner task 1',
+      userId: ownerUser.id,
+      sensitive: 'redacted'
+    },
+    {
+      _id: todoIds.ownerSecond,
+      title: 'Owner task 2',
+      userId: ownerUser.id,
+      sensitive: 'redacted'
+    },
+    {
+      _id: todoIds.otherUser,
+      title: 'Other user task',
+      userId: guestUser.id,
+      sensitive: 'redacted'
+    }
   ])
 
   await db.collection(USER_COLLECTION).insertMany([
@@ -585,6 +644,24 @@ const resetCollections = async () => {
     }
   ])
 
+  await db.collection(INTERNAL_CONTACTS_COLLECTION).insertMany([
+    {
+      _id: new ObjectId('000000000000000000000350'),
+      name: 'Internal HQ',
+      address: 'Via Roma 1',
+      phone: '+39-123456'
+    }
+  ])
+
+  await db.collection(INTERNAL_READ_CONTACTS_COLLECTION).insertMany([
+    {
+      _id: new ObjectId('000000000000000000000351'),
+      name: 'Read HQ',
+      address: 'Via Milano 2',
+      phone: '+39-654321'
+    }
+  ])
+
   const [ownerPassword, guestPassword, adminPassword] = await Promise.all([
     hashPassword('top-secret'),
     hashPassword('safe-secret'),
@@ -622,7 +699,10 @@ const resetCollections = async () => {
 const ensureFilteredTriggerCollections = async () => {
   const db = client.db(DB_NAME)
 
-  const recreateCollection = async (name: string, options?: Parameters<typeof db.createCollection>[1]) => {
+  const recreateCollection = async (
+    name: string,
+    options?: Parameters<typeof db.createCollection>[1]
+  ) => {
     try {
       await db.collection(name).drop()
     } catch {
@@ -687,7 +767,9 @@ const waitForFilteredTriggerEvent = async (documentId: string) => {
 }
 
 const waitForFilteredUpdateTriggerEvent = async (documentId: string) => {
-  const collection = client.db(DB_NAME).collection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
+  const collection = client
+    .db(DB_NAME)
+    .collection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
   for (let attempt = 0; attempt < 10; attempt++) {
     const record = await collection.findOne({ documentId })
     if (record) {
@@ -841,7 +923,9 @@ const openWatchConnection = async ({
                 const timer = setTimeout(() => {
                   const index = waiters.indexOf(waitForEvent)
                   if (index >= 0) waiters.splice(index, 1)
-                  rejectEvent(new Error(`Timed out waiting for watch event (${timeoutMs}ms)`))
+                  rejectEvent(
+                    new Error(`Timed out waiting for watch event (${timeoutMs}ms)`)
+                  )
                 }, timeoutMs)
                 const waitForEvent = (event: WatchEvent) => {
                   clearTimeout(timer)
@@ -892,7 +976,8 @@ const isReplicaSetNotInitializedError = (error: unknown) => {
     message.includes('not yet a member of a replset') ||
     message.includes('replset not yet initialized') ||
     ('code' in error && (error as { code?: number }).code === 94) ||
-    ('codeName' in error && (error as { codeName?: string }).codeName === 'NotYetInitialized')
+    ('codeName' in error &&
+      (error as { codeName?: string }).codeName === 'NotYetInitialized')
   )
 }
 
@@ -902,7 +987,11 @@ const ensureReplicaSet = async (client: MongoClient) => {
   for (let attempt = 0; attempt < 30; attempt++) {
     try {
       const status = await adminDb.command({ replSetGetStatus: 1 })
-      if (status.members?.some((member: { stateStr: string }) => member.stateStr === 'PRIMARY')) {
+      if (
+        status.members?.some(
+          (member: { stateStr: string }) => member.stateStr === 'PRIMARY'
+        )
+      ) {
         return
       }
     } catch (error) {
@@ -1015,7 +1104,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       }
     ]
 
-    const summary = (await getTodosCollection(ownerUser).aggregate(pipeline).toArray()) as Array<{
+    const summary = (await getTodosCollection(ownerUser)
+      .aggregate(pipeline)
+      .toArray()) as Array<{
       _id: string
       count: number
     }>
@@ -1112,23 +1203,31 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('allows users to delete only their own todos with deleteMany', async () => {
-    const deleteResult = (await getTodosCollection(ownerUser).deleteMany({})) as DeleteResult
+    const deleteResult = (await getTodosCollection(ownerUser).deleteMany(
+      {}
+    )) as DeleteResult
     expect(deleteResult.deletedCount).toBe(2)
 
-    const remainingOwner = (await getTodosCollection(ownerUser).find({}).toArray()) as TodoDoc[]
+    const remainingOwner = (await getTodosCollection(ownerUser)
+      .find({})
+      .toArray()) as TodoDoc[]
     expect(remainingOwner).toHaveLength(0)
 
-    const remainingGuest = (await getTodosCollection(guestUser).find({}).toArray()) as TodoDoc[]
+    const remainingGuest = (await getTodosCollection(guestUser)
+      .find({})
+      .toArray()) as TodoDoc[]
     expect(remainingGuest).toHaveLength(1)
   })
 
-  it('does not delete others\' documents with deleteMany', async () => {
+  it("does not delete others' documents with deleteMany", async () => {
     const deleteResult = (await getTodosCollection(ownerUser).deleteMany({
       userId: guestUser.id
     })) as DeleteResult
     expect(deleteResult.deletedCount).toBe(0)
 
-    const remainingOwner = (await getTodosCollection(ownerUser).find({}).toArray()) as TodoDoc[]
+    const remainingOwner = (await getTodosCollection(ownerUser)
+      .find({})
+      .toArray()) as TodoDoc[]
     expect(remainingOwner).toHaveLength(2)
   })
 
@@ -1147,7 +1246,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       )
     ).rejects.toThrow()
 
-    const remainingOwner = (await getTodosCollection(ownerUser).find({}).toArray()) as TodoDoc[]
+    const remainingOwner = (await getTodosCollection(ownerUser)
+      .find({})
+      .toArray()) as TodoDoc[]
     expect(remainingOwner).toHaveLength(2)
   })
 
@@ -1174,17 +1275,23 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('limits profiles to shared workspaces', async () => {
-    const ownerUsers = (await getUsersCollection(ownerUser).find({}).toArray()) as UserDoc[]
+    const ownerUsers = (await getUsersCollection(ownerUser)
+      .find({})
+      .toArray()) as UserDoc[]
     expect(ownerUsers).toHaveLength(1)
     expect(ownerUsers[0].workspaces).toContain('workspace-1')
     expect(ownerUsers[0].userId).toBe(ownerUser.id)
 
-    const guestUsers = (await getUsersCollection(guestUser).find({}).toArray()) as UserDoc[]
+    const guestUsers = (await getUsersCollection(guestUser)
+      .find({})
+      .toArray()) as UserDoc[]
     expect(guestUsers).toHaveLength(1)
     expect(guestUsers[0].workspaces).toContain('workspace-2')
     expect(guestUsers[0].userId).toBe(guestUser.id)
 
-    const adminUsers = (await getUsersCollection(adminUser).find({}).toArray()) as UserDoc[]
+    const adminUsers = (await getUsersCollection(adminUser)
+      .find({})
+      .toArray()) as UserDoc[]
     expect(adminUsers).toHaveLength(2)
   })
 
@@ -1202,7 +1309,10 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(ownerRecord?.name).toBe(updatedName)
 
     await expect(
-      getUsersCollection(guestUser).updateOne({ _id: userIds.owner }, { $set: { name: 'Hijack' } })
+      getUsersCollection(guestUser).updateOne(
+        { _id: userIds.owner },
+        { $set: { name: 'Hijack' } }
+      )
     ).rejects.toThrow('Update not permitted')
   })
 
@@ -1223,7 +1333,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('limits projects to the owner and hides forbidden fields', async () => {
-    const projects = (await getProjectsCollection(ownerUser).find({}).toArray()) as ProjectDoc[]
+    const projects = (await getProjectsCollection(ownerUser)
+      .find({})
+      .toArray()) as ProjectDoc[]
     expect(projects).toHaveLength(1)
     expect(projects[0].ownerId).toBe(ownerUser.id)
     expect(projects[0]).not.toHaveProperty('secretNotes')
@@ -1264,7 +1376,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('lets admins read all projects and see privileged fields', async () => {
-    const projects = (await getProjectsCollection(adminUser).find({}).toArray()) as ProjectDoc[]
+    const projects = (await getProjectsCollection(adminUser)
+      .find({})
+      .toArray()) as ProjectDoc[]
     expect(projects.length).toBeGreaterThanOrEqual(2)
     const ownerProject = projects.find((project) => project.ownerId === ownerUser.id)
     expect(ownerProject).toBeDefined()
@@ -1305,13 +1419,17 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('returns only active activity logs for non-admin roles', async () => {
-    const logs = (await getActivityLogsCollection(ownerUser).find({}).toArray()) as ActivityLogDoc[]
+    const logs = (await getActivityLogsCollection(ownerUser)
+      .find({})
+      .toArray()) as ActivityLogDoc[]
     expect(logs.every((log) => log.status === 'active')).toBe(true)
     expect(logs).toHaveLength(2)
   })
 
   it('allows admins to read all logs and insert new entries', async () => {
-    const logs = (await getActivityLogsCollection(adminUser).find({}).toArray()) as ActivityLogDoc[]
+    const logs = (await getActivityLogsCollection(adminUser)
+      .find({})
+      .toArray()) as ActivityLogDoc[]
     expect(logs.some((log) => log.status === 'inactive')).toBe(true)
 
     const insertResult = await getActivityLogsCollection(adminUser).insertOne({
@@ -1332,12 +1450,57 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     ).rejects.toThrow('Insert not permitted')
   })
 
-  it('respects workspace/visibility filters for activities', async () => {
-    const ownerActivities = (await getActivitiesCollection(ownerUser).find({}).toArray()) as ActivityDoc[]
-    expect(ownerActivities).toHaveLength(2)
-    expect(ownerActivities.every((activity) => activity.workspace === 'workspace-1')).toBe(true)
+  it('allows insert-only roles to insert new documents', async () => {
+    const insertResult = await getInsertOnlyCollection(ownerUser).insertOne({
+      _id: new ObjectId('000000000000000000000401'),
+      ownerId: ownerUser.id,
+      title: 'new insert-only doc'
+    })
 
-    const guestActivities = (await getActivitiesCollection(guestUser).find({}).toArray()) as ActivityDoc[]
+    expect(insertResult.insertedId).toEqual(new ObjectId('000000000000000000000401'))
+  })
+
+  it('prevents insert-only roles from reading existing documents', async () => {
+    const docId = new ObjectId('000000000000000000000402')
+    await client.db(DB_NAME).collection(INSERT_ONLY_COLLECTION).insertOne({
+      _id: docId,
+      ownerId: ownerUser.id,
+      title: 'existing insert-only doc'
+    })
+
+    await expect(
+      getInsertOnlyCollection(ownerUser).findOne({ _id: docId })
+    ).resolves.toEqual({})
+  })
+
+  it('prevents insert-only roles from updating existing documents', async () => {
+    const docId = new ObjectId('000000000000000000000403')
+    await client.db(DB_NAME).collection(INSERT_ONLY_COLLECTION).insertOne({
+      _id: docId,
+      ownerId: ownerUser.id,
+      title: 'existing insert-only doc'
+    })
+
+    await expect(
+      getInsertOnlyCollection(ownerUser).updateOne(
+        { _id: docId },
+        { $set: { title: 'blocked update' } }
+      )
+    ).rejects.toThrow('Update not permitted')
+  })
+
+  it('respects workspace/visibility filters for activities', async () => {
+    const ownerActivities = (await getActivitiesCollection(ownerUser)
+      .find({})
+      .toArray()) as ActivityDoc[]
+    expect(ownerActivities).toHaveLength(2)
+    expect(
+      ownerActivities.every((activity) => activity.workspace === 'workspace-1')
+    ).toBe(true)
+
+    const guestActivities = (await getActivitiesCollection(guestUser)
+      .find({})
+      .toArray()) as ActivityDoc[]
     expect(guestActivities).toHaveLength(1)
     expect(guestActivities[0].workspace).toBe('workspace-2')
   })
@@ -1375,15 +1538,23 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('applies complex visibility filters on counters', async () => {
-    const ownerCounters = (await getCountersCollection(ownerUser).find({}).toArray()) as CounterDoc[]
+    const ownerCounters = (await getCountersCollection(ownerUser)
+      .find({})
+      .toArray()) as CounterDoc[]
     expect(ownerCounters).toHaveLength(3)
-    expect(ownerCounters.every((counter) => counter.workspace === 'workspace-1')).toBe(true)
+    expect(ownerCounters.every((counter) => counter.workspace === 'workspace-1')).toBe(
+      true
+    )
 
-    const guestCounters = (await getCountersCollection(guestUser).find({}).toArray()) as CounterDoc[]
+    const guestCounters = (await getCountersCollection(guestUser)
+      .find({})
+      .toArray()) as CounterDoc[]
     expect(guestCounters).toHaveLength(1)
     expect(guestCounters[0].visibility.users).toContain(guestUser.id)
 
-    const adminCounters = (await getCountersCollection(adminUser).find({}).toArray()) as CounterDoc[]
+    const adminCounters = (await getCountersCollection(adminUser)
+      .find({})
+      .toArray()) as CounterDoc[]
     expect(adminCounters).toHaveLength(4)
   })
 
@@ -1391,13 +1562,17 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const ownerCount = await getCountersCollection(ownerUser).count({})
     expect(ownerCount).toBe(3)
 
-    const ownerWorkspaceTwoCount = await getCountersCollection(ownerUser).count({ workspace: 'workspace-2' })
+    const ownerWorkspaceTwoCount = await getCountersCollection(ownerUser).count({
+      workspace: 'workspace-2'
+    })
     expect(ownerWorkspaceTwoCount).toBe(0)
 
     const guestCount = await getCountersCollection(guestUser).count({})
     expect(guestCount).toBe(1)
 
-    const guestWorkspaceTwoCount = await getCountersCollection(guestUser).count({ workspace: 'workspace-2' })
+    const guestWorkspaceTwoCount = await getCountersCollection(guestUser).count({
+      workspace: 'workspace-2'
+    })
     expect(guestWorkspaceTwoCount).toBe(1)
 
     const adminCount = await getCountersCollection(adminUser).count({})
@@ -1411,7 +1586,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       { $skip: 1 },
       { $limit: 1 }
     ]
-    const ownerResults = (await getCountersCollection(ownerUser).aggregate(ownerPipeline).toArray()) as CounterDoc[]
+    const ownerResults = (await getCountersCollection(ownerUser)
+      .aggregate(ownerPipeline)
+      .toArray()) as CounterDoc[]
     expect(ownerResults).toHaveLength(1)
     expect(ownerResults[0].value).toBe(200)
 
@@ -1421,7 +1598,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       { $skip: 0 },
       { $limit: 1 }
     ]
-    const guestResults = (await getCountersCollection(guestUser).aggregate(guestPipeline).toArray()) as CounterDoc[]
+    const guestResults = (await getCountersCollection(guestUser)
+      .aggregate(guestPipeline)
+      .toArray()) as CounterDoc[]
     expect(guestResults).toHaveLength(1)
     expect(guestResults[0].workspace).toBe('workspace-2')
   })
@@ -1502,7 +1681,10 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(ownerCounter?.value).toBe(450)
 
     await expect(
-      getCountersCollection(guestUser).updateOne({ _id: counterIds.adminOnly }, { $set: { value: 10 } })
+      getCountersCollection(guestUser).updateOne(
+        { _id: counterIds.adminOnly },
+        { $set: { value: 10 } }
+      )
     ).rejects.toThrow('Update not permitted')
 
     const adminUpdate = await getCountersCollection(adminUser).updateOne(
@@ -1528,6 +1710,55 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       _id: uploadIds.owner
     })) as UploadDoc | null
     expect(updated?.status).toBe('canceled')
+  })
+
+  it('keeps write-only fields readable in find and findOne responses', async () => {
+    const found = (await getUploadsCollection(ownerUser).find({}).toArray()) as UploadDoc[]
+    expect(found).toHaveLength(1)
+    expect(found[0]).toMatchObject({
+      _id: uploadIds.owner,
+      publisher: ownerUser.custom_data?.key,
+      status: 'pending'
+    })
+
+    const single = (await getUploadsCollection(ownerUser).findOne({
+      _id: uploadIds.owner
+    })) as UploadDoc | null
+    expect(single).toMatchObject({
+      _id: uploadIds.owner,
+      publisher: ownerUser.custom_data?.key,
+      status: 'pending'
+    })
+  })
+
+  it('keeps readable the exact Internal role shape with only write permissions on name and address', async () => {
+    const found = (await getInternalContactsCollection(ownerUser).find({}).toArray()) as Document[]
+    expect(found).toHaveLength(1)
+    expect(found[0]).toEqual({
+      name: 'Internal HQ',
+      address: 'Via Roma 1'
+    })
+
+    const single = await getInternalContactsCollection(ownerUser).findOne({})
+    expect(single).toEqual({
+      name: 'Internal HQ',
+      address: 'Via Roma 1'
+    })
+  })
+
+  it('keeps readable the exact Internal role shape with only read permissions on name and address', async () => {
+    const found = (await getInternalReadContactsCollection(ownerUser).find({}).toArray()) as Document[]
+    expect(found).toHaveLength(1)
+    expect(found[0]).toEqual({
+      name: 'Read HQ',
+      address: 'Via Milano 2'
+    })
+
+    const single = await getInternalReadContactsCollection(ownerUser).findOne({})
+    expect(single).toEqual({
+      name: 'Read HQ',
+      address: 'Via Milano 2'
+    })
   })
 
   it('triggers activityLogs stream and saves the log', async () => {
@@ -1602,7 +1833,10 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       category: 'approved',
       ownerId: adminUser.id
     }
-    await client.db(DB_NAME).collection(FILTERED_TRIGGER_ITEMS_COLLECTION).insertOne(payload)
+    await client
+      .db(DB_NAME)
+      .collection(FILTERED_TRIGGER_ITEMS_COLLECTION)
+      .insertOne(payload)
 
     const event = await waitForFilteredTriggerEvent(documentId.toString())
     expect(event).toBeDefined()
@@ -1628,19 +1862,19 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
   it('records update triggers that include fullDocument and fullDocumentBeforeChange when the filter matches', async () => {
     const documentId = new ObjectId()
-    await client
-      .db(DB_NAME)
-      .collection(FILTERED_TRIGGER_ITEMS_COLLECTION)
-      .insertOne({
-        _id: documentId,
-        label: 'update-event',
-        category: 'pending'
-      })
+    await client.db(DB_NAME).collection(FILTERED_TRIGGER_ITEMS_COLLECTION).insertOne({
+      _id: documentId,
+      label: 'update-event',
+      category: 'pending'
+    })
 
     await client
       .db(DB_NAME)
       .collection(FILTERED_TRIGGER_ITEMS_COLLECTION)
-      .updateOne({ _id: documentId }, { $set: { label: 'update-event-approved', category: 'approved' } })
+      .updateOne(
+        { _id: documentId },
+        { $set: { label: 'update-event-approved', category: 'approved' } }
+      )
 
     const event = await waitForFilteredUpdateTriggerEvent(documentId.toString())
     expect(event).toBeDefined()
@@ -1660,39 +1894,48 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
   it('ignores update triggers when the filter does not match', async () => {
     const documentId = new ObjectId()
-    await client
-      .db(DB_NAME)
-      .collection(FILTERED_TRIGGER_ITEMS_COLLECTION)
-      .insertOne({
-        _id: documentId,
-        label: 'update-event',
-        category: 'pending'
-      })
+    await client.db(DB_NAME).collection(FILTERED_TRIGGER_ITEMS_COLLECTION).insertOne({
+      _id: documentId,
+      label: 'update-event',
+      category: 'pending'
+    })
 
     await client
       .db(DB_NAME)
       .collection(FILTERED_TRIGGER_ITEMS_COLLECTION)
-      .updateOne({ _id: documentId }, { $set: { label: 'update-event-rejected', category: 'rejected' } })
+      .updateOne(
+        { _id: documentId },
+        { $set: { label: 'update-event-rejected', category: 'rejected' } }
+      )
 
     const event = await waitForFilteredUpdateTriggerEvent(documentId.toString())
     expect(event).toBeNull()
   })
 
   it('keeps remaining same-user watchers alive when one tab closes', async () => {
-    const first = await openWatchConnection({ user: ownerUser, collection: COUNTERS_COLLECTION })
-    const second = await openWatchConnection({ user: ownerUser, collection: COUNTERS_COLLECTION })
+    const first = await openWatchConnection({
+      user: ownerUser,
+      collection: COUNTERS_COLLECTION
+    })
+    const second = await openWatchConnection({
+      user: ownerUser,
+      collection: COUNTERS_COLLECTION
+    })
 
     await first.close()
     await new Promise((resolve) => setTimeout(resolve, 200))
 
     const insertedId = new ObjectId()
-    await client.db(DB_NAME).collection(COUNTERS_COLLECTION).insertOne({
-      _id: insertedId,
-      ownerId: ownerUser.id,
-      workspace: 'workspace-1',
-      value: 501,
-      visibility: { type: 'all' }
-    })
+    await client
+      .db(DB_NAME)
+      .collection(COUNTERS_COLLECTION)
+      .insertOne({
+        _id: insertedId,
+        ownerId: ownerUser.id,
+        workspace: 'workspace-1',
+        value: 501,
+        visibility: { type: 'all' }
+      })
 
     const event = await second.nextEvent()
     expect(event.operationType).toBe('insert')
@@ -1702,20 +1945,29 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('keeps other users watchers alive when one user disconnects', async () => {
-    const ownerWatch = await openWatchConnection({ user: ownerUser, collection: COUNTERS_COLLECTION })
-    const adminWatch = await openWatchConnection({ user: adminUser, collection: COUNTERS_COLLECTION })
+    const ownerWatch = await openWatchConnection({
+      user: ownerUser,
+      collection: COUNTERS_COLLECTION
+    })
+    const adminWatch = await openWatchConnection({
+      user: adminUser,
+      collection: COUNTERS_COLLECTION
+    })
 
     await ownerWatch.close()
     await new Promise((resolve) => setTimeout(resolve, 200))
 
     const insertedId = new ObjectId()
-    await client.db(DB_NAME).collection(COUNTERS_COLLECTION).insertOne({
-      _id: insertedId,
-      ownerId: adminUser.id,
-      workspace: 'workspace-1',
-      value: 777,
-      visibility: { type: 'all' }
-    })
+    await client
+      .db(DB_NAME)
+      .collection(COUNTERS_COLLECTION)
+      .insertOne({
+        _id: insertedId,
+        ownerId: adminUser.id,
+        workspace: 'workspace-1',
+        value: 777,
+        visibility: { type: 'all' }
+      })
 
     const event = await adminWatch.nextEvent()
     expect(event.operationType).toBe('insert')
@@ -1725,17 +1977,26 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('does not under-deliver when a less-privileged user subscribes first', async () => {
-    const guestWatch = await openWatchConnection({ user: guestUser, collection: COUNTERS_COLLECTION })
-    const adminWatch = await openWatchConnection({ user: adminUser, collection: COUNTERS_COLLECTION })
+    const guestWatch = await openWatchConnection({
+      user: guestUser,
+      collection: COUNTERS_COLLECTION
+    })
+    const adminWatch = await openWatchConnection({
+      user: adminUser,
+      collection: COUNTERS_COLLECTION
+    })
 
     const insertedId = new ObjectId()
-    await client.db(DB_NAME).collection(COUNTERS_COLLECTION).insertOne({
-      _id: insertedId,
-      ownerId: adminUser.id,
-      workspace: 'workspace-1',
-      value: 888,
-      visibility: { type: 'private' }
-    })
+    await client
+      .db(DB_NAME)
+      .collection(COUNTERS_COLLECTION)
+      .insertOne({
+        _id: insertedId,
+        ownerId: adminUser.id,
+        workspace: 'workspace-1',
+        value: 888,
+        visibility: { type: 'private' }
+      })
 
     const adminEvent = await adminWatch.nextEvent()
     expect(String(adminEvent.documentKey?._id)).toBe(String(insertedId))
@@ -1746,17 +2007,26 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('does not leak events when a privileged user subscribes first', async () => {
-    const adminWatch = await openWatchConnection({ user: adminUser, collection: COUNTERS_COLLECTION })
-    const guestWatch = await openWatchConnection({ user: guestUser, collection: COUNTERS_COLLECTION })
+    const adminWatch = await openWatchConnection({
+      user: adminUser,
+      collection: COUNTERS_COLLECTION
+    })
+    const guestWatch = await openWatchConnection({
+      user: guestUser,
+      collection: COUNTERS_COLLECTION
+    })
 
     const insertedId = new ObjectId()
-    await client.db(DB_NAME).collection(COUNTERS_COLLECTION).insertOne({
-      _id: insertedId,
-      ownerId: adminUser.id,
-      workspace: 'workspace-1',
-      value: 999,
-      visibility: { type: 'private' }
-    })
+    await client
+      .db(DB_NAME)
+      .collection(COUNTERS_COLLECTION)
+      .insertOne({
+        _id: insertedId,
+        ownerId: adminUser.id,
+        workspace: 'workspace-1',
+        value: 999,
+        visibility: { type: 'private' }
+      })
 
     const adminEvent = await adminWatch.nextEvent()
     expect(String(adminEvent.documentKey?._id)).toBe(String(insertedId))
@@ -1837,14 +2107,11 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     })
 
     try {
-      await client
-        .db(DB_NAME)
-        .collection(UPLOADS_COLLECTION)
-        .insertOne({
-          _id: documentId,
-          publisher: accountId,
-          status: 'pending'
-        })
+      await client.db(DB_NAME).collection(UPLOADS_COLLECTION).insertOne({
+        _id: documentId,
+        publisher: accountId,
+        status: 'pending'
+      })
 
       await watch.expectNoEvent()
 
@@ -1867,5 +2134,4 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       require.main.path = originalMainPath
     }
   })
-
 })

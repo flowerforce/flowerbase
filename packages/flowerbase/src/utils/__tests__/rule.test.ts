@@ -85,4 +85,42 @@ describe('rule function', () => {
     expect(result.valid).toBe(true)
     expect(result.name).toBe('user.authId___%oidToString')
   })
+
+  it('does not treat scalar equality as array membership in compact rules', () => {
+    const data = {
+      doc: {
+        owners: ['user-1', 'user-2']
+      }
+    }
+
+    const result = rulesMatcherUtils.rule({ owners: 'user-1' }, data, {
+      prefix: 'doc'
+    })
+
+    expect(result.valid).toBe(false)
+    expect(result.name).toBe('doc.owners___$eq')
+  })
+
+  it('supports explicit array membership with $in rules', () => {
+    const data = {
+      doc: {
+        owners: ['user-1', 'user-2']
+      }
+    }
+
+    const result = rulesMatcherUtils.rule(
+      {
+        owners: {
+          $in: ['user-1']
+        }
+      },
+      data,
+      {
+        prefix: 'doc'
+      }
+    )
+
+    expect(result.valid).toBe(true)
+    expect(result.name).toBe('doc.owners___$in')
+  })
 })
