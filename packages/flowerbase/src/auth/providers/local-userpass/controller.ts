@@ -27,6 +27,8 @@ import {
 
 const rateLimitStore = new Map<string, number[]>()
 
+type ResetFunctionResult = { status?: 'success' | 'pending' | 'fail' }
+
 const isRateLimited = (key: string, maxAttempts: number, windowMs: number) => {
   const now = Date.now()
   const existing = rateLimitStore.get(key) ?? []
@@ -106,7 +108,7 @@ export async function localUserPassController(app: FastifyInstance) {
       const currentFunction = functionsList[resetPasswordConfig.resetFunctionName]
       const baseArgs = { token, tokenId, email, password, username: email }
       const args = Array.isArray(extraArguments) ? [baseArgs, ...extraArguments] : [baseArgs]
-      await GenerateContext({
+      const response = await GenerateContext({
         args,
         app,
         rules: {},
@@ -114,11 +116,41 @@ export async function localUserPassController(app: FastifyInstance) {
         currentFunction,
         functionName: resetPasswordConfig.resetFunctionName,
         functionsList,
-        services
-      })
-      return
+        services,
+        runAsSystem: true
+      }) as ResetFunctionResult
+      const resetStatus = response?.status
+
+      if (resetStatus === 'success') {
+        if (!password) {
+          throw new Error(AUTH_ERRORS.INVALID_RESET_FUNCTION_RESPONSE)
+        }
+
+        const hashedPassword = await hashPassword(password)
+        await authDb.collection(authCollection!).updateOne(
+          { email },
+          {
+            $set: {
+              password: hashedPassword
+            }
+          }
+        )
+        await authDb?.collection(resetPasswordCollection).deleteOne({ email })
+        return { status: 'success' as const }
+      }
+
+      if (resetStatus === 'pending') {
+        return { status: 'pending' as const }
+      }
+
+      if (resetStatus === 'fail') {
+        throw new Error(AUTH_ERRORS.INVALID_RESET_PARAMS)
+      }
+
+      throw new Error(AUTH_ERRORS.INVALID_RESET_FUNCTION_RESPONSE)
     }
 
+    return { status: 'pending' as const }
   }
 
   /**
@@ -352,15 +384,13 @@ export async function localUserPassController(app: FastifyInstance) {
         res.status(429)
         return { message: 'Too many requests' }
       }
-      await handleResetPasswordRequest(
+      const result = await handleResetPasswordRequest(
         req.body.email,
         req.body.password,
         req.body.arguments
       )
       res.status(202)
-      return {
-        status: 'ok'
-      }
+      return result
     }
   )
 

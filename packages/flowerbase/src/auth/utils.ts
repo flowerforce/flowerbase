@@ -117,6 +117,7 @@ export enum AUTH_ERRORS {
   INVALID_TOKEN = 'Invalid refresh token provided',
   INVALID_RESET_PARAMS = 'Invalid token or tokenId provided',
   MISSING_RESET_FUNCTION = 'Missing reset function',
+  INVALID_RESET_FUNCTION_RESPONSE = 'Invalid reset function response',
   USER_NOT_CONFIRMED = 'User not confirmed'
 }
 
