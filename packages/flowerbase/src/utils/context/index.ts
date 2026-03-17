@@ -189,8 +189,8 @@ export async function GenerateContext({
   if (!currentFunction) return
 
   const functionsQueue = StateManager.select("functionsQueue")
-
-  const functionToRun = { run_as_system: runAsSystem, ...currentFunction }
+  const effectiveRunAsSystem = Boolean(runAsSystem || currentFunction.run_as_system)
+  const functionToRun = { ...currentFunction, run_as_system: effectiveRunAsSystem }
 
   const run = async () => {
 
@@ -309,7 +309,8 @@ export function GenerateContextSync({
 }: GenerateContextParams): unknown {
   if (!currentFunction) return
 
-  const functionToRun = { run_as_system: runAsSystem, ...currentFunction }
+  const effectiveRunAsSystem = Boolean(runAsSystem || currentFunction.run_as_system)
+  const functionToRun = { ...currentFunction, run_as_system: effectiveRunAsSystem }
   const contextData = generateContextData({
     user,
     services,
