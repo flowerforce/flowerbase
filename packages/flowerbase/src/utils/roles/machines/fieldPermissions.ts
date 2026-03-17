@@ -78,6 +78,8 @@ export const filterDocumentByFieldPermissions = async (
         const readAllowed = await canReadField(context, permission)
         if (typeof readAllowed !== 'undefined') {
           allowed = readAllowed
+        } else if (!allowed && typeof permission.write !== 'undefined') {
+          allowed = await canWriteField(context, permission)
         }
       } else {
         allowed = await canWriteField(context, permission)

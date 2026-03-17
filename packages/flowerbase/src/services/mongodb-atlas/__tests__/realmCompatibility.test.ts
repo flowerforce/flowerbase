@@ -379,6 +379,7 @@ describe('mongodb-atlas Realm compatibility', () => {
     const result = await operators.findOne({ _id: doc._id })
 
     expect(result).toEqual({
+      _id: doc._id,
       name: 'HQ',
       address: 'Main Street 1'
     })
@@ -415,9 +416,54 @@ describe('mongodb-atlas Realm compatibility', () => {
     const result = await operators.findOne({ _id: doc._id })
 
     expect(result).toEqual({
+      _id: doc._id,
       name: 'HQ',
       address: 'Main Street 1'
     })
+  })
+
+  it('keeps top-level read access even when fields only define write rules', async () => {
+    const doc = {
+      _id: new ObjectId(),
+      userId: 'user-1',
+      email: 'owner@example.com',
+      workspaces: ['workspace-1'],
+      avatar: 'owner.png',
+      name: 'Owner name',
+      tags: ['owner'],
+      updatedAt: new Date('2026-03-17T10:00:00.000Z')
+    }
+    const findOne = jest.fn().mockResolvedValue(doc)
+    const collection = {
+      collectionName: 'todos',
+      findOne
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules({
+        roles: [
+          {
+            name: 'all',
+            apply_when: { '%%true': true },
+            insert: false,
+            delete: false,
+            search: true,
+            read: true,
+            fields: {
+              avatar: { write: false },
+              name: { write: true },
+              tags: { write: false },
+              updatedAt: { write: true }
+            },
+            additional_fields: {}
+          } as any
+        ]
+      }),
+      user: { id: 'user-1', custom_data: { workspaces: ['workspace-1'] } }
+    }).db('db').collection('todos')
+
+    const result = await operators.findOne({ _id: doc._id })
+
+    expect(result).toEqual(doc)
   })
 
   it('returns insertMany insertedIds as an array', async () => {
