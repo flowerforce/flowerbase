@@ -5,7 +5,12 @@ import handleUserRegistration from '../../../shared/handleUserRegistration'
 import { PROVIDER } from '../../../shared/models/handleUserRegistration.model'
 import { StateManager } from '../../../state'
 import { GenerateContext } from '../../../utils/context'
-import { comparePassword, generateToken, hashPassword, hashToken } from '../../../utils/crypto'
+import {
+  comparePassword,
+  generateToken,
+  hashPassword,
+  hashToken
+} from '../../../utils/crypto'
 import {
   AUTH_ENDPOINTS,
   AUTH_ERRORS,
@@ -55,21 +60,23 @@ export async function localUserPassController(app: FastifyInstance) {
   const resetMaxAttempts = DEFAULT_CONFIG.AUTH_RESET_MAX_ATTEMPTS
   const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
   const resolveLocalUserpassProvider = () => AUTH_CONFIG.authProviders?.['local-userpass']
+  const invalidPasswordError = {
+    error: 'unauthorized',
+    error_code: 'InvalidPassword'
+  } as const
 
   try {
-    await authDb.collection(resetPasswordCollection).createIndex(
-      { createdAt: 1 },
-      { expireAfterSeconds: resetPasswordTtlSeconds }
-    )
+    await authDb
+      .collection(resetPasswordCollection)
+      .createIndex({ createdAt: 1 }, { expireAfterSeconds: resetPasswordTtlSeconds })
   } catch (error) {
     console.error('Failed to ensure reset password TTL index', error)
   }
 
   try {
-    await authDb.collection(refreshTokensCollection).createIndex(
-      { expiresAt: 1 },
-      { expireAfterSeconds: 0 }
-    )
+    await authDb
+      .collection(refreshTokensCollection)
+      .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
   } catch (error) {
     console.error('Failed to ensure refresh token TTL index', error)
   }
@@ -107,8 +114,10 @@ export async function localUserPassController(app: FastifyInstance) {
       const services = StateManager.select('services')
       const currentFunction = functionsList[resetPasswordConfig.resetFunctionName]
       const baseArgs = { token, tokenId, email, password, username: email }
-      const args = Array.isArray(extraArguments) ? [baseArgs, ...extraArguments] : [baseArgs]
-      const response = await GenerateContext({
+      const args = Array.isArray(extraArguments)
+        ? [baseArgs, ...extraArguments]
+        : [baseArgs]
+      const response = (await GenerateContext({
         args,
         app,
         rules: {},
@@ -118,7 +127,7 @@ export async function localUserPassController(app: FastifyInstance) {
         functionsList,
         services,
         runAsSystem: true
-      }) as ResetFunctionResult
+      })) as ResetFunctionResult
       const resetStatus = response?.status
 
       if (resetStatus === 'success') {
@@ -179,12 +188,18 @@ export async function localUserPassController(app: FastifyInstance) {
 
       let result
       try {
-        result = await handleUserRegistration(app, { run_as_system: true, provider: PROVIDER.LOCAL_USERPASS })({
+        result = await handleUserRegistration(app, {
+          run_as_system: true,
+          provider: PROVIDER.LOCAL_USERPASS
+        })({
           email: req.body.email.toLowerCase(),
           password: req.body.password
         })
       } catch (error) {
-        if (error instanceof Error && error.message === 'This email address is already used') {
+        if (
+          error instanceof Error &&
+          error.message === 'This email address is already used'
+        ) {
           res.status(409).send({
             error: 'name already in use',
             error_code: 'AccountNameInUse'
@@ -227,10 +242,10 @@ export async function localUserPassController(app: FastifyInstance) {
         return
       }
 
-      const existing = await authDb.collection(authCollection!).findOne({
+      const existing = (await authDb.collection(authCollection!).findOne({
         confirmationToken: req.body.token,
         confirmationTokenId: req.body.tokenId
-      }) as { _id: ObjectId; status?: string } | null
+      })) as { _id: ObjectId; status?: string } | null
 
       if (!existing) {
         res.status(500)
@@ -279,23 +294,22 @@ export async function localUserPassController(app: FastifyInstance) {
       })
 
       if (!authUser) {
-        throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
+        res.status(401)
+        return invalidPasswordError
       }
 
-      const passwordMatches = await comparePassword(
-        req.body.password,
-        authUser.password
-      )
+      const passwordMatches = await comparePassword(req.body.password, authUser.password)
 
       if (!passwordMatches) {
-        throw new Error(AUTH_ERRORS.INVALID_CREDENTIALS)
+        res.status(401)
+        return invalidPasswordError
       }
 
       const user =
         user_id_field && userCollection
           ? await customUserDb
-            .collection(userCollection)
-            .findOne({ [user_id_field]: authUser._id.toString() })
+              .collection(userCollection)
+              .findOne({ [user_id_field]: authUser._id.toString() })
           : {}
       delete authUser?.password
 
@@ -325,10 +339,9 @@ export async function localUserPassController(app: FastifyInstance) {
         expiresAt: new Date(Date.now() + refreshTokenTtlMs),
         revokedAt: null
       })
-      await authDb.collection(authCollection!).updateOne(
-        { _id: authUser._id },
-        { $set: { lastLoginAt: now } }
-      )
+      await authDb
+        .collection(authCollection!)
+        .updateOne({ _id: authUser._id }, { $set: { lastLoginAt: now } })
 
       return {
         access_token: this.createAccessToken(userWithCustomData),
@@ -427,12 +440,15 @@ export async function localUserPassController(app: FastifyInstance) {
       }
 
       const createdAt = resetRequest.createdAt ? new Date(resetRequest.createdAt) : null
-      const isExpired = !createdAt ||
+      const isExpired =
+        !createdAt ||
         Number.isNaN(createdAt.getTime()) ||
         Date.now() - createdAt.getTime() > resetPasswordTtlSeconds * 1000
 
       if (isExpired) {
-        await authDb?.collection(resetPasswordCollection).deleteOne({ _id: resetRequest._id })
+        await authDb
+          ?.collection(resetPasswordCollection)
+          .deleteOne({ _id: resetRequest._id })
         throw new Error(AUTH_ERRORS.INVALID_RESET_PARAMS)
       }
       const hashedPassword = await hashPassword(password)
@@ -445,7 +461,9 @@ export async function localUserPassController(app: FastifyInstance) {
         }
       )
 
-      await authDb?.collection(resetPasswordCollection).deleteOne({ _id: resetRequest._id })
+      await authDb
+        ?.collection(resetPasswordCollection)
+        .deleteOne({ _id: resetRequest._id })
     }
   )
 }

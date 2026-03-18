@@ -3,7 +3,11 @@ import { EJSON } from 'bson'
 import { FastifyInstance } from 'fastify'
 import { Document, MongoClient, ObjectId } from 'mongodb'
 import type { User } from '../../packages/flowerbase/src/auth/dtos'
-import { API_VERSION, AUTH_CONFIG, DEFAULT_CONFIG } from '../../packages/flowerbase/src/constants'
+import {
+  API_VERSION,
+  AUTH_CONFIG,
+  DEFAULT_CONFIG
+} from '../../packages/flowerbase/src/constants'
 import { hashPassword, hashToken } from '../../packages/flowerbase/src/utils/crypto'
 import { registerMongoAtlasE2eSetup } from './mongodb-atlas.rules.e2e.setup'
 
@@ -43,7 +47,6 @@ type TestUser = User & {
     adminIn?: string[]
   }
 }
-
 
 const todoIds = {
   ownerFirst: new ObjectId('000000000000000000000001'),
@@ -159,16 +162,16 @@ const callServiceOperation = async ({
 }: {
   collection: string
   method:
-  | 'find'
-  | 'findOne'
-  | 'count'
-  | 'countDocuments'
-  | 'findOneAndUpdate'
-  | 'deleteOne'
-  | 'deleteMany'
-  | 'insertOne'
-  | 'updateOne'
-  | 'aggregate'
+    | 'find'
+    | 'findOne'
+    | 'count'
+    | 'countDocuments'
+    | 'findOneAndUpdate'
+    | 'deleteOne'
+    | 'deleteMany'
+    | 'insertOne'
+    | 'updateOne'
+    | 'aggregate'
   user: TestUser | null
   query?: Document
   filter?: Document
@@ -219,7 +222,10 @@ const callServiceOperation = async ({
 
   if (response.statusCode >= 400) {
     const body = response.json()
-    const message = body && typeof body === 'object' && 'message' in body ? (body as { message?: string }).message : undefined
+    const message =
+      body && typeof body === 'object' && 'message' in body
+        ? (body as { message?: string }).message
+        : undefined
     throw new Error(message ?? response.payload ?? 'failed to execute service operation')
   }
 
@@ -229,18 +235,34 @@ const callServiceOperation = async ({
 const createCollectionProxy = (collection: string, user: TestUser | null) => ({
   find: (query: Document = {}, projection?: Document, options?: Document) => ({
     toArray: async () =>
-      callServiceOperation({ collection, method: 'find', user, query, projection, options })
+      callServiceOperation({
+        collection,
+        method: 'find',
+        user,
+        query,
+        projection,
+        options
+      })
   }),
   aggregate: (pipeline: Document[] = []) => ({
-    toArray: async () => callServiceOperation({ collection, method: 'aggregate', user, pipeline })
+    toArray: async () =>
+      callServiceOperation({ collection, method: 'aggregate', user, pipeline })
   }),
   findOne: (query: Document = {}, projection?: Document, options?: Document) =>
-    callServiceOperation({ collection, method: 'findOne', user, query, projection, options }),
+    callServiceOperation({
+      collection,
+      method: 'findOne',
+      user,
+      query,
+      projection,
+      options
+    }),
   count: (query: Document = {}, options?: Document) =>
     callServiceOperation({ collection, method: 'count', user, query, options }),
   countDocuments: (query: Document = {}, options?: Document) =>
     callServiceOperation({ collection, method: 'countDocuments', user, query, options }),
-  insertOne: (document: Document) => callServiceOperation({ collection, method: 'insertOne', user, document }),
+  insertOne: (document: Document) =>
+    callServiceOperation({ collection, method: 'insertOne', user, document }),
   updateOne: (query: Document, update: Document) =>
     callServiceOperation({ collection, method: 'updateOne', user, query, update }),
   findOneAndUpdate: (query: Document, update: Document) =>
@@ -248,11 +270,13 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
   deleteOne: (query: Document, options?: Document) =>
     callServiceOperation({ collection, method: 'deleteOne', user, query, options }),
   deleteMany: (query: Document = {}, options?: Document) =>
-    callServiceOperation({ collection, method: 'deleteMany', user, query, options }),
+    callServiceOperation({ collection, method: 'deleteMany', user, query, options })
 })
 
-const getTodosCollection = (user: TestUser | null) => createCollectionProxy(TODO_COLLECTION, user)
-const getAuthUsersCollection = (user: TestUser | null) => createCollectionProxy(AUTH_USERS_COLLECTION, user)
+const getTodosCollection = (user: TestUser | null) =>
+  createCollectionProxy(TODO_COLLECTION, user)
+const getAuthUsersCollection = (user: TestUser | null) =>
+  createCollectionProxy(AUTH_USERS_COLLECTION, user)
 
 const registerAccessToken = (user: TestUser, authId: ObjectId) => {
   if (!appInstance) {
@@ -314,9 +338,24 @@ const resetCollections = async () => {
   ])
 
   await db.collection(TODO_COLLECTION).insertMany([
-    { _id: todoIds.ownerFirst, title: 'Owner task 1', userId: ownerUser.id, sensitive: 'redacted' },
-    { _id: todoIds.ownerSecond, title: 'Owner task 2', userId: ownerUser.id, sensitive: 'redacted' },
-    { _id: todoIds.otherUser, title: 'Other user task', userId: guestUser.id, sensitive: 'redacted' }
+    {
+      _id: todoIds.ownerFirst,
+      title: 'Owner task 1',
+      userId: ownerUser.id,
+      sensitive: 'redacted'
+    },
+    {
+      _id: todoIds.ownerSecond,
+      title: 'Owner task 2',
+      userId: ownerUser.id,
+      sensitive: 'redacted'
+    },
+    {
+      _id: todoIds.otherUser,
+      title: 'Other user task',
+      userId: guestUser.id,
+      sensitive: 'redacted'
+    }
   ])
 
   await db.collection(USER_COLLECTION).insertMany([
@@ -506,7 +545,10 @@ const resetCollections = async () => {
 const ensureFilteredTriggerCollections = async () => {
   const db = client.db(DB_NAME)
 
-  const recreateCollection = async (name: string, options?: Parameters<typeof db.createCollection>[1]) => {
+  const recreateCollection = async (
+    name: string,
+    options?: Parameters<typeof db.createCollection>[1]
+  ) => {
     try {
       await db.collection(name).drop()
     } catch {
@@ -517,8 +559,8 @@ const ensureFilteredTriggerCollections = async () => {
   }
 
   await recreateCollection(FILTERED_TRIGGER_EVENTS_COLLECTION)
-    await recreateCollection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
-    await recreateCollection(FILTERED_TRIGGER_ITEMS_COLLECTION, {
+  await recreateCollection(FILTERED_UPDATE_TRIGGER_EVENTS_COLLECTION)
+  await recreateCollection(FILTERED_TRIGGER_ITEMS_COLLECTION, {
     changeStreamPreAndPostImages: { enabled: true }
   })
 }
@@ -537,7 +579,10 @@ const dropReplicaSetHint = (mongoUrl: string) => {
 const cloneAuthProviders = () =>
   JSON.parse(JSON.stringify(AUTH_CONFIG.authProviders ?? {})) as Record<string, unknown>
 
-const withAuthProviders = async (nextProviders: Record<string, unknown>, fn: () => Promise<void>) => {
+const withAuthProviders = async (
+  nextProviders: Record<string, unknown>,
+  fn: () => Promise<void>
+) => {
   const originalProviders = cloneAuthProviders()
   AUTH_CONFIG.authProviders = nextProviders as typeof AUTH_CONFIG.authProviders
   try {
@@ -557,9 +602,9 @@ const withDisabledProvider = (providerName: string) => {
   const next = cloneAuthProviders()
   const existing = (next as Record<string, unknown>)[providerName]
   if (existing && typeof existing === 'object') {
-    (existing as { disabled?: boolean }).disabled = true
+    ;(existing as { disabled?: boolean }).disabled = true
   } else {
-    (next as Record<string, unknown>)[providerName] = {
+    ;(next as Record<string, unknown>)[providerName] = {
       name: providerName,
       type: providerName,
       disabled: true
@@ -580,7 +625,8 @@ const isReplicaSetNotInitializedError = (error: unknown) => {
     message.includes('not yet a member of a replset') ||
     message.includes('replset not yet initialized') ||
     ('code' in error && (error as { code?: number }).code === 94) ||
-    ('codeName' in error && (error as { codeName?: string }).codeName === 'NotYetInitialized')
+    ('codeName' in error &&
+      (error as { codeName?: string }).codeName === 'NotYetInitialized')
   )
 }
 
@@ -590,7 +636,11 @@ const ensureReplicaSet = async (client: MongoClient) => {
   for (let attempt = 0; attempt < 30; attempt++) {
     try {
       const status = await adminDb.command({ replSetGetStatus: 1 })
-      if (status.members?.some((member: { stateStr: string }) => member.stateStr === 'PRIMARY')) {
+      if (
+        status.members?.some(
+          (member: { stateStr: string }) => member.stateStr === 'PRIMARY'
+        )
+      ) {
         return
       }
     } catch (error) {
@@ -806,10 +856,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('creates a unique email index for auth users', async () => {
-    const indexes = await client
-      .db(DB_NAME)
-      .collection(AUTH_USERS_COLLECTION)
-      .indexes()
+    const indexes = await client.db(DB_NAME).collection(AUTH_USERS_COLLECTION).indexes()
     const emailIndex = indexes.find((index) => {
       const key = index.key as Record<string, number>
       return key?.email === 1
@@ -873,7 +920,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(second.statusCode).toBe(400)
     const secondBody = second.json() as { error?: string; error_code?: string }
     expect(secondBody.error_code).toBe('FunctionExecutionError')
-    const parsedError = secondBody.error ? (JSON.parse(secondBody.error) as { message?: string }) : {}
+    const parsedError = secondBody.error
+      ? (JSON.parse(secondBody.error) as { message?: string })
+      : {}
     expect(parsedError.message).toBe('This email address is already used')
   })
 
@@ -1185,7 +1234,11 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
           password: 'wrong-password'
         }
       })
-      expect(response.statusCode).toBe(500)
+      expect(response.statusCode).toBe(401)
+      expect(response.json()).toEqual({
+        error: 'unauthorized',
+        error_code: 'InvalidPassword'
+      })
     }
 
     const limited = await appInstance!.inject({
@@ -1329,7 +1382,11 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
         password: oldPassword
       }
     })
-    expect(loginOldAgain.statusCode).toBe(500)
+    expect(loginOldAgain.statusCode).toBe(401)
+    expect(loginOldAgain.json()).toEqual({
+      error: 'unauthorized',
+      error_code: 'InvalidPassword'
+    })
 
     const loginNew = await appInstance!.inject({
       method: 'POST',
@@ -1352,7 +1409,11 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       }
     })
 
-    expect(response.statusCode).toBe(500)
+    expect(response.statusCode).toBe(401)
+    expect(response.json()).toEqual({
+      error: 'unauthorized',
+      error_code: 'InvalidPassword'
+    })
   })
 
   it('blocks password reset requests for unregistered emails', async () => {
@@ -1393,7 +1454,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const pipeline: Document[] = [
       {
         $lookup: {
-          from: "auth_users",
+          from: 'auth_users',
           localField: 'userId',
           foreignField: 'userId',
           as: 'users'
@@ -1479,7 +1540,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       }
     ]
 
-    const res = (await getTodosCollection(ownerUser).aggregate(pipeline).toArray()) as Array<{
+    const res = (await getTodosCollection(ownerUser)
+      .aggregate(pipeline)
+      .toArray()) as Array<{
       projects?: ProjectDoc[]
     }>
 
@@ -1492,7 +1555,6 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     })
   })
 
-
   afterAll(async () => {
     await appInstance?.close()
     await client.close()
@@ -1500,5 +1562,4 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       require.main.path = originalMainPath
     }
   })
-
 })

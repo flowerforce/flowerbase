@@ -19,13 +19,18 @@ export type ErrorResponseDto = {
   message: string
 }
 
+export type InvalidPasswordResponseDto = {
+  error: 'unauthorized'
+  error_code: 'InvalidPassword'
+}
+
 export interface RegistrationDto {
   Body: RegisterUserDto
 }
 
 export interface LoginDto {
   Body: LoginUserDto
-  Reply: LoginSuccessDto | ErrorResponseDto
+  Reply: LoginSuccessDto | ErrorResponseDto | InvalidPasswordResponseDto
 }
 
 export interface ResetPasswordSendDto {
