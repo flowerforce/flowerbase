@@ -10,9 +10,11 @@
         "disabled": false,
         "config": {
             "autoConfirm": true,
+            "resetFunctionName": "resetPasswordHandler",
             "resetPasswordSubject": "reset",
             "resetPasswordUrl": "http://localhost:5173/password-reset",
-            "runConfirmationFunction": false
+            "runConfirmationFunction": false,
+            "runResetFunction": true
         }
     }
 }

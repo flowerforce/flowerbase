@@ -10,5 +10,17 @@
       }
     }
   ],
-  "roles": []
+  "roles": [
+    {
+      "name": "todoOwner",
+      "apply_when": {
+        "userId": "%%user.id"
+      },
+      "insert": true,
+      "delete": true,
+      "search": true,
+      "read": true,
+      "write": true
+    }
+  ]
 }
