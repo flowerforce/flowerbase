@@ -6,8 +6,11 @@
   "scripts": {
     "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\"",
     "start:frontend": "cd packages/frontend && npm run dev",
+    "start:mobile": "cd packages/mobile && npm start",
     "start:backend": "cd packages/backend && npm run start",
-    "build:backend": "cd packages/backend && npm run build"
+    "build:backend": "cd packages/backend && npm run build",
+    "test:e2e": "cd packages/mobile && npm run test:e2e",
+    "test:e2e:with-backend": "npm run build:backend && concurrently -k -s first \"cd packages/backend && /Users/andreazucca/.nvm/versions/node/v25.7.0/bin/node dist/index.js\" \"sh -c 'until curl -sS -o /dev/null -X POST http://localhost:3000/app/flowerbase-demo/endpoint/webhooks/searchTodos; do sleep 1; done; cd packages/mobile && /Users/andreazucca/.nvm/versions/node/v25.7.0/bin/node ./node_modules/jest/bin/jest.js --config jest.e2e.config.cjs --runInBand'\""
   },
   "keywords": [],
   "author": "",
