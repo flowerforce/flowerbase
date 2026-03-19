@@ -359,7 +359,7 @@
       }, {
         lineNumbers: true,
         lineWrapping: false,
-        readOnly: 'nocursor',
+        readOnly: true,
         foldGutter: true,
         gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
         mode
@@ -369,7 +369,7 @@
 
     const collapsible = opts.collapsible !== false;
     editor.setOption('lineNumbers', opts.lineNumbers !== false);
-    editor.setOption('readOnly', opts.readOnly === false ? false : 'nocursor');
+    editor.setOption('readOnly', opts.readOnly === false ? false : true);
     editor.setOption('foldGutter', collapsible);
     editor.setOption('gutters', collapsible
       ? ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
