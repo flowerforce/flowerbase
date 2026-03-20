@@ -1,6 +1,6 @@
 import type { App } from './app'
 import { EJSON } from './bson'
-import { CollectionLike, MongoClientLike } from './types'
+import { CollectionLike, MongoClientLike, MongoDbServiceName } from './types'
 import { createWatchIterator } from './watch'
 
 const serialize = (value: unknown) => EJSON.serialize(value, { relaxed: false })
@@ -20,7 +20,7 @@ const mapResult = (value: unknown) => {
   return deserialize(value)
 }
 
-export const createMongoClient = (app: App, serviceName: string, userId: string): MongoClientLike => ({
+export const createMongoClient = (app: App, serviceName: MongoDbServiceName, userId: string): MongoClientLike => ({
   db: (database: string) => ({
     collection: (collection: string): CollectionLike => {
       const callService = async (name: string, args: unknown[]) => {

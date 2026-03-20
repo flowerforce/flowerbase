@@ -39,14 +39,14 @@ describe('flowerbase-client mongo service wrapper', () => {
 
     expect((global.fetch as jest.Mock).mock.calls).toHaveLength(8)
     const [url, request] = (global.fetch as jest.Mock).mock.calls[3]
-    expect(url).toBe('http://localhost:3000/api/client/v2.0/app/my-app/functions/call')
+    expect(url).toBe('http://localhost:3000/api/client/v2.0/app/my-app/functions/call?col=todos-findOne')
     expect(request.method).toBe('POST')
     const parsed = JSON.parse(request.body)
     expect(parsed.service).toBe('mongodb-atlas')
     expect(parsed.name).toBe('findOne')
   })
 
-  it('supports extended CRUD operations and custom service name', async () => {
+  it('supports extended CRUD operations on mongodb-atlas', async () => {
     global.fetch = jest
       .fn()
       .mockResolvedValueOnce({
@@ -65,7 +65,7 @@ describe('flowerbase-client mongo service wrapper', () => {
     const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
     await app.logIn(Credentials.emailPassword('john@doe.com', 'secret123'))
 
-    const collection = app.currentUser!.mongoClient('my-service').db('testdb').collection('todos')
+    const collection = app.currentUser!.mongoClient('mongodb-atlas').db('testdb').collection('todos')
 
     await collection.findOneAndUpdate({ done: false }, { $set: { done: true } })
     await collection.findOneAndReplace({ done: true }, { done: true, title: 'done' })
@@ -77,7 +77,7 @@ describe('flowerbase-client mongo service wrapper', () => {
 
     const calls = (global.fetch as jest.Mock).mock.calls
     const lastBody = JSON.parse(calls[calls.length - 1][1].body)
-    expect(lastBody.service).toBe('my-service')
+    expect(lastBody.service).toBe('mongodb-atlas')
     expect(lastBody.name).toBe('deleteMany')
   })
 })
