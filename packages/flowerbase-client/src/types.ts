@@ -24,11 +24,37 @@ export type ProfileData = {
   data?: Record<string, unknown>
 }
 
-export type FunctionCallPayload = {
-  name: string
-  arguments: unknown[]
-  service?: string
+export type MongoDbDocument = Record<string, unknown>
+export type MongoDbServiceName = 'mongodb-atlas'
+
+export type MongoDbServiceArgument = {
+  database: string
+  collection: string
+  query?: MongoDbDocument
+  filter?: MongoDbDocument
+  update?: MongoDbDocument | MongoDbDocument[]
+  projection?: MongoDbDocument
+  options?: MongoDbDocument
+  returnNewDocument?: boolean
+  document?: MongoDbDocument
+  documents?: MongoDbDocument[]
+  pipeline?: MongoDbDocument[]
+  replacement?: MongoDbDocument
 }
+
+export type MongoDbServiceArguments = [MongoDbServiceArgument]
+
+export type FunctionCallPayload =
+  | {
+    name: string
+    arguments: unknown[]
+    service?: undefined
+  }
+  | {
+    name: string
+    arguments: MongoDbServiceArguments
+    service: MongoDbServiceName
+  }
 
 export type WatchConfig = {
   appId: string
@@ -107,7 +133,7 @@ export interface UserLike {
   callFunction: (name: string, ...args: unknown[]) => Promise<unknown>
   refreshAccessToken: () => Promise<string>
   refreshCustomData: () => Promise<Record<string, unknown>>
-  mongoClient: (serviceName: string) => MongoClientLike
+  mongoClient: (serviceName: MongoDbServiceName) => MongoClientLike
   addListener: (callback: () => void) => void
   removeListener: (callback: () => void) => void
   removeAllListeners: () => void

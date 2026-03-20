@@ -1,8 +1,16 @@
+import { Credentials } from './credentials'
 import { normalizeFunctionResponse } from './functions'
 import { FlowerbaseHttpError, requestJson, requestStream } from './http'
 import { SessionManager } from './session'
-import { AppConfig, CredentialsLike, FunctionCallPayload, ProfileData, SessionData } from './types'
-import { Credentials } from './credentials'
+import {
+  AppConfig,
+  CredentialsLike,
+  FunctionCallPayload,
+  MongoDbServiceArguments,
+  MongoDbServiceName,
+  ProfileData,
+  SessionData
+} from './types'
 import { User } from './user'
 
 const API_PREFIX = '/api/client/v2.0'
@@ -43,7 +51,11 @@ export class App {
       passwordOrArg?: string,
       ...args: unknown[]
     ) => Promise<unknown>
-    resetPassword: (input: { token: string; tokenId: string; password: string }) => Promise<unknown>
+    resetPassword: (input: {
+      token: string
+      tokenId: string
+      password: string
+    }) => Promise<unknown>
   }
 
   constructor(idOrConfig: string | AppConfig) {
@@ -144,13 +156,18 @@ export class App {
     }
 
     const users = Object.fromEntries(
-      [...activeUsers, ...loggedOutUsers].map((userId) => [userId, this.usersById.get(userId)!])
+      [...activeUsers, ...loggedOutUsers].map((userId) => [
+        userId,
+        this.usersById.get(userId)!
+      ])
     )
     return users
   }
 
   private persistSessionsByUser() {
-    this.sessionManager.setSessionsByUser(Object.fromEntries(this.sessionsByUserId.entries()))
+    this.sessionManager.setSessionsByUser(
+      Object.fromEntries(this.sessionsByUserId.entries())
+    )
   }
 
   private persistUsersOrder() {
@@ -293,17 +310,24 @@ export class App {
     }
 
     if (credentials.provider === 'custom-function') {
-      const result = await this.postProvider<LoginResponse>('/custom-function/login', credentials.payload)
+      const result = await this.postProvider<LoginResponse>(
+        '/custom-function/login',
+        credentials.payload
+      )
       return this.setLoggedInUser(result, 'custom-function')
     }
 
     if (credentials.provider === 'custom-token') {
-      const result = await this.postProvider<LoginResponse>('/custom-token/login', { token: credentials.token })
+      const result = await this.postProvider<LoginResponse>('/custom-token/login', {
+        token: credentials.token
+      })
       return this.setLoggedInUser(result, 'custom-token')
     }
 
     const unsupportedProvider: never = credentials
-    throw new Error(`Unsupported credentials provider: ${JSON.stringify(unsupportedProvider)}`)
+    throw new Error(
+      `Unsupported credentials provider: ${JSON.stringify(unsupportedProvider)}`
+    )
   }
 
   switchUser(nextUser: User) {
@@ -336,13 +360,14 @@ export class App {
   }
 
   async deleteUser(user: User) {
-    await this.requestWithAccessToken((accessToken) =>
-      requestJson({
-        url: this.authUrl('/delete'),
-        method: 'DELETE',
-        bearerToken: accessToken,
-        timeout: this.timeout
-      }),
+    await this.requestWithAccessToken(
+      (accessToken) =>
+        requestJson({
+          url: this.authUrl('/delete'),
+          method: 'DELETE',
+          bearerToken: accessToken,
+          timeout: this.timeout
+        }),
       user.id
     )
     await this.removeUser(user)
@@ -350,7 +375,9 @@ export class App {
 
   getSessionOrThrow(userId?: string) {
     const targetUserId = userId ?? this.currentUser?.id
-    const session = targetUserId ? this.sessionsByUserId.get(targetUserId) : this.sessionManager.get()
+    const session = targetUserId
+      ? this.sessionsByUserId.get(targetUserId)
+      : this.sessionManager.get()
     if (!session) {
       throw new Error('User is not authenticated')
     }
@@ -381,7 +408,10 @@ export class App {
     })
   }
 
-  private async requestWithAccessToken<T>(operation: (accessToken: string) => Promise<T>, userId?: string) {
+  private async requestWithAccessToken<T>(
+    operation: (accessToken: string) => Promise<T>,
+    userId?: string
+  ) {
     const firstSession = this.getSessionOrThrow(userId)
     try {
       return await operation(firstSession.accessToken)
@@ -402,21 +432,26 @@ export class App {
       arguments: args
     }
 
-    const result = await this.requestWithAccessToken((accessToken) =>
-      requestJson<unknown>({
-        url: this.functionsUrl('/call'),
-        method: 'POST',
-        body: payload,
-        bearerToken: accessToken,
-        timeout: this.timeout
-      }),
+    const result = await this.requestWithAccessToken(
+      (accessToken) =>
+        requestJson<unknown>({
+          url: this.functionsUrl(`/call?func=${name}`),
+          method: 'POST',
+          body: payload,
+          bearerToken: accessToken,
+          timeout: this.timeout
+        }),
       userId
     )
 
     return normalizeFunctionResponse(result)
   }
 
-  async callFunctionStreaming(name: string, args: unknown[], userId?: string): Promise<AsyncIterable<Uint8Array>> {
+  async callFunctionStreaming(
+    name: string,
+    args: unknown[],
+    userId?: string
+  ): Promise<AsyncIterable<Uint8Array>> {
     await this.ensureSessionBootstrapped()
     const payload: FunctionCallPayload = {
       name,
@@ -443,7 +478,11 @@ export class App {
               timeout
             })
           } catch (error) {
-            if (!didRefresh && error instanceof FlowerbaseHttpError && error.status === 401) {
+            if (
+              !didRefresh &&
+              error instanceof FlowerbaseHttpError &&
+              error.status === 401
+            ) {
               await refreshSession()
               didRefresh = true
               continue
@@ -457,7 +496,11 @@ export class App {
             }
             return
           } catch (error) {
-            if (!didRefresh && error instanceof FlowerbaseHttpError && error.status === 401) {
+            if (
+              !didRefresh &&
+              error instanceof FlowerbaseHttpError &&
+              error.status === 401
+            ) {
               await refreshSession()
               didRefresh = true
               continue
@@ -469,7 +512,12 @@ export class App {
     }
   }
 
-  async callService(name: string, args: unknown[], service = 'mongodb-atlas', userId?: string) {
+  async callService(
+    name: string,
+    args: MongoDbServiceArguments,
+    service: MongoDbServiceName = 'mongodb-atlas',
+    userId?: string
+  ) {
     await this.ensureSessionBootstrapped()
     const payload: FunctionCallPayload = {
       name,
@@ -477,27 +525,29 @@ export class App {
       arguments: args
     }
 
-    return this.requestWithAccessToken((accessToken) =>
-      requestJson<unknown>({
-        url: this.functionsUrl('/call'),
-        method: 'POST',
-        body: payload,
-        bearerToken: accessToken,
-        timeout: this.timeout
-      }),
+    return this.requestWithAccessToken(
+      (accessToken) =>
+        requestJson<unknown>({
+          url: this.functionsUrl(`/call?col=${args[0].collection}-${name}`),
+          method: 'POST',
+          body: payload,
+          bearerToken: accessToken,
+          timeout: this.timeout
+        }),
       userId
     )
   }
 
   async getProfile(userId?: string): Promise<ProfileData> {
     await this.ensureSessionBootstrapped()
-    const profile = await this.requestWithAccessToken((accessToken) =>
-      requestJson<ProfileData>({
-        url: this.authUrl('/profile'),
-        method: 'GET',
-        bearerToken: accessToken,
-        timeout: this.timeout
-      }),
+    const profile = await this.requestWithAccessToken(
+      (accessToken) =>
+        requestJson<ProfileData>({
+          url: this.authUrl('/profile'),
+          method: 'GET',
+          bearerToken: accessToken,
+          timeout: this.timeout
+        }),
       userId
     )
     const session = this.getSessionOrThrow(userId)
