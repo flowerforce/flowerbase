@@ -268,6 +268,32 @@ describe('mongodb-atlas Realm compatibility', () => {
     expect(findOne).toHaveBeenCalledWith({}, undefined)
   })
 
+  it('returns null from findOne when no document matches, even with permissive roles', async () => {
+    const findOne = jest.fn().mockResolvedValue(null)
+    const collection = {
+      collectionName: 'todos',
+      findOne
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules({
+        roles: [
+          {
+            name: 'Others',
+            apply_when: {},
+            read: true,
+            search: true
+          } as any
+        ]
+      }),
+      user: { id: 'user-1' }
+    }).db('db').collection('todos')
+
+    const result = await operators.findOne({ _id: new ObjectId() })
+
+    expect(result).toBeNull()
+    expect(findOne).toHaveBeenCalledWith({ $and: [{ _id: expect.any(ObjectId) }] }, undefined)
+  })
+
   it('keeps write-only field permissions readable in findOne responses', async () => {
     const doc = {
       _id: new ObjectId(),
