@@ -599,6 +599,11 @@ const getOperators: GetOperatorsFunction = (
           })
           logService('findOne result', { collName, result })
 
+          if (result === null) {
+            emitMongoEvent('findOne')
+            return null
+          }
+
           const winningRole = getWinningRole(result, user, roles)
 
           logDebug('findOne winningRole', {
