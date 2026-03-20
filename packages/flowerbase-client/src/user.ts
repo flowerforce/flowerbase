@@ -1,7 +1,7 @@
 import type { App } from './app'
 import { createFunctionsProxy } from './functions'
 import { createMongoClient } from './mongo'
-import { MongoClientLike, UserLike } from './types'
+import { MongoClientLike, MongoDbServiceName, UserLike } from './types'
 
 export class User implements UserLike {
   readonly id: string
@@ -122,7 +122,7 @@ export class User implements UserLike {
     return this.customData
   }
 
-  mongoClient(serviceName: string): MongoClientLike {
+  mongoClient(serviceName: MongoDbServiceName): MongoClientLike {
     return createMongoClient(this.app, serviceName, this.id)
   }
 
