@@ -46,7 +46,7 @@ describe('flowerbase-client functions', () => {
 
     expect(global.fetch).toHaveBeenNthCalledWith(
       3,
-      'http://localhost:3000/api/client/v2.0/app/my-app/functions/call',
+      'http://localhost:3000/api/client/v2.0/app/my-app/functions/call?func=sum',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ Authorization: 'Bearer access' })

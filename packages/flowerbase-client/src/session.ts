@@ -1,5 +1,5 @@
-import { SessionData } from './types'
 import { createStorage } from './storage'
+import { SessionData } from './types'
 
 const parseSession = (raw: string | null): SessionData | null => {
   if (!raw) return null
