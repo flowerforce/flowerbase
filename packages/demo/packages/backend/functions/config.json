@@ -4,5 +4,17 @@
         "private": false,
         "run_as_system": false,
         "disable_arg_logs": true
+    },
+    {
+        "name": "resetPasswordHandler",
+        "private": false,
+        "run_as_system": true,
+        "disable_arg_logs": true
+    },
+    {
+        "name": "getResetPasswordPreview",
+        "private": false,
+        "run_as_system": true,
+        "disable_arg_logs": true
     }
 ]

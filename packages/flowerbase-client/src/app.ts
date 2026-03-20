@@ -52,29 +52,8 @@ export class App {
     this.baseUrl = (config.baseUrl ?? '').replace(/\/$/, '')
     this.timeout = config.timeout ?? 10000
     this.sessionManager = new SessionManager(this.id)
-    const persistedSessionsByUser = this.sessionManager.getSessionsByUser()
-    for (const [userId, session] of Object.entries(persistedSessionsByUser)) {
-      this.sessionsByUserId.set(userId, session)
-    }
-    this.usersOrder = this.sessionManager.getUsersOrder()
-    for (const userId of this.sessionsByUserId.keys()) {
-      if (!this.usersOrder.includes(userId)) {
-        this.usersOrder.push(userId)
-      }
-    }
-    for (const userId of this.usersOrder) {
-      this.getOrCreateUser(userId)
-    }
-
-    const currentSession = this.sessionManager.get()
-    if (currentSession?.userId) {
-      this.sessionsByUserId.set(currentSession.userId, currentSession)
-      this.getOrCreateUser(currentSession.userId)
-      this.touchUser(currentSession.userId)
-      this.persistSessionsByUser()
-    } else {
-      this.setCurrentSessionFromOrder()
-    }
+    this.restorePersistedUsers()
+    this.restoreCurrentSession()
     this.sessionBootstrapPromise = this.bootstrapSessionOnLoad()
 
     this.emailPasswordAuth = {
@@ -157,6 +136,44 @@ export class App {
     this.sessionManager.setUsersOrder(this.usersOrder)
   }
 
+  private restorePersistedUsers() {
+    const persistedSessionsByUser = this.sessionManager.getSessionsByUser()
+    for (const [userId, session] of Object.entries(persistedSessionsByUser)) {
+      this.sessionsByUserId.set(userId, session)
+    }
+
+    const persistedOrder = this.sessionManager.getUsersOrder()
+    const nextUsersOrder: string[] = []
+    for (const userId of persistedOrder) {
+      if (!nextUsersOrder.includes(userId)) {
+        nextUsersOrder.push(userId)
+      }
+    }
+    for (const userId of this.sessionsByUserId.keys()) {
+      if (!nextUsersOrder.includes(userId)) {
+        nextUsersOrder.push(userId)
+      }
+    }
+    this.usersOrder = nextUsersOrder
+
+    for (const userId of this.usersOrder) {
+      this.getOrCreateUser(userId)
+    }
+  }
+
+  private restoreCurrentSession() {
+    const currentSession = this.sessionManager.get()
+    if (currentSession?.userId) {
+      this.sessionsByUserId.set(currentSession.userId, currentSession)
+      this.getOrCreateUser(currentSession.userId)
+      this.touchUser(currentSession.userId)
+      this.persistSessionsByUser()
+      return
+    }
+
+    this.setCurrentSessionFromOrder()
+  }
+
   private touchUser(userId: string) {
     this.usersOrder = [userId, ...this.usersOrder.filter((id) => id !== userId)]
     this.persistUsersOrder()
@@ -225,8 +242,12 @@ export class App {
   }
 
   private async bootstrapSessionOnLoad(): Promise<void> {
+    await this.sessionManager.whenReady()
+    this.restorePersistedUsers()
+    this.restoreCurrentSession()
+
     const session = this.sessionManager.get()
-    if (!session || typeof localStorage === 'undefined') {
+    if (!session || !this.sessionManager.hasPersistentStorage()) {
       return
     }
 
