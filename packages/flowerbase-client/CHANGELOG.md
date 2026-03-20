@@ -1,3 +1,10 @@
+## 0.3.1 (2026-03-20)
+
+
+### 🩹 Fixes
+
+- api call name ([f33a832](https://github.com/flowerforce/flowerbase/commit/f33a832))
+
 ## 0.3.0 (2026-03-20)
 
 
