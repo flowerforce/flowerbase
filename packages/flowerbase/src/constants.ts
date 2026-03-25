@@ -25,6 +25,7 @@ export const DEFAULT_CONFIG = {
   PORT: Number(process.env.PORT) || 3000,
   MONGODB_URL: process.env.MONGODB_URL || '',
   JWT_SECRET: process.env.JWT_SECRET || '',
+  FUNCTION_CALL_BODY_LIMIT_BYTES: Number(process.env.FUNCTION_CALL_BODY_LIMIT_BYTES) || 50 * 1024 * 1024,
   API_VERSION: process.env.API_VERSION || 'v2.0',
   HTTPS_SCHEMA: process.env.HTTPS_SCHEMA || 'https',
   HOST: process.env.HOST || '0.0.0.0',
