@@ -1,3 +1,10 @@
+## 1.8.1 (2026-03-27)
+
+
+### 🩹 Fixes
+
+- add config FUNCTION_CALL_BODY_LIMIT ([5f6ec70](https://github.com/flowerforce/flowerbase/commit/5f6ec70))
+
 ## 1.8.0 (2026-03-20)
 
 
