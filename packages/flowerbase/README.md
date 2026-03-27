@@ -484,6 +484,7 @@ Ensure the following environment variables are set in your .env file or deployme
 | `PORT`                 | The port on which the server will run.                                      | `3000`                                             |
 | `MONGODB_URL`          | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
 | `JWT_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
+| `FUNCTION_CALL_BODY_LIMIT_BYTES` | Max request body size in bytes for `POST /api/client/<version>/app/:appId/functions/call`. | `52428800` |
 | `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
 | `API_VERSION`          | API version used in client base path.                                       | `v2.0`                                             |
 | `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
@@ -518,6 +519,7 @@ PROJECT_ID=your-project-id
 PORT=3000
 MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/dbname
 JWT_SECRET=your-jwt-secret
+FUNCTION_CALL_BODY_LIMIT_BYTES=52428800
 HOST=0.0.0.0
 API_VERSION=v2.0
 HTTPS_SCHEMA=http
