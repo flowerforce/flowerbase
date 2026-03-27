@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify'
+import { CacheProvider, noopCacheProvider } from './cache'
 import { Endpoints } from './features/endpoints/interface'
 import { Functions } from './features/functions/interface'
 import { FunctionsQueue } from './features/functions/queue'
@@ -14,6 +15,7 @@ type State = {
   endpoints: Endpoints
   rules: Rules
   projectId: string
+  cache: CacheProvider
   app?: FastifyInstance
   functionsQueue: FunctionsQueue
   monitoring: {
@@ -28,6 +30,7 @@ export class StateManager {
     endpoints: [],
     projectId: '',
     rules: {},
+    cache: noopCacheProvider,
     functionsQueue: new FunctionsQueue(),
     monitoring: {}
   }

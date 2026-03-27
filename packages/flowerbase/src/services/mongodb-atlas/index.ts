@@ -16,8 +16,14 @@ import {
   UpdateFilter,
   WithId
 } from 'mongodb'
+import {
+  buildAuthorizationCacheTag,
+  buildCacheKey,
+  CacheProvider
+} from '../../cache'
 import { Rules } from '../../features/rules/interface'
 import { buildRulesMeta } from '../../monitoring/utils'
+import { StateManager } from '../../state'
 import { checkValidation } from '../../utils/roles/machines'
 import { getWinningRole } from '../../utils/roles/machines/utils'
 import { emitServiceEvent } from '../monitoring'
@@ -491,15 +497,145 @@ const areUpdatedFieldsAllowed = (
   return updatedPaths.every((path) => isEqual(get(filtered, path), get(updated, path)))
 }
 
+const hasSessionOption = (options?: Document | FindOptions | FindOneOptions) =>
+  !!options &&
+  typeof options === 'object' &&
+  !Array.isArray(options) &&
+  'session' in options &&
+  typeof options.session !== 'undefined'
+
+const canUseCache = (
+  cache: CacheProvider,
+  options?: Document | FindOptions | FindOneOptions
+) => cache.kind !== 'none' && !hasSessionOption(options)
+
+const buildReadOperationCacheKey = ({
+  dbName,
+  collName,
+  operation,
+  query,
+  options,
+  projection,
+  user,
+  runAsSystem,
+  filters,
+  extra
+}: {
+  dbName: string
+  collName: string
+  operation: string
+  query?: unknown
+  options?: unknown
+  projection?: unknown
+  user?: unknown
+  runAsSystem?: boolean
+  filters?: unknown
+  extra?: unknown
+}) =>
+  buildCacheKey({
+    dbName,
+    collName,
+    operation,
+    query,
+    options,
+    projection,
+    user,
+    runAsSystem: !!runAsSystem,
+    filters,
+    extra
+  })
+
+const createCachedCursor = <T>(
+  cursor: {
+    toArray: () => Promise<T[]>
+    sort?: (...args: any[]) => unknown
+    skip?: (...args: any[]) => unknown
+    limit?: (...args: any[]) => unknown
+  },
+  {
+    cache,
+    cacheKey,
+    tag,
+    transform,
+    onCacheHit
+  }: {
+    cache: CacheProvider
+    cacheKey: string
+    tag: string
+    transform?: (items: T[]) => Promise<T[]> | T[]
+    onCacheHit?: (items: T[]) => Promise<T[]> | T[]
+  }
+) => {
+  const originalToArray = cursor.toArray.bind(cursor)
+  const originalSort = cursor.sort?.bind(cursor)
+  const originalSkip = cursor.skip?.bind(cursor)
+  const originalLimit = cursor.limit?.bind(cursor)
+  const cursorState: {
+    sort?: unknown
+    skip?: number
+    limit?: number
+  } = {}
+
+  if (originalSort) {
+    cursor.sort = ((...args: any[]) => {
+      cursorState.sort = args
+      originalSort(...args)
+      return cursor
+    }) as typeof cursor.sort
+  }
+
+  if (originalSkip) {
+    cursor.skip = ((...args: any[]) => {
+      cursorState.skip = args[0]
+      originalSkip(...args)
+      return cursor
+    }) as typeof cursor.skip
+  }
+
+  if (originalLimit) {
+    cursor.limit = ((...args: any[]) => {
+      cursorState.limit = args[0]
+      originalLimit(...args)
+      return cursor
+    }) as typeof cursor.limit
+  }
+
+  cursor.toArray = async () => {
+    const effectiveKey = buildCacheKey({
+      cacheKey,
+      cursorState
+    })
+
+    const cached = await cache.get<T[]>(effectiveKey)
+    if (typeof cached !== 'undefined') {
+      return onCacheHit ? await onCacheHit(cached) : cached
+    }
+
+    const response = await originalToArray()
+    const transformedResponse = transform ? await transform(response) : response
+    await cache.set(effectiveKey, transformedResponse, { tags: [tag] })
+    return transformedResponse
+  }
+
+  return cursor
+}
+
 const getOperators: GetOperatorsFunction = (
   mongo,
   { rules, dbName, collName, user, run_as_system, monitoringOrigin }
 ) => {
   const collection = mongo.client.db(dbName).collection(collName)
+  const cache = StateManager.select('cache')
   const normalizedRules: Rules = rules ?? ({} as Rules)
   const collectionRules = normalizedRules[collName]
   const filters = collectionRules?.filters ?? []
   const roles = collectionRules?.roles ?? []
+  const authorizationCacheTag = buildAuthorizationCacheTag({
+    database: dbName,
+    collection: collName,
+    runAsSystem: run_as_system,
+    filters
+  })
   const fallbackAccess = (doc: Document | null | undefined = undefined) => ({
     status: false,
     document: doc
@@ -532,6 +668,35 @@ const getOperators: GetOperatorsFunction = (
       error,
       origin: monitoringOrigin
     })
+  }
+  const invalidateCollectionCache = async () => {
+    await cache.invalidateTags([authorizationCacheTag])
+  }
+  const validateReadAccess = async (document: Document | null) => {
+    if (document === null) return null
+
+    const winningRole = getWinningRole(document, user, roles)
+
+    logDebug('findOne winningRole', {
+      collection: collName,
+      winningRoleName: winningRole?.name ?? null,
+      userId: getUserId(user)
+    })
+
+    const { status, document: validatedDocument } = winningRole
+      ? await checkValidation(
+          winningRole,
+          {
+            type: 'read',
+            roles,
+            cursor: document,
+            expansions: getValidationExpansions(document)
+          },
+          user
+        )
+      : fallbackAccess(document)
+
+    return status ? validatedDocument : {}
   }
 
   return {
@@ -566,12 +731,34 @@ const getOperators: GetOperatorsFunction = (
               }
             : undefined
         const resolvedQuery = query ?? {}
+        const cacheKey = buildReadOperationCacheKey({
+          dbName,
+          collName,
+          operation: 'findOne',
+          query: resolvedQuery,
+          options: resolvedOptions,
+          projection,
+          user,
+          runAsSystem: run_as_system,
+          filters
+        })
         if (!run_as_system) {
           checkDenyOperation(
             normalizedRules,
             collection.collectionName,
             CRUD_OPERATIONS.READ
           )
+        }
+        if (canUseCache(cache, resolvedOptions)) {
+          const cached = await cache.get<Document | null | Record<string, never>>(cacheKey)
+          if (typeof cached !== 'undefined') {
+            emitMongoEvent('findOne', { cacheHit: true })
+            return !run_as_system
+              ? await validateReadAccess(cached as Document | null)
+              : cached
+          }
+        }
+        if (!run_as_system) {
           // Apply access control filters to the query
           const formattedQuery = getFormattedQuery(filters, resolvedQuery, user)
           logDebug('update formattedQuery', {
@@ -604,33 +791,18 @@ const getOperators: GetOperatorsFunction = (
             return null
           }
 
-          const winningRole = getWinningRole(result, user, roles)
-
-          logDebug('findOne winningRole', {
-            collection: collName,
-            winningRoleName: winningRole?.name ?? null,
-            userId: getUserId(user)
-          })
-          const { status, document } = winningRole
-            ? await checkValidation(
-                winningRole,
-                {
-                  type: 'read',
-                  roles,
-                  cursor: result,
-                  expansions: getValidationExpansions(result)
-                },
-                user
-              )
-            : fallbackAccess(result)
-
-          // Return validated document or empty object if not permitted
-          const response = status ? document : {}
+          const response = await validateReadAccess(result)
+          if (canUseCache(cache, resolvedOptions)) {
+            await cache.set(cacheKey, response, { tags: [authorizationCacheTag] })
+          }
           emitMongoEvent('findOne')
           return Promise.resolve(response)
         }
         // System mode: no validation applied
         const response = await collection.findOne(resolvedQuery, resolvedOptions)
+        if (canUseCache(cache, resolvedOptions)) {
+          await cache.set(cacheKey, response, { tags: [authorizationCacheTag] })
+        }
         emitMongoEvent('findOne')
         return response
       } catch (error) {
@@ -694,11 +866,13 @@ const getOperators: GetOperatorsFunction = (
           }
 
           const res = await collection.deleteOne(buildAndQuery(formattedQuery), options)
+          await invalidateCollectionCache()
           emitMongoEvent('deleteOne')
           return res
         }
         // System mode: bypass access control
         const result = await collection.deleteOne(query, options)
+        await invalidateCollectionCache()
         emitMongoEvent('deleteOne')
         return result
       } catch (error) {
@@ -753,6 +927,7 @@ const getOperators: GetOperatorsFunction = (
           }
           logService('insertOne payload', { collName, data })
           const insertResult = await collection.insertOne(data, options)
+          await invalidateCollectionCache()
           logService('insertOne result', {
             collName,
             insertedId: insertResult.insertedId.toString(),
@@ -763,6 +938,7 @@ const getOperators: GetOperatorsFunction = (
         }
         // System mode: insert without validation
         const insertResult = await collection.insertOne(data, options)
+        await invalidateCollectionCache()
         emitMongoEvent('insertOne')
         return insertResult
       } catch (error) {
@@ -817,6 +993,7 @@ const getOperators: GetOperatorsFunction = (
                 normalizedData,
                 options
               )
+              await invalidateCollectionCache()
               emitMongoEvent('updateOne')
               return upsertResult
             }
@@ -856,10 +1033,12 @@ const getOperators: GetOperatorsFunction = (
             normalizedData,
             options
           )
+          await invalidateCollectionCache()
           emitMongoEvent('updateOne')
           return res
         }
         const result = await collection.updateOne(query, normalizedData, options)
+        await invalidateCollectionCache()
         emitMongoEvent('updateOne')
         return result
       } catch (error) {
@@ -961,6 +1140,7 @@ const getOperators: GetOperatorsFunction = (
                 normalizedOptions
               )
             : await collection.findOneAndUpdate(buildAndQuery(safeQuery), normalizedData)
+          await invalidateCollectionCache()
           if (!updateResult) {
             emitMongoEvent('findOneAndUpdate')
             return updateResult
@@ -990,6 +1170,7 @@ const getOperators: GetOperatorsFunction = (
         const updateResult = normalizedOptions
           ? await collection.findOneAndUpdate(query, data, normalizedOptions)
           : await collection.findOneAndUpdate(query, data)
+        await invalidateCollectionCache()
         emitMongoEvent('findOneAndUpdate')
         return updateResult
       } catch (error) {
@@ -1030,6 +1211,17 @@ const getOperators: GetOperatorsFunction = (
                 ...(projection ? { projection } : {})
               }
             : undefined
+        const baseCacheKey = buildReadOperationCacheKey({
+          dbName,
+          collName,
+          operation: 'find',
+          query,
+          options: resolvedOptions,
+          projection,
+          user,
+          runAsSystem: run_as_system,
+          filters
+        })
         if (!run_as_system) {
           checkDenyOperation(
             normalizedRules,
@@ -1041,51 +1233,82 @@ const getOperators: GetOperatorsFunction = (
           const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
           // aggiunto filter per evitare questo errore: $and argument's entries must be objects
           const cursor = collection.find(currentQuery, resolvedOptions)
-          const originalToArray = cursor.toArray.bind(cursor)
+          createCachedCursor(cursor, {
+            cache,
+            cacheKey: baseCacheKey,
+            tag: authorizationCacheTag,
+            onCacheHit: async (response) => {
+              const filteredResponse = await Promise.all(
+                response.map(async (currentDoc) => {
+                  const winningRole = getWinningRole(currentDoc, user, roles)
 
-          /**
-           * Overridden `toArray` method that validates each document for read access.
-           *
-           * @returns {Promise<Document[]>} An array of documents the user is authorized to read.
-           */
-          cursor.toArray = async () => {
-            const response = await originalToArray()
+                  logDebug('find winningRole', {
+                    collection: collName,
+                    userId: getUserId(user),
+                    winningRoleName: winningRole?.name ?? null,
+                    rolesLength: roles.length
+                  })
+                  const { status, document } = winningRole
+                    ? await checkValidation(
+                        winningRole,
+                        {
+                          type: 'read',
+                          roles,
+                          cursor: currentDoc,
+                          expansions: getValidationExpansions(currentDoc)
+                        },
+                        user
+                      )
+                    : fallbackAccess(currentDoc)
 
-            const filteredResponse = await Promise.all(
-              response.map(async (currentDoc) => {
-                const winningRole = getWinningRole(currentDoc, user, roles)
-
-                logDebug('find winningRole', {
-                  collection: collName,
-                  userId: getUserId(user),
-                  winningRoleName: winningRole?.name ?? null,
-                  rolesLength: roles.length
+                  return status ? document : undefined
                 })
-                const { status, document } = winningRole
-                  ? await checkValidation(
-                      winningRole,
-                      {
-                        type: 'read',
-                        roles,
-                        cursor: currentDoc,
-                        expansions: getValidationExpansions(currentDoc)
-                      },
-                      user
-                    )
-                  : fallbackAccess(currentDoc)
+              )
 
-                return status ? document : undefined
-              })
-            )
+              return filteredResponse.filter(Boolean) as WithId<Document>[]
+            },
+            transform: async (response) => {
+              const filteredResponse = await Promise.all(
+                response.map(async (currentDoc) => {
+                  const winningRole = getWinningRole(currentDoc, user, roles)
 
-            return filteredResponse.filter(Boolean) as WithId<Document>[]
-          }
+                  logDebug('find winningRole', {
+                    collection: collName,
+                    userId: getUserId(user),
+                    winningRoleName: winningRole?.name ?? null,
+                    rolesLength: roles.length
+                  })
+                  const { status, document } = winningRole
+                    ? await checkValidation(
+                        winningRole,
+                        {
+                          type: 'read',
+                          roles,
+                          cursor: currentDoc,
+                          expansions: getValidationExpansions(currentDoc)
+                        },
+                        user
+                      )
+                    : fallbackAccess(currentDoc)
+
+                  return status ? document : undefined
+                })
+              )
+
+              return filteredResponse.filter(Boolean) as WithId<Document>[]
+            }
+          })
 
           emitMongoEvent('find')
           return cursor
         }
         // System mode: return original unfiltered cursor
         const cursor = collection.find(query, resolvedOptions)
+        createCachedCursor(cursor, {
+          cache,
+          cacheKey: baseCacheKey,
+          tag: authorizationCacheTag
+        })
         emitMongoEvent('find')
         return cursor
       } catch (error) {
@@ -1095,21 +1318,46 @@ const getOperators: GetOperatorsFunction = (
     },
     count: async (query, options) => {
       try {
+        const cacheKey = buildReadOperationCacheKey({
+          dbName,
+          collName,
+          operation: 'count',
+          query,
+          options,
+          user,
+          runAsSystem: run_as_system,
+          filters
+        })
         if (!run_as_system) {
           checkDenyOperation(
             normalizedRules,
             collection.collectionName,
             CRUD_OPERATIONS.READ
           )
+        }
+        if (canUseCache(cache, options)) {
+          const cached = await cache.get<number>(cacheKey)
+          if (typeof cached !== 'undefined') {
+            emitMongoEvent('count', { cacheHit: true })
+            return cached
+          }
+        }
+        if (!run_as_system) {
           const formattedQuery = getFormattedQuery(filters, query, user)
           const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
           logService('count query', { collName, currentQuery })
           const result = await collection.countDocuments(currentQuery, options)
+          if (canUseCache(cache, options)) {
+            await cache.set(cacheKey, result, { tags: [authorizationCacheTag] })
+          }
           emitMongoEvent('count')
           return result
         }
 
         const result = await collection.countDocuments(query, options)
+        if (canUseCache(cache, options)) {
+          await cache.set(cacheKey, result, { tags: [authorizationCacheTag] })
+        }
         emitMongoEvent('count')
         return result
       } catch (error) {
@@ -1119,21 +1367,46 @@ const getOperators: GetOperatorsFunction = (
     },
     countDocuments: async (query, options) => {
       try {
+        const cacheKey = buildReadOperationCacheKey({
+          dbName,
+          collName,
+          operation: 'countDocuments',
+          query,
+          options,
+          user,
+          runAsSystem: run_as_system,
+          filters
+        })
         if (!run_as_system) {
           checkDenyOperation(
             normalizedRules,
             collection.collectionName,
             CRUD_OPERATIONS.READ
           )
+        }
+        if (canUseCache(cache, options)) {
+          const cached = await cache.get<number>(cacheKey)
+          if (typeof cached !== 'undefined') {
+            emitMongoEvent('countDocuments', { cacheHit: true })
+            return cached
+          }
+        }
+        if (!run_as_system) {
           const formattedQuery = getFormattedQuery(filters, query, user)
           const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
           logService('countDocuments query', { collName, currentQuery })
           const result = await collection.countDocuments(currentQuery, options)
+          if (canUseCache(cache, options)) {
+            await cache.set(cacheKey, result, { tags: [authorizationCacheTag] })
+          }
           emitMongoEvent('countDocuments')
           return result
         }
 
         const result = await collection.countDocuments(query, options)
+        if (canUseCache(cache, options)) {
+          await cache.set(cacheKey, result, { tags: [authorizationCacheTag] })
+        }
         emitMongoEvent('countDocuments')
         return result
       } catch (error) {
@@ -1415,11 +1688,13 @@ const getOperators: GetOperatorsFunction = (
           }
 
           const result = await collection.insertMany(documents, options)
+          await invalidateCollectionCache()
           emitMongoEvent('insertMany')
           return normalizeInsertManyResult(result)
         }
         // If system mode is active, insert all documents without validation
         const result = await collection.insertMany(documents, options)
+        await invalidateCollectionCache()
         emitMongoEvent('insertMany')
         return normalizeInsertManyResult(result)
       } catch (error) {
@@ -1486,10 +1761,12 @@ const getOperators: GetOperatorsFunction = (
             normalizedData,
             options
           )
+          await invalidateCollectionCache()
           emitMongoEvent('updateMany')
           return res
         }
         const result = await collection.updateMany(query, normalizedData, options)
+        await invalidateCollectionCache()
         emitMongoEvent('updateMany')
         return result
       } catch (error) {
@@ -1566,11 +1843,13 @@ const getOperators: GetOperatorsFunction = (
             $and: [...formattedQuery, { _id: { $in: elementsToDelete } }]
           }
           const result = await collection.deleteMany(deleteQuery, options)
+          await invalidateCollectionCache()
           emitMongoEvent('deleteMany')
           return result
         }
         // If running as system, bypass access control and delete directly
         const result = await collection.deleteMany(query, options)
+        await invalidateCollectionCache()
         emitMongoEvent('deleteMany')
         return result
       } catch (error) {
