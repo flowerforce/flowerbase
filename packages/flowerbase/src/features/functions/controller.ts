@@ -2,6 +2,7 @@ import type { ServerResponse } from 'http'
 import { EJSON, ObjectId } from 'bson'
 import type { FastifyRequest } from 'fastify'
 import type { Document } from 'mongodb'
+import { DEFAULT_CONFIG } from '../../constants'
 import { services } from '../../services'
 import { GenerateContext } from '../../utils/context'
 import { Base64Function, FunctionCallBase64Dto, FunctionCallDto } from './dtos'
@@ -331,6 +332,7 @@ export const functionsController: FunctionController = async (
   app.addHook('preHandler', app.jwtAuthentication)
 
   app.post<{ Body: FunctionCallDto }>('/call', {
+    bodyLimit: DEFAULT_CONFIG.FUNCTION_CALL_BODY_LIMIT_BYTES,
     schema: {
       tags: ['Functions']
     }
