@@ -557,6 +557,45 @@ MONIT_ALLOW_EDIT=true
 - If `MONIT_ALLOWED_IPS` is set, only those IPs can reach `/monit` (ensure `req.ip` reflects your proxy setup / `trustProxy`).
 - You can disable **invoke** or **edit** with `MONIT_ALLOW_INVOKE=false` and/or `MONIT_ALLOW_EDIT=false`.
 
+### 🔐 Reverse Proxy and SSL Termination
+
+When Flowerbase runs behind Nginx or HAProxy with SSL termination, make sure the proxy forwards the public scheme/host/port headers.
+
+Flowerbase uses these headers for `GET /api/client/<version>/app/:appId/location`, and Realm-style clients use that response to build auth URLs (including `/login`).
+
+- Header priority for host and scheme is: `Forwarded` first, then `X-Forwarded-*`, then `Host`.
+- If `X-Forwarded-Port` is set and host has no explicit port, Flowerbase appends it.
+
+#### Nginx
+
+```nginx
+location / {
+  proxy_pass http://flowerbase_upstream;
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-Host $http_host;
+  proxy_set_header X-Forwarded-Port $server_port;
+}
+```
+
+#### HAProxy
+
+```haproxy
+frontend fe_https
+  bind *:443 ssl crt /etc/haproxy/certs/site.pem
+  mode http
+  default_backend be_flowerbase
+
+backend be_flowerbase
+  mode http
+  server app1 127.0.0.1:3000 check
+  http-request set-header Host %[req.hdr(host)]
+  http-request set-header X-Forwarded-Proto https if { ssl_fc }
+  http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
+  http-request set-header X-Forwarded-Host %[req.hdr(host)]
+  http-request set-header X-Forwarded-Port %[dst_port]
+```
+
 
 <a id="build"></a>
 ## 🚀 Build & Deploy the Server
