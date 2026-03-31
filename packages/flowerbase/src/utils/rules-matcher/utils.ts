@@ -267,6 +267,20 @@ const rulesMatcherUtils: RulesMatcherUtils = {
       )
     }
 
+    if (!Array.isArray(block) && block && typeof block === 'object') {
+      const keys = Object.keys(block)
+      const hasLogicalOperators = keys.some((key) => key === '$and' || key === '$or')
+      if (!hasLogicalOperators && keys.length > 1) {
+        return keys.every((key) =>
+          rulesMatcherUtils.checkRule(
+            { [key]: (block as Record<string, unknown>)[key] } as any,
+            data,
+            options
+          )
+        )
+      }
+    }
+
     const res = rulesMatcherUtils.rule(block, data, options)
     return res.valid
   },
