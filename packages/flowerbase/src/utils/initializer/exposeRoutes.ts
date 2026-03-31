@@ -6,6 +6,34 @@ import { API_VERSION, AUTH_CONFIG, AUTH_DB_NAME, DEFAULT_CONFIG } from '../../co
 import { PROVIDER } from '../../shared/models/handleUserRegistration.model'
 import { hashPassword } from '../crypto'
 
+const parseFirstHeaderValue = (header: string | string[] | undefined): string | undefined => {
+  if (!header) return undefined
+  const raw = Array.isArray(header) ? header[0] : header
+  return raw?.split(',')[0]?.trim() || undefined
+}
+
+const parseForwardedHeader = (header: string | undefined): { proto?: string; host?: string } => {
+  if (!header) return {}
+  const segment = header.split(',')[0]?.trim()
+  if (!segment) return {}
+
+  const tokens = segment.split(';').map((item) => item.trim())
+  const protoToken = tokens.find((item) => item.toLowerCase().startsWith('proto='))
+  const hostToken = tokens.find((item) => item.toLowerCase().startsWith('host='))
+  const clean = (value?: string) => value?.replace(/^"|"$/g, '')
+
+  return {
+    proto: clean(protoToken?.split('=')[1]),
+    host: clean(hostToken?.split('=')[1])
+  }
+}
+
+const hasExplicitPort = (host: string): boolean => {
+  if (/^\[[^\]]+]\:\d+$/.test(host)) return true
+  if (/^[^:]+\:\d+$/.test(host)) return true
+  return false
+}
+
 /**
  * > Used to expose all app routes
  * @param fastify -> the fastify instance
@@ -18,11 +46,17 @@ export const exposeRoutes = async (fastify: FastifyInstance) => {
         tags: ['System']
       }
     }, async (req) => {
-      const schema = DEFAULT_CONFIG?.HTTPS_SCHEMA ?? 'http'
-      const headerHost = req.headers.host ?? 'localhost:3000'
-      const hostname = headerHost.split(':')[0]
-      const port = DEFAULT_CONFIG?.PORT ?? 3000
-      const host = process.env.NODE_ENV === "production" ? hostname : `${hostname}:${port}`
+      const forwarded = parseForwardedHeader(parseFirstHeaderValue(req.headers.forwarded))
+      const forwardedProto = parseFirstHeaderValue(req.headers['x-forwarded-proto'])
+      const forwardedHost = parseFirstHeaderValue(req.headers['x-forwarded-host'])
+      const forwardedPort = parseFirstHeaderValue(req.headers['x-forwarded-port'])
+      const schema = forwarded.proto ?? forwardedProto ?? DEFAULT_CONFIG?.HTTPS_SCHEMA ?? 'http'
+      let host = forwarded.host ?? forwardedHost ?? req.headers.host ?? `localhost:${DEFAULT_CONFIG?.PORT ?? 3000}`
+
+      if (forwardedPort && !hasExplicitPort(host)) {
+        host = `${host}:${forwardedPort}`
+      }
+
       const wsSchema = 'wss'
 
       return {
