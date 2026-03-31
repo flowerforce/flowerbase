@@ -1,3 +1,12 @@
+## 1.8.2 (2026-03-31)
+
+
+### 🩹 Fixes
+
+- apply_when ([f2bcef2](https://github.com/flowerforce/flowerbase/commit/f2bcef2))
+
+- forwarded host ([#52](https://github.com/flowerforce/flowerbase/pull/52))
+
 ## 1.8.1 (2026-03-27)
 
 
