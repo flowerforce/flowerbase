@@ -37,6 +37,9 @@ export const STEP_B_STATES: States = {
     })
     const check = await evaluateTopLevelPermissionsFn(context, 'write')
     if (check) {
+      if (context.params.type === 'write') {
+        return endValidation({ success: true })
+      }
       return next('evaluateTopLevelInsert')
     }
     if (check === false) {
