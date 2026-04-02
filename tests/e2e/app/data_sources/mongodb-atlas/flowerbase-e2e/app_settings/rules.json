@@ -1,0 +1,26 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "app_settings",
+  "roles": [
+    {
+      "name": "operator",
+      "apply_when": { "%%user.custom_data.role": "operator" },
+      "insert": true,
+      "delete": false,
+      "search": true,
+      "read": true,
+      "write": true,
+      "additional_fields": {}
+    },
+    {
+      "name": "admin",
+      "apply_when": { "%%user.custom_data.role": "admin" },
+      "insert": true,
+      "delete": true,
+      "search": true,
+      "read": true,
+      "write": true,
+      "additional_fields": {}
+    }
+  ]
+}
