@@ -616,35 +616,80 @@ Once deployed, you'll receive a public URL (e.g. https://your-app-name.up.exampl
 
 >This URL should be used as the base URL in your frontend application, as explained in the next section.
 
-## 🌐 Frontend Setup – Realm SDK in React (Example)
+## 🌐 Frontend Setup – `@flowerforce/flowerbase-client` (Recommended)
 
-You can use the official `realm-web` SDK to integrate MongoDB Realm into a React application.
-This serves as a sample setup — similar logic can be applied using other official Realm SDKs **(e.g. React Native, Node, or Flutter)**.
-
-### 📦 Install Realm SDK
+For frontend and mobile projects, you can use the dedicated Flowerbase client:
 
 ```bash
-npm install realm-web
+npm install @flowerforce/flowerbase-client
 ```
 
-### ⚙️ Configure Realm in React
-
-Create a file to initialize and export the Realm App instance:
+### ⚙️ Configure client app
 
 ```ts
-// src/realm/realmApp.ts
+import { App, Credentials } from '@flowerforce/flowerbase-client'
 
-import * as Realm from "realm-web";
+const app = new App({
+  id: 'your-app-id',
+  baseUrl: 'https://your-deployed-backend-url.com',
+  timeout: 10000
+})
 
-// Replace with your actual Realm App ID and your deployed backend URL
-const app = new Realm.App({
-  id: "your-realm-app-id", // e.g., my-app-abcde
-  baseUrl: "https://your-deployed-backend-url.com" // e.g., https://your-app-name.up.example.app
-});
-
-export default app;
-
+await app.logIn(Credentials.emailPassword('user@example.com', 'secret'))
 ```
 
->🔗 The baseUrl should point to the backend URL you deployed earlier using Flowerbase.
-This tells the frontend SDK where to send authentication and data requests.
+### 📦 Common client operations
+
+```ts
+const user = app.currentUser
+if (!user) throw new Error('User not logged in')
+
+const profile = await user.functions.getProfile()
+
+const todos = user.mongoClient('mongodb-atlas')
+  .db('my-db')
+  .collection('todos')
+
+await todos.insertOne({ title: 'Ship docs update', done: false })
+const openTodos = await todos.find({ done: false })
+```
+
+`@flowerforce/flowerbase-client` supports:
+- local-userpass / anon-user / custom-function authentication
+- function calls (`user.functions.<name>(...)`)
+- MongoDB operations via `user.mongoClient('mongodb-atlas')`
+- change streams with `watch()` async iterator
+- BSON/EJSON interoperability (`ObjectId`, `Date`, etc.)
+
+## 💡 Use Cases by Feature
+
+### 🔐 Authentication
+- Registration and login flows for SaaS dashboards using `local-userpass`.
+- Guest sessions for trial users with `anon-user`, then account upgrade with full registration.
+- Delegated enterprise login with `custom-function` auth when credentials must be validated by external identity logic.
+
+### 🔒 Rules
+- Multi-tenant isolation where each user can only read/write documents of their own workspace.
+- Field-level protection to hide private fields (for example billing or internal notes) from non-admin users.
+
+### ⚙️ Functions
+- Centralized business logic (pricing, counters, workflows) called from web and mobile clients.
+- Privileged server-side tasks invoked with `run_as_system` to perform safe internal operations.
+
+### 🔔 Triggers
+- Audit logging on insert/update/delete events into an activity collection.
+- Scheduled jobs (for example nightly cleanup, reminder generation, data aggregation).
+- Auth lifecycle reactions (welcome email on user creation, cleanup on user deletion).
+
+### 🌐 HTTP Endpoints
+- Public webhook ingestion from third-party systems.
+- Protected custom APIs for backoffice actions not exposed as direct database operations.
+
+### 📡 `flowerbase-client`
+- Real-time UI updates in task boards using `collection.watch()` change streams.
+- Frontend data access with Realm-style API surface to minimize integration complexity.
+- Shared client usage across web and React Native projects with consistent auth/session behavior.
+
+### 🖥 Monitoring UI
+- Live inspection of function invocations, endpoint calls, and trigger executions in staging/production.
+- Fast troubleshooting with event stream filters and user/session search tools.
