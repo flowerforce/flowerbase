@@ -1,6 +1,6 @@
 {
   "name": "@flowerforce/flowerbase-client",
-  "version": "0.3.2",
+  "version": "0.3.3-beta.0",
   "description": "Client for Flowerbase",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
