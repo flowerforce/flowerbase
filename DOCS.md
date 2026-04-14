@@ -218,6 +218,8 @@ The `response` object available in HTTP endpoint handlers supports:
 - [🔒 Auth System](#auth-system)
 - [🧪 Testing](#testing)
 - [🚢 Deployment](#deployment)
+- [📡 Flowerbase Client](#flowerbase-client)
+- [💡 Use Cases](#use-cases)
 - [💡 Examples](#examples)
 - [❓ FAQ](#faq)
 
@@ -371,3 +373,73 @@ npm test
 ```
 
 In mancanza di un valore esplicito, il test fallirà perché il server remoto non sarà raggiungibile: assicurati che la stringa punti a un cluster che esegue le regole attese (per esempio `flowerbase-e2e`). Non serve più avviare Docker o Replica Set locali.
+
+<a id="flowerbase-client"></a>
+## 4. 📡 Flowerbase Client
+
+Per usare Flowerbase da frontend o mobile, è disponibile il pacchetto dedicato:
+
+```bash
+npm install @flowerforce/flowerbase-client
+```
+
+Esempio rapido:
+
+```ts
+import { App, Credentials } from '@flowerforce/flowerbase-client'
+
+const app = new App({
+  id: 'my-app-id',
+  baseUrl: 'http://localhost:8000',
+  timeout: 10000
+})
+
+await app.logIn(Credentials.emailPassword('user@example.com', 'secret'))
+
+const user = app.currentUser
+if (!user) throw new Error('User not logged in')
+
+const todos = user.mongoClient('mongodb-atlas')
+  .db('my-db')
+  .collection('todos')
+
+await todos.insertOne({ title: 'Nuovo task', done: false })
+const list = await todos.find({ done: false })
+```
+
+Funzionalità principali del client:
+- autenticazione (`local-userpass`, `anon-user`, `custom-function`)
+- chiamata funzioni (`user.functions.<name>(...)`)
+- operazioni MongoDB (`find`, `insertOne`, `updateOne`, `deleteOne`, ecc.)
+- change stream con `watch()` come async iterator
+- supporto BSON/EJSON (`ObjectId`, `Date`, ecc.)
+
+<a id="use-cases"></a>
+## 5. 💡 Casi d’uso per funzionalità
+
+### 🔐 Auth
+- Login email/password per dashboard B2B con utenti confermati.
+- Sessioni anonime per onboarding rapido e conversione successiva ad account registrato.
+- Integrazione con credenziali custom via `custom-function`.
+
+### 🔒 Rules
+- Isolamento multi-tenant (utente vede solo i documenti del proprio workspace).
+- Protezione a livello campo (es. campi interni visibili solo ad admin).
+
+### ⚙️ Functions
+- Calcoli server-side condivisi tra web e mobile (pricing, report, validazioni).
+- Orchestrazione di processi applicativi senza esporre logica critica sul client.
+
+### 🔔 Triggers
+- Audit automatico su insert/update/delete.
+- Processi schedulati (pulizia dati, reminder, aggregazioni periodiche).
+- Hook sul ciclo di vita utente (on create/on delete).
+
+### 🌐 HTTP Endpoints
+- Webhook pubblici per integrazioni esterne.
+- Endpoint protetti per operazioni amministrative custom.
+
+### 📡 Flowerbase Client
+- Accesso dati Realm-like da React/React Native con una API coerente.
+- Aggiornamenti real-time UI con `watch()` su collection.
+- Invocazione funzioni backend e gestione sessione in modo centralizzato.
