@@ -2,6 +2,7 @@ import { Document, OptionalId } from 'mongodb'
 import { User } from '../../../auth/dtos'
 import { Filter } from '../../../features/rules/interface'
 import { getValidRule } from '../../../services/mongodb-atlas/utils'
+import { evaluateExpression } from '../helpers'
 import { Role } from '../interface'
 import { LogMachineInfoParams } from './interface'
 
@@ -28,6 +29,20 @@ export const getWinningRole = (
   return null
 }
 
+export const getWinningRoleAsync = async (
+  document: OptionalId<Document> | null,
+  user: User,
+  roles: Role[] = []
+): Promise<Role | null> => {
+  if (!roles.length) return null
+  for (const role of roles) {
+    if (await checkApplyWhenAsync(role.apply_when, user, document)) {
+      return role
+    }
+  }
+  return null
+}
+
 /**
  * Checks if the `apply_when` condition is valid for the given user and document.
  *
@@ -48,6 +63,25 @@ export const checkApplyWhen = (
     record: document
   })
   return !!validRule.length
+}
+
+export const checkApplyWhenAsync = async (
+  apply_when: Role['apply_when'],
+  user: User,
+  document: OptionalId<Document> | null
+) => {
+  return evaluateExpression(
+    {
+      type: 'read',
+      roles: [],
+      cursor: document,
+      expansions: {
+        '%%prevRoot': undefined
+      }
+    },
+    apply_when,
+    user
+  )
 }
 
 /**
