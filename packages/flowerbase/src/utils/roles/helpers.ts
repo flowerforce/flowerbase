@@ -7,6 +7,8 @@ import { PermissionExpression } from './interface'
 import { MachineContext } from './machines/interface'
 
 const functionsConditions = ['%%true', '%%false']
+const andConditions = ['$and', '%and']
+const orConditions = ['$or', '%or']
 
 const normalizeUserRole = (user?: MachineContext['user']) => {
   if (!user) return user
@@ -22,30 +24,121 @@ const normalizeUserRole = (user?: MachineContext['user']) => {
     : user
 }
 
-export const evaluateExpression = async (
+const buildEvaluationContext = (
   params: MachineContext['params'],
-  expression?: PermissionExpression,
   user?: MachineContext['user']
-): Promise<boolean> => {
-  if (!expression || typeof expression === 'boolean') return !!expression
+) => {
   const normalizedUser = normalizeUserRole(user)
 
-  const value = {
-    ...params.expansions,
-    ...params.cursor,
+  return {
+    ...(params.expansions ?? {}),
+    ...(params.cursor ?? {}),
     '%%root': params.cursor,
     '%%prevRoot': params.expansions?.['%%prevRoot'],
     '%%user': normalizedUser,
     '%%true': true,
     '%%false': false
   }
+}
+
+const getFunctionCondition = (
+  expression: unknown
+): [string, Record<string, any>] | null => {
+  if (!expression || typeof expression !== 'object' || Array.isArray(expression)) {
+    return null
+  }
+
+  const entries = Object.entries(expression as Record<string, unknown>)
+  if (entries.length !== 1) {
+    return null
+  }
+
+  const [key, value] = entries[0]
+  if (!functionsConditions.includes(key)) {
+    return null
+  }
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+
+  return Object.prototype.hasOwnProperty.call(value, '%function')
+    ? [key, value as Record<string, any>]
+    : null
+}
+
+export const evaluateExpandedExpression = async (
+  expression: unknown,
+  params: MachineContext['params'],
+  user?: MachineContext['user']
+): Promise<boolean> => {
+  if (typeof expression === 'boolean') {
+    return expression
+  }
+
+  if (!expression || typeof expression !== 'object') {
+    return Boolean(expression)
+  }
+
+  const block = expression as Record<string, unknown>
+  const functionCondition = getFunctionCondition(block)
+
+  if (functionCondition) {
+    return evaluateComplexExpression(functionCondition, params, user)
+  }
+
+  const andKey = andConditions.find((key) => Object.prototype.hasOwnProperty.call(block, key))
+  if (andKey) {
+    const conditions = Array.isArray(block[andKey]) ? (block[andKey] as unknown[]) : []
+    if (!conditions.length) return true
+
+    for (const condition of conditions) {
+      if (!(await evaluateExpandedExpression(condition, params, user))) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  const orKey = orConditions.find((key) => Object.prototype.hasOwnProperty.call(block, key))
+  if (orKey) {
+    const conditions = Array.isArray(block[orKey]) ? (block[orKey] as unknown[]) : []
+    if (!conditions.length) return true
+
+    for (const condition of conditions) {
+      if (await evaluateExpandedExpression(condition, params, user)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  const keys = Object.keys(block)
+  if (keys.length > 1) {
+    for (const key of keys) {
+      if (!(await evaluateExpandedExpression({ [key]: block[key] }, params, user))) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  return rulesMatcherUtils.checkRule(block as never, buildEvaluationContext(params, user), {})
+}
+
+export const evaluateExpression = async (
+  params: MachineContext['params'],
+  expression?: PermissionExpression,
+  user?: MachineContext['user']
+): Promise<boolean> => {
+  if (!expression || typeof expression === 'boolean') return !!expression
+
+  const value = buildEvaluationContext(params, user)
   const conditions = expandQuery(expression, value)
-  const complexCondition = Object.entries(conditions as Record<string, any>).find(
-    ([key]) => functionsConditions.includes(key)
-  )
-  return complexCondition
-    ? await evaluateComplexExpression(complexCondition, params, normalizedUser)
-    : rulesMatcherUtils.checkRule(conditions, value, {})
+  return evaluateExpandedExpression(conditions, params, user)
 }
 
 const evaluateComplexExpression = async (
@@ -74,7 +167,7 @@ const evaluateComplexExpression = async (
   const expandedArguments =
     fnArguments && fnArguments.length
       ? ((expandQuery({ args: fnArguments }, expansionContext) as { args: unknown[] })
-          .args ?? [])
+        .args ?? [])
       : [params.cursor]
 
   const response = await GenerateContext({

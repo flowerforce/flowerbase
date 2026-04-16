@@ -19,7 +19,7 @@ import {
 import { Rules } from '../../features/rules/interface'
 import { buildRulesMeta } from '../../monitoring/utils'
 import { checkValidation } from '../../utils/roles/machines'
-import { getWinningRole } from '../../utils/roles/machines/utils'
+import { getWinningRoleAsync } from '../../utils/roles/machines/utils'
 import { emitServiceEvent } from '../monitoring'
 import { CHANGESTREAM } from '../../constants'
 import {
@@ -561,9 +561,9 @@ const getOperators: GetOperatorsFunction = (
         const resolvedOptions =
           projection || normalizedOptions
             ? {
-                ...(normalizedOptions ?? {}),
-                ...(projection ? { projection } : {})
-              }
+              ...(normalizedOptions ?? {}),
+              ...(projection ? { projection } : {})
+            }
             : undefined
         const resolvedQuery = query ?? {}
         if (!run_as_system) {
@@ -604,7 +604,7 @@ const getOperators: GetOperatorsFunction = (
             return null
           }
 
-          const winningRole = getWinningRole(result, user, roles)
+          const winningRole = await getWinningRoleAsync(result, user, roles)
 
           logDebug('findOne winningRole', {
             collection: collName,
@@ -613,15 +613,15 @@ const getOperators: GetOperatorsFunction = (
           })
           const { status, document } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: 'read',
-                  roles,
-                  cursor: result,
-                  expansions: getValidationExpansions(result)
-                },
-                user
-              )
+              winningRole,
+              {
+                type: 'read',
+                roles,
+                cursor: result,
+                expansions: getValidationExpansions(result)
+              },
+              user
+            )
             : fallbackAccess(result)
 
           // Return validated document or empty object if not permitted
@@ -669,7 +669,7 @@ const getOperators: GetOperatorsFunction = (
 
           // Retrieve the document to check permissions before deleting
           const result = await collection.findOne(buildAndQuery(formattedQuery))
-          const winningRole = getWinningRole(result, user, roles)
+          const winningRole = await getWinningRoleAsync(result, user, roles)
 
           logDebug('delete winningRole', {
             collection: collName,
@@ -678,15 +678,15 @@ const getOperators: GetOperatorsFunction = (
           })
           const { status } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: 'delete',
-                  roles,
-                  cursor: result,
-                  expansions: getValidationExpansions(result)
-                },
-                user
-              )
+              winningRole,
+              {
+                type: 'delete',
+                roles,
+                cursor: result,
+                expansions: getValidationExpansions(result)
+              },
+              user
+            )
             : fallbackAccess(result)
 
           if (!status) {
@@ -733,19 +733,19 @@ const getOperators: GetOperatorsFunction = (
             collection.collectionName,
             CRUD_OPERATIONS.CREATE
           )
-          const winningRole = getWinningRole(data, user, roles)
+          const winningRole = await getWinningRoleAsync(data, user, roles)
 
           const { status, document } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: 'insert',
-                  roles,
-                  cursor: data,
-                  expansions: getValidationExpansions()
-                },
-                user
-              )
+              winningRole,
+              {
+                type: 'insert',
+                roles,
+                cursor: data,
+                expansions: getValidationExpansions()
+              },
+              user
+            )
             : fallbackAccess(data)
 
           if (!status || !isEqual(data, document)) {
@@ -823,7 +823,7 @@ const getOperators: GetOperatorsFunction = (
             throw new Error('Update not permitted')
           }
 
-          const winningRole = getWinningRole(result, user, roles)
+          const winningRole = await getWinningRoleAsync(result, user, roles)
 
           // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
           const updatedPaths = getUpdatedPaths(normalizedData)
@@ -831,15 +831,15 @@ const getOperators: GetOperatorsFunction = (
           // Validate update permissions
           const { status, document } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: 'write',
-                  roles,
-                  cursor: docToCheck,
-                  expansions: getValidationExpansions(result)
-                },
-                user
-              )
+              winningRole,
+              {
+                type: 'write',
+                roles,
+                cursor: docToCheck,
+                expansions: getValidationExpansions(result)
+              },
+              user
+            )
             : fallbackAccess(docToCheck)
           // Ensure no unauthorized changes are made
           const areDocumentsEqual = areUpdatedFieldsAllowed(
@@ -918,31 +918,31 @@ const getOperators: GetOperatorsFunction = (
           } else {
             const [computedDoc] = Array.isArray(normalizedData)
               ? await collection
-                  .aggregate([
-                    { $match: buildAndQuery(safeQuery) },
-                    { $limit: 1 },
-                    ...normalizedData
-                  ])
-                  .toArray()
+                .aggregate([
+                  { $match: buildAndQuery(safeQuery) },
+                  { $limit: 1 },
+                  ...normalizedData
+                ])
+                .toArray()
               : [applyDocumentUpdateOperators(currentDoc, normalizedData as Document)]
             docToCheck = computedDoc
           }
 
-          const winningRole = getWinningRole(docToCheck, user, roles)
+          const winningRole = await getWinningRoleAsync(docToCheck, user, roles)
 
           const { status, document } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: validationType,
-                  roles,
-                  cursor: docToCheck,
-                  expansions: getValidationExpansions(
-                    validationType === 'insert' ? undefined : currentDoc
-                  )
-                },
-                user
-              )
+              winningRole,
+              {
+                type: validationType,
+                roles,
+                cursor: docToCheck,
+                expansions: getValidationExpansions(
+                  validationType === 'insert' ? undefined : currentDoc
+                )
+              },
+              user
+            )
             : fallbackAccess(docToCheck)
 
           const areDocumentsEqual = areUpdatedFieldsAllowed(
@@ -956,28 +956,28 @@ const getOperators: GetOperatorsFunction = (
 
           const updateResult = normalizedOptions
             ? await collection.findOneAndUpdate(
-                buildAndQuery(safeQuery),
-                normalizedData,
-                normalizedOptions
-              )
+              buildAndQuery(safeQuery),
+              normalizedData,
+              normalizedOptions
+            )
             : await collection.findOneAndUpdate(buildAndQuery(safeQuery), normalizedData)
           if (!updateResult) {
             emitMongoEvent('findOneAndUpdate')
             return updateResult
           }
 
-          const readRole = getWinningRole(updateResult, user, roles)
+          const readRole = await getWinningRoleAsync(updateResult, user, roles)
           const readResult = readRole
             ? await checkValidation(
-                readRole,
-                {
-                  type: 'read',
-                  roles,
-                  cursor: updateResult,
-                  expansions: getValidationExpansions(updateResult)
-                },
-                user
-              )
+              readRole,
+              {
+                type: 'read',
+                roles,
+                cursor: updateResult,
+                expansions: getValidationExpansions(updateResult)
+              },
+              user
+            )
             : fallbackAccess(updateResult)
 
           const sanitizedDoc = readResult.status
@@ -1026,9 +1026,9 @@ const getOperators: GetOperatorsFunction = (
         const resolvedOptions =
           projection || normalizedOptions
             ? {
-                ...(normalizedOptions ?? {}),
-                ...(projection ? { projection } : {})
-              }
+              ...(normalizedOptions ?? {}),
+              ...(projection ? { projection } : {})
+            }
             : undefined
         if (!run_as_system) {
           checkDenyOperation(
@@ -1053,7 +1053,7 @@ const getOperators: GetOperatorsFunction = (
 
             const filteredResponse = await Promise.all(
               response.map(async (currentDoc) => {
-                const winningRole = getWinningRole(currentDoc, user, roles)
+                const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
                 logDebug('find winningRole', {
                   collection: collName,
@@ -1063,15 +1063,15 @@ const getOperators: GetOperatorsFunction = (
                 })
                 const { status, document } = winningRole
                   ? await checkValidation(
-                      winningRole,
-                      {
-                        type: 'read',
-                        roles,
-                        cursor: currentDoc,
-                        expansions: getValidationExpansions(currentDoc)
-                      },
-                      user
-                    )
+                    winningRole,
+                    {
+                      type: 'read',
+                      roles,
+                      cursor: currentDoc,
+                      expansions: getValidationExpansions(currentDoc)
+                    },
+                    user
+                  )
                   : fallbackAccess(currentDoc)
 
                 return status ? document : undefined
@@ -1190,19 +1190,19 @@ const getOperators: GetOperatorsFunction = (
           const allowDeleteBypass = watchPipelineRequestsDelete(requestedPipeline)
           const firstStep = watchFormattedQuery.length
             ? {
-                $match: allowDeleteBypass
-                  ? {
-                      $or: [
-                        {
-                          $and: watchFormattedQuery
-                        },
-                        { operationType: 'delete' }
-                      ]
-                    }
-                  : {
+              $match: allowDeleteBypass
+                ? {
+                  $or: [
+                    {
                       $and: watchFormattedQuery
-                    }
-              }
+                    },
+                    { operationType: 'delete' }
+                  ]
+                }
+                : {
+                  $and: watchFormattedQuery
+                }
+            }
             : undefined
 
           const formattedPipeline = [firstStep, ...requestedPipeline].filter(
@@ -1221,33 +1221,33 @@ const getOperators: GetOperatorsFunction = (
           const isValidChange = async (change: Document) => {
             const { fullDocument, updateDescription } = change
             const hasFullDocument = !!fullDocument
-            const winningRole = getWinningRole(fullDocument, user, roles)
+            const winningRole = await getWinningRoleAsync(fullDocument, user, roles)
 
             const fullDocumentValidation = winningRole
               ? await checkValidation(
-                  winningRole,
-                  {
-                    type: 'read',
-                    roles,
-                    cursor: fullDocument,
-                    expansions: getValidationExpansions(fullDocument)
-                  },
-                  user
-                )
+                winningRole,
+                {
+                  type: 'read',
+                  roles,
+                  cursor: fullDocument,
+                  expansions: getValidationExpansions(fullDocument)
+                },
+                user
+              )
               : fallbackAccess(fullDocument)
             const { status, document } = fullDocumentValidation
 
             const { status: updatedFieldsStatus, document: updatedFields } = winningRole
               ? await checkValidation(
-                  winningRole,
-                  {
-                    type: 'read',
-                    roles,
-                    cursor: updateDescription?.updatedFields,
-                    expansions: getValidationExpansions(fullDocument)
-                  },
-                  user
-                )
+                winningRole,
+                {
+                  type: 'read',
+                  roles,
+                  cursor: updateDescription?.updatedFields,
+                  expansions: getValidationExpansions(fullDocument)
+                },
+                user
+              )
               : fallbackAccess(updateDescription?.updatedFields)
 
             return {
@@ -1389,19 +1389,19 @@ const getOperators: GetOperatorsFunction = (
           // Validate each document against user's roles
           const filteredItems = await Promise.all(
             documents.map(async (currentDoc) => {
-              const winningRole = getWinningRole(currentDoc, user, roles)
+              const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
               const { status, document } = winningRole
                 ? await checkValidation(
-                    winningRole,
-                    {
-                      type: 'insert',
-                      roles,
-                      cursor: currentDoc,
-                      expansions: getValidationExpansions()
-                    },
-                    user
-                  )
+                  winningRole,
+                  {
+                    type: 'insert',
+                    roles,
+                    cursor: currentDoc,
+                    expansions: getValidationExpansions()
+                  },
+                  user
+                )
                 : fallbackAccess(currentDoc)
 
               return status ? document : undefined
@@ -1453,19 +1453,19 @@ const getOperators: GetOperatorsFunction = (
 
           const filteredItems = await Promise.all(
             docsToCheck.map(async (currentDoc, index) => {
-              const winningRole = getWinningRole(currentDoc, user, roles)
+              const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
               const { status, document } = winningRole
                 ? await checkValidation(
-                    winningRole,
-                    {
-                      type: 'write',
-                      roles,
-                      cursor: currentDoc,
-                      expansions: getValidationExpansions(result[index])
-                    },
-                    user
-                  )
+                  winningRole,
+                  {
+                    type: 'write',
+                    roles,
+                    cursor: currentDoc,
+                    expansions: getValidationExpansions(result[index])
+                  },
+                  user
+                )
                 : fallbackAccess(currentDoc)
 
               return status ? document : undefined
@@ -1529,19 +1529,19 @@ const getOperators: GetOperatorsFunction = (
           // Filter and validate each document based on user's roles
           const filteredItems = await Promise.all(
             data.map(async (currentDoc) => {
-              const winningRole = getWinningRole(currentDoc, user, roles)
+              const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
               const { status, document } = winningRole
                 ? await checkValidation(
-                    winningRole,
-                    {
-                      type: 'delete',
-                      roles,
-                      cursor: currentDoc,
-                      expansions: getValidationExpansions(currentDoc)
-                    },
-                    user
-                  )
+                  winningRole,
+                  {
+                    type: 'delete',
+                    roles,
+                    cursor: currentDoc,
+                    expansions: getValidationExpansions(currentDoc)
+                  },
+                  user
+                )
                 : fallbackAccess(currentDoc)
 
               return status ? document : undefined
