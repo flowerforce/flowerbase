@@ -1,0 +1,29 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "inventory",
+  "filters": [
+    {
+      "name": "ownerScope",
+      "apply_when": {},
+      "query": {
+        "ownerId": "%%user.id"
+      },
+      "projection": {
+        "item": 1,
+        "status": 1,
+        "instock.qty": 1
+      }
+    }
+  ],
+  "roles": [
+    {
+      "name": "inventoryOwner",
+      "apply_when": {},
+      "insert": true,
+      "delete": true,
+      "search": true,
+      "read": true,
+      "write": true
+    }
+  ]
+}
