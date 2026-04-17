@@ -63,6 +63,12 @@ Install the `@flowerforce/flowerbase` library, which provides the tools required
 npm install @flowerforce/flowerbase
 ```
 
+If you want to use Redis as cache provider, install `redis` in your application too:
+
+```bash
+npm install redis
+```
+
 Add Typescript
 
 ```bash
@@ -122,6 +128,58 @@ initialize({
 ```
 
 This initializes the Flowerbase integration, connecting your application to MongoDB Atlas.
+
+### 🧠 Optional Cache Configuration
+
+Flowerbase can cache server-side Mongo reads and invalidate them automatically after writes.
+
+Supported providers:
+
+- `memory`: in-process cache, useful for local development or single-instance deployments
+- `redis`: shared cache for multi-instance deployments
+
+The cache is configured during `initialize()` and is applied to idempotent read operations exposed by the `mongodb-atlas` service. Invalidation is scoped to the current authorization context, so a successful write clears cached reads only for the same `database + collection + runAsSystem + filters` context.
+
+#### Memory cache
+
+```ts
+import { initialize } from '@flowerforce/flowerbase';
+
+initialize({
+  projectId: 'my-project-id',
+  mongodbUrl: process.env.MONGODB_URL,
+  jwtSecret: process.env.JWT_SECRET,
+  cache: {
+    provider: 'memory',
+    defaultTtlSeconds: 60,
+    maxEntries: 1000
+  }
+})
+```
+
+#### Redis cache
+
+```ts
+import { initialize } from '@flowerforce/flowerbase';
+
+initialize({
+  projectId: 'my-project-id',
+  mongodbUrl: process.env.MONGODB_URL,
+  jwtSecret: process.env.JWT_SECRET,
+  cache: {
+    provider: 'redis',
+    url: process.env.REDIS_URL!,
+    defaultTtlSeconds: 300
+  }
+})
+```
+
+Cache notes:
+
+- no cache provider is enabled by default
+- Redis does not fall back to memory automatically
+- reads executed with a Mongo session are not cached
+- the memory provider supports `maxEntries` and evicts the least recently used entry when the limit is reached
 
 ## 🛠️ 5. Server Configuration – Authentication, Rules, and Functions
 After setting up the base Flowerbase integration, you can now configure advanced features to control how your backend behaves.

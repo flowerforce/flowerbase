@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import Fastify from 'fastify'
+import { CacheConfig, createCacheProvider } from './cache'
 import { DEFAULT_CONFIG } from './constants'
 import { generateEndpoints } from './features/endpoints'
 import { loadEndpoints } from './features/endpoints/utils'
@@ -33,6 +34,7 @@ export type InitializeConfig = {
   corsConfig?: CorsConfig
   basePath?: string
   mongodbEncryptionConfig?: MongoDbEncryptionConfig
+  cache?: CacheConfig
 }
 
 /**
@@ -51,7 +53,8 @@ export async function initialize({
   mongodbUrl = DEFAULT_CONFIG.MONGODB_URL,
   corsConfig = DEFAULT_CONFIG.CORS_OPTIONS,
   basePath,
-  mongodbEncryptionConfig
+  mongodbEncryptionConfig,
+  cache: cacheConfig
 }: InitializeConfig) {
   if (!jwtSecret || jwtSecret.trim().length === 0) {
     throw new Error('JWT secret missing: set JWT_SECRET or pass jwtSecret to initialize()')
@@ -61,6 +64,7 @@ export async function initialize({
   const fastify = Fastify({
     logger: !!DEFAULT_CONFIG.ENABLE_LOGGER
   })
+  const cache = await createCacheProvider(cacheConfig)
 
   const isTest = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined
   const logInfo = (...args: unknown[]) => {
@@ -90,6 +94,7 @@ export async function initialize({
     endpoints: endpointsList,
     rules: rulesList,
     projectId,
+    cache,
     app: fastify,
     services
   }
@@ -153,6 +158,10 @@ export async function initialize({
     })
   }
 
+  fastify.addHook('onClose', async () => {
+    await cache.close()
+  })
+
   await registerPlugins({
     register: fastify.register,
     mongodbUrl,
@@ -178,3 +187,5 @@ export async function initialize({
 
   fastify.log.info(`[${projectId}] Server listening on port ${port}`)
 }
+
+export type { CacheConfig }
