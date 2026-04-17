@@ -1,9 +1,11 @@
+import fs from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import vm from 'vm'
 import { EJSON } from 'bson'
 import { StateManager } from '../../state'
+import { Function as AppFunction } from '../../features/functions/interface'
 import { generateContextData } from './helpers'
 import { GenerateContextParams } from './interface'
 
@@ -92,6 +94,42 @@ const wrapEsmModule = (code: string): string => {
   return `${prelude}\n${code}\n${trailer}`
 }
 
+const transpileSandboxModule = (code: string): string => {
+  const exportedNames: string[] = []
+  let transformed = code.includes('import ')
+    ? transformImportsToRequire(code)
+    : code
+
+  transformed = transformed.replace(
+    /^\s*export\s+function\s+([A-Za-z_$][\w$]*)\s*\(/gm,
+    (_match, name: string) => {
+      exportedNames.push(name)
+      return `function ${name}(`
+    }
+  )
+
+  transformed = transformed.replace(
+    /^\s*export\s+(const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm,
+    (_match, kind: string, name: string) => {
+      exportedNames.push(name)
+      return `${kind} ${name}`
+    }
+  )
+
+  transformed = transformed.replace(
+    /^\s*export\s+default\s+/gm,
+    'module.exports = '
+  )
+
+  if (exportedNames.length === 0) {
+    return transformed
+  }
+
+  return `${transformed}\n${[...new Set(exportedNames)]
+    .map((name) => `exports.${name} = ${name}`)
+    .join('\n')}`
+}
+
 const resolveImportTarget = (specifier: string, customRequire: NodeRequire): string => {
   try {
     const resolved = customRequire.resolve(specifier)
@@ -123,6 +161,82 @@ type SandboxContext = vm.Context & {
   __fb_dirname?: string
 }
 
+type SandboxExecutionContext = ReturnType<typeof generateContextData>
+
+const resolveModulePath = (specifier: string, parentFile: string): string | undefined => {
+  const parentDir = path.dirname(parentFile)
+  const basePath = path.resolve(parentDir, specifier)
+  const candidates = [
+    basePath,
+    `${basePath}.js`,
+    `${basePath}.ts`,
+    path.join(basePath, 'index.js'),
+    path.join(basePath, 'index.ts')
+  ]
+
+  return candidates.find((candidate) => {
+    try {
+      return fs.statSync(candidate).isFile()
+    } catch {
+      return false
+    }
+  })
+}
+
+const executeSandboxModule = ({
+  code,
+  contextData,
+  filePath,
+  moduleCache
+}: {
+  code: string
+  contextData: SandboxExecutionContext
+  filePath: string
+  moduleCache: Map<string, unknown>
+}): unknown => {
+  if (moduleCache.has(filePath)) {
+    return moduleCache.get(filePath)
+  }
+
+  const sandboxModule: SandboxModule = { exports: {} }
+  moduleCache.set(filePath, sandboxModule.exports)
+  const baseRequire = createRequire(filePath)
+
+  const localRequire = ((specifier: string) => {
+    if (specifier.startsWith('.') || specifier.startsWith('/')) {
+      const resolvedPath = resolveModulePath(specifier, filePath)
+      if (resolvedPath) {
+        return executeSandboxModule({
+          code: fs.readFileSync(resolvedPath, 'utf-8'),
+          contextData,
+          filePath: resolvedPath,
+          moduleCache
+        })
+      }
+    }
+
+    return baseRequire(specifier)
+  }) as NodeRequire
+
+  const vmContext = vm.createContext({
+    ...contextData,
+    require: localRequire,
+    exports: sandboxModule.exports,
+    module: sandboxModule,
+    __filename: filePath,
+    __dirname: path.dirname(filePath),
+    __fb_require: localRequire,
+    __fb_filename: filePath,
+    __fb_dirname: path.dirname(filePath)
+  }) as SandboxContext
+
+  vm.runInContext(transpileSandboxModule(code), vmContext, { filename: filePath })
+  sandboxModule.exports = resolveExport(vmContext) ?? sandboxModule.exports
+  moduleCache.set(filePath, sandboxModule.exports)
+
+  return sandboxModule.exports
+}
+
 const isExportedFunction = (value: unknown): value is ExportedFunction =>
   typeof value === 'function'
 
@@ -141,10 +255,28 @@ const resolveExport = (ctx: SandboxContext): ExportedFunction | undefined => {
   return getDefaultExport(moduleExports) ?? getDefaultExport(contextExports)
 }
 
-const buildVmContext = (contextData: ReturnType<typeof generateContextData>) => {
+const buildVmContext = (
+  contextData: ReturnType<typeof generateContextData>,
+  currentFunction?: AppFunction
+) => {
   const sandboxModule: SandboxModule = { exports: {} }
-  const entryFile = require.main?.filename ?? process.cwd()
-  const customRequire = createRequire(entryFile)
+  const entryFile = currentFunction?.sourcePath ?? require.main?.filename ?? process.cwd()
+  const moduleCache = new Map<string, unknown>()
+  const customRequire = ((specifier: string) => {
+    if ((specifier.startsWith('.') || specifier.startsWith('/')) && currentFunction?.sourcePath) {
+      const resolvedPath = resolveModulePath(specifier, currentFunction.sourcePath)
+      if (resolvedPath) {
+        return executeSandboxModule({
+          code: fs.readFileSync(resolvedPath, 'utf-8'),
+          contextData,
+          filePath: resolvedPath,
+          moduleCache
+        })
+      }
+    }
+
+    return createRequire(entryFile)(specifier)
+  }) as NodeRequire
 
   const vmContext: SandboxContext = vm.createContext({
     ...contextData,
@@ -206,7 +338,10 @@ export async function GenerateContext({
       GenerateContextSync,
       request
     })
-    const { sandboxModule, entryFile, customRequire, vmContext } = buildVmContext(contextData)
+    const { sandboxModule, entryFile, customRequire, vmContext } = buildVmContext(
+      contextData,
+      functionToRun
+    )
 
     const vmModules = vm as typeof vm & {
       SourceTextModule?: typeof vm.SourceTextModule
@@ -271,10 +406,7 @@ export async function GenerateContext({
     }
 
     if (!usedVmModules) {
-      const codeToRun = functionToRun.code.includes('import ')
-        ? transformImportsToRequire(functionToRun.code)
-        : functionToRun.code
-      vm.runInContext(codeToRun, vmContext)
+      vm.runInContext(transpileSandboxModule(functionToRun.code), vmContext, { filename: entryFile })
     }
 
     sandboxModule.exports = resolveExport(vmContext) ?? sandboxModule.exports
@@ -323,12 +455,9 @@ export function GenerateContextSync({
     GenerateContextSync,
     request
   })
-  const { sandboxModule, vmContext } = buildVmContext(contextData)
-  const codeToRun = functionToRun.code.includes('import ')
-    ? transformImportsToRequire(functionToRun.code)
-    : functionToRun.code
+  const { sandboxModule, entryFile, vmContext } = buildVmContext(contextData, functionToRun)
 
-  vm.runInContext(codeToRun, vmContext)
+  vm.runInContext(transpileSandboxModule(functionToRun.code), vmContext, { filename: entryFile })
   sandboxModule.exports = resolveExport(vmContext) ?? sandboxModule.exports
   const fn = sandboxModule.exports as ExportedFunction
   if (deserializeArgs) {
