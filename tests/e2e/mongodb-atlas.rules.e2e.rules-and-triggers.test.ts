@@ -197,16 +197,16 @@ const callServiceOperation = async ({
 }: {
   collection: string
   method:
-    | 'find'
-    | 'findOne'
-    | 'count'
-    | 'countDocuments'
-    | 'findOneAndUpdate'
-    | 'deleteOne'
-    | 'deleteMany'
-    | 'insertOne'
-    | 'updateOne'
-    | 'aggregate'
+  | 'find'
+  | 'findOne'
+  | 'count'
+  | 'countDocuments'
+  | 'findOneAndUpdate'
+  | 'deleteOne'
+  | 'deleteMany'
+  | 'insertOne'
+  | 'updateOne'
+  | 'aggregate'
   user: TestUser | null
   query?: Document
   filter?: Document
@@ -1383,9 +1383,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const summary = (await getTodosCollection(ownerUser)
       .aggregate(pipeline)
       .toArray()) as Array<{
-      _id: string
-      count: number
-    }>
+        _id: string
+        count: number
+      }>
 
     expect(summary).toHaveLength(1)
     expect(summary[0]).toEqual({ _id: ownerUser.id, count: 2 })
