@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "main": "expo/AppEntry",
   "scripts": {
@@ -12,7 +12,7 @@
     "test:e2e": "jest --config jest.e2e.config.cjs --runInBand"
   },
   "dependencies": {
-    "@flowerforce/flowerbase-client": "0.3.1",
+    "@flowerforce/flowerbase-client": "0.3.2",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "expo": "~55.0.7",
     "expo-status-bar": "~55.0.4",

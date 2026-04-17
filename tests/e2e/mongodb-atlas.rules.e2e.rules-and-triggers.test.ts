@@ -23,6 +23,7 @@ const ACTIVITIES_COLLECTION = 'activities'
 const COUNTERS_COLLECTION = 'counters'
 const UPLOADS_COLLECTION = 'uploads'
 const INSERT_ONLY_COLLECTION = 'insertOnlyDocs'
+const APP_SETTINGS_COLLECTION = 'app_settings'
 const INTERNAL_CONTACTS_COLLECTION = 'internalContacts'
 const INTERNAL_READ_CONTACTS_COLLECTION = 'internalReadContacts'
 const TRIGGER_ITEMS_INSERT_COLLECTION = 'trigger_items_insert'
@@ -100,6 +101,9 @@ const counterIds = {
 const uploadIds = {
   owner: new ObjectId('000000000000000000000301'),
   guest: new ObjectId('000000000000000000000302')
+}
+const appSettingsIds = {
+  ownerGeneral: new ObjectId('000000000000000000000501')
 }
 const authUserIds = {
   owner: new ObjectId('000000000000000000000090'),
@@ -282,8 +286,8 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
     callServiceOperation({ collection, method: 'countDocuments', user, query, options }),
   insertOne: (document: Document) =>
     callServiceOperation({ collection, method: 'insertOne', user, document }),
-  updateOne: (query: Document, update: Document) =>
-    callServiceOperation({ collection, method: 'updateOne', user, query, update }),
+  updateOne: (query: Document, update: Document, options?: Document) =>
+    callServiceOperation({ collection, method: 'updateOne', user, query, update, options }),
   findOneAndUpdate: (query: Document, update: Document) =>
     callServiceOperation({ collection, method: 'findOneAndUpdate', user, query, update }),
   deleteOne: (query: Document, options?: Document) =>
@@ -318,6 +322,8 @@ const getUploadsCollection = (user: TestUser | null) =>
   createCollectionProxy(UPLOADS_COLLECTION, user)
 const getInsertOnlyCollection = (user: TestUser | null) =>
   createCollectionProxy(INSERT_ONLY_COLLECTION, user)
+const getAppSettingsCollection = (user: TestUser | null) =>
+  createCollectionProxy(APP_SETTINGS_COLLECTION, user)
 const getInternalContactsCollection = (user: TestUser | null) =>
   createCollectionProxy(INTERNAL_CONTACTS_COLLECTION, user)
 const getInternalReadContactsCollection = (user: TestUser | null) =>
@@ -393,6 +399,13 @@ type UploadDoc = Document & {
   publisher: string
   status: string
 }
+type AppSettingsDoc = Document & {
+  scope: string
+  ownerUserId?: string
+  updatedAt?: string
+  createdAt?: string
+  locale?: string
+}
 
 let client: MongoClient
 let appInstance: FastifyInstance | undefined
@@ -413,6 +426,7 @@ const resetCollections = async () => {
     db.collection(COUNTERS_COLLECTION).deleteMany({}),
     db.collection(UPLOADS_COLLECTION).deleteMany({}),
     db.collection(INSERT_ONLY_COLLECTION).deleteMany({}),
+    db.collection(APP_SETTINGS_COLLECTION).deleteMany({}),
     db.collection(INTERNAL_CONTACTS_COLLECTION).deleteMany({}),
     db.collection(INTERNAL_READ_CONTACTS_COLLECTION).deleteMany({}),
     db.collection(AUTH_USERS_COLLECTION).deleteMany({}),
@@ -641,6 +655,17 @@ const resetCollections = async () => {
       _id: uploadIds.guest,
       publisher: guestUser.custom_data?.key,
       status: 'pending'
+    }
+  ])
+
+  await db.collection(APP_SETTINGS_COLLECTION).insertMany([
+    {
+      _id: appSettingsIds.ownerGeneral,
+      scope: 'workspace',
+      ownerUserId: ownerUser.id,
+      locale: 'it-IT',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z'
     }
   ])
 
@@ -1512,6 +1537,70 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
         { $set: { title: 'blocked update' } }
       )
     ).rejects.toThrow('Update not permitted')
+  })
+
+  it('allows admin updateOne upsert with ownerUserId scoped filters in app_settings', async () => {
+    const ownerFilter = {
+      scope: 'workspace',
+      ownerUserId: ownerUser.id
+    }
+    const ownerSetValues = {
+      ownerUserId: ownerUser.id,
+      locale: 'en-US',
+      updatedAt: '2026-04-02T10:00:00.000Z'
+    }
+
+    const updateExistingResult = await getAppSettingsCollection(adminUser).updateOne(
+      ownerFilter,
+      {
+        $set: ownerSetValues,
+        $setOnInsert: {
+          scope: 'workspace',
+          createdAt: '2026-04-02T09:59:00.000Z'
+        }
+      },
+      { upsert: true }
+    )
+
+    expect(updateExistingResult.matchedCount).toBe(1)
+
+    const updatedOwnerSettings = (await getAppSettingsCollection(adminUser).findOne(
+      ownerFilter
+    )) as AppSettingsDoc | null
+    expect(updatedOwnerSettings?.locale).toBe('en-US')
+    expect(updatedOwnerSettings?.ownerUserId).toBe(ownerUser.id)
+    expect(updatedOwnerSettings?.createdAt).toBe('2026-01-01T00:00:00.000Z')
+
+    const guestFilter = {
+      scope: 'workspace',
+      ownerUserId: guestUser.id
+    }
+    const guestSetValues = {
+      ownerUserId: guestUser.id,
+      locale: 'fr-FR',
+      updatedAt: '2026-04-02T10:05:00.000Z'
+    }
+
+    const upsertInsertResult = await getAppSettingsCollection(adminUser).updateOne(
+      guestFilter,
+      {
+        $set: guestSetValues,
+        $setOnInsert: {
+          scope: 'workspace',
+          createdAt: '2026-04-02T10:04:00.000Z'
+        }
+      },
+      { upsert: true }
+    )
+
+    expect(upsertInsertResult.upsertedCount).toBe(1)
+
+    const upsertedGuestSettings = (await getAppSettingsCollection(adminUser).findOne(
+      guestFilter
+    )) as AppSettingsDoc | null
+    expect(upsertedGuestSettings?.locale).toBe('fr-FR')
+    expect(upsertedGuestSettings?.ownerUserId).toBe(guestUser.id)
+    expect(upsertedGuestSettings?.createdAt).toBe('2026-04-02T10:04:00.000Z')
   })
 
   it('respects workspace/visibility filters for activities', async () => {

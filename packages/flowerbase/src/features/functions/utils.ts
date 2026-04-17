@@ -122,7 +122,12 @@ export const executeQuery = async ({
       (currentMethod as ReturnType<GetOperatorsFunction>['insertOne'])(
         EJSON.deserialize(document)
       ),
-    updateOne: () => currentMethod(EJSON.deserialize(resolvedQuery), EJSON.deserialize(resolvedUpdate)),
+    updateOne: () =>
+      (currentMethod as ReturnType<GetOperatorsFunction>['updateOne'])(
+        EJSON.deserialize(resolvedQuery),
+        EJSON.deserialize(resolvedUpdate),
+        parsedOptions
+      ),
     findOneAndUpdate: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['findOneAndUpdate'])(
         EJSON.deserialize(resolvedQuery),

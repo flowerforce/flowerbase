@@ -9,7 +9,8 @@ const {
   getPath,
   forceNumber,
   getDefaultStringValue,
-  getTypeOf
+  getTypeOf,
+  checkRule
 } = rulesMatcherUtils
 
 describe('rulesMatcherUtils', () => {
@@ -63,5 +64,34 @@ describe('rulesMatcherUtils', () => {
     expect(getPath('data.name')).toBe('data.name')
     expect(getPath('^data.name')).toBe('data.name')
     expect(getPath('$data.name')).toBe('$data.name')
+  })
+
+  it('evaluates plain objects with multiple keys as AND conditions', () => {
+    const data = {
+      '%%root': { accountId: 'acc-1' },
+      '%%user': { custom_data: { accountId: 'acc-1', role: 'admin' } }
+    }
+
+    expect(
+      checkRule(
+        {
+          '%%root.accountId': '$ref:%%user.custom_data.accountId',
+          '%%user.custom_data.role': 'admin'
+        } as any,
+        data,
+        {}
+      )
+    ).toBe(true)
+
+    expect(
+      checkRule(
+        {
+          '%%root.accountId': '$ref:%%user.custom_data.accountId',
+          '%%user.custom_data.role': 'staff'
+        } as any,
+        data,
+        {}
+      )
+    ).toBe(false)
   })
 })

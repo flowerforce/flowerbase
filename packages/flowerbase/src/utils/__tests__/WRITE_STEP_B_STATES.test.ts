@@ -77,9 +77,9 @@ describe('WRITE STEP_B_STATES', () => {
     expect(endValidation).toHaveBeenCalledWith({ success: false })
   })
 
-  it('routes to insert check when write=true', async () => {
+  it('ends validation when write=true on update requests', async () => {
     ;(evaluateTopLevelPermissionsFn as jest.Mock).mockResolvedValueOnce(true)
-    const context = {} as MachineContext
+    const context = { params: { type: 'write' } } as MachineContext
     await evaluateTopLevelWrite({
       context,
       endValidation,
@@ -87,13 +87,12 @@ describe('WRITE STEP_B_STATES', () => {
       next,
       initialStep: null
     })
-    expect(next).toHaveBeenCalledWith('evaluateTopLevelInsert')
+    expect(endValidation).toHaveBeenCalledWith({ success: true })
   })
 
-  it('routes to insert check when write=true and field-level rules exist', async () => {
+  it('routes to insert check when write=true on insert requests', async () => {
     ;(evaluateTopLevelPermissionsFn as jest.Mock).mockResolvedValueOnce(true)
-    ;(checkFieldsPropertyExists as jest.Mock).mockReturnValue(true)
-    const context = {} as MachineContext
+    const context = { params: { type: 'insert' } } as MachineContext
     await evaluateTopLevelWrite({
       context,
       endValidation,

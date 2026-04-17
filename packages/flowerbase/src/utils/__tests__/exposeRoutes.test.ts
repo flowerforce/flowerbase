@@ -38,7 +38,10 @@ describe('exposeRoutes', () => {
     const appId = 'it'
     const response = await config.app!.inject({
       method: 'GET',
-      url: `${API_VERSION}/app/${appId}/location`
+      url: `${API_VERSION}/app/${appId}/location`,
+      headers: {
+        host: 'localhost:3000'
+      }
     })
 
     expect(response.statusCode).toBe(200)
@@ -47,6 +50,28 @@ describe('exposeRoutes', () => {
       location: 'IE',
       hostname: 'http://localhost:3000',
       ws_hostname: 'wss://localhost:3000'
+    })
+  })
+
+  it('GET location should prioritize forwarded host and port', async () => {
+    const appId = 'it'
+    const response = await config.app!.inject({
+      method: 'GET',
+      url: `${API_VERSION}/app/${appId}/location`,
+      headers: {
+        host: 'internal-flowerbase:3000',
+        'x-forwarded-proto': 'https',
+        'x-forwarded-host': 'api.example.com',
+        'x-forwarded-port': '8443'
+      }
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(JSON.parse(response.body)).toEqual({
+      deployment_model: 'LOCAL',
+      location: 'IE',
+      hostname: 'https://api.example.com:8443',
+      ws_hostname: 'wss://api.example.com:8443'
     })
   })
 

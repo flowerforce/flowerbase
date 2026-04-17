@@ -542,6 +542,7 @@ Ensure the following environment variables are set in your .env file or deployme
 | `PORT`                 | The port on which the server will run.                                      | `3000`                                             |
 | `MONGODB_URL`          | MongoDB connection URI, including username, password, and database name.    | `mongodb+srv://user:pass@cluster.mongodb.net/mydb` |
 | `JWT_SECRET`           | Secret used to sign and verify JWT tokens (choose a strong secret).         | `supersecretkey123!`                               |
+| `FUNCTION_CALL_BODY_LIMIT_BYTES` | Max request body size in bytes for `POST /api/client/<version>/app/:appId/functions/call`. | `52428800` |
 | `HOST`                 | The host address the server binds to (usually `0.0.0.0` for public access). | `0.0.0.0`                                          |
 | `API_VERSION`          | API version used in client base path.                                       | `v2.0`                                             |
 | `HTTPS_SCHEMA`         | The schema for your server requests (usually `https` or `http`).            | `http`                                             |
@@ -576,6 +577,7 @@ PROJECT_ID=your-project-id
 PORT=3000
 MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/dbname
 JWT_SECRET=your-jwt-secret
+FUNCTION_CALL_BODY_LIMIT_BYTES=52428800
 HOST=0.0.0.0
 API_VERSION=v2.0
 HTTPS_SCHEMA=http
@@ -613,6 +615,45 @@ MONIT_ALLOW_EDIT=true
 - If `MONIT_ALLOWED_IPS` is set, only those IPs can reach `/monit` (ensure `req.ip` reflects your proxy setup / `trustProxy`).
 - You can disable **invoke** or **edit** with `MONIT_ALLOW_INVOKE=false` and/or `MONIT_ALLOW_EDIT=false`.
 
+### 🔐 Reverse Proxy and SSL Termination
+
+When Flowerbase runs behind Nginx or HAProxy with SSL termination, make sure the proxy forwards the public scheme/host/port headers.
+
+Flowerbase uses these headers for `GET /api/client/<version>/app/:appId/location`, and Realm-style clients use that response to build auth URLs (including `/login`).
+
+- Header priority for host and scheme is: `Forwarded` first, then `X-Forwarded-*`, then `Host`.
+- If `X-Forwarded-Port` is set and host has no explicit port, Flowerbase appends it.
+
+#### Nginx
+
+```nginx
+location / {
+  proxy_pass http://flowerbase_upstream;
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-Host $http_host;
+  proxy_set_header X-Forwarded-Port $server_port;
+}
+```
+
+#### HAProxy
+
+```haproxy
+frontend fe_https
+  bind *:443 ssl crt /etc/haproxy/certs/site.pem
+  mode http
+  default_backend be_flowerbase
+
+backend be_flowerbase
+  mode http
+  server app1 127.0.0.1:3000 check
+  http-request set-header Host %[req.hdr(host)]
+  http-request set-header X-Forwarded-Proto https if { ssl_fc }
+  http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
+  http-request set-header X-Forwarded-Host %[req.hdr(host)]
+  http-request set-header X-Forwarded-Port %[dst_port]
+```
+
 
 <a id="build"></a>
 ## 🚀 Build & Deploy the Server
@@ -633,35 +674,80 @@ Once deployed, you'll receive a public URL (e.g. https://your-app-name.up.exampl
 
 >This URL should be used as the base URL in your frontend application, as explained in the next section.
 
-## 🌐 Frontend Setup – Realm SDK in React (Example)
+## 🌐 Frontend Setup – `@flowerforce/flowerbase-client` (Recommended)
 
-You can use the official `realm-web` SDK to integrate MongoDB Realm into a React application.
-This serves as a sample setup — similar logic can be applied using other official Realm SDKs **(e.g. React Native, Node, or Flutter)**.
-
-### 📦 Install Realm SDK
+For frontend and mobile projects, you can use the dedicated Flowerbase client:
 
 ```bash
-npm install realm-web
+npm install @flowerforce/flowerbase-client
 ```
 
-### ⚙️ Configure Realm in React
-
-Create a file to initialize and export the Realm App instance:
+### ⚙️ Configure client app
 
 ```ts
-// src/realm/realmApp.ts
+import { App, Credentials } from '@flowerforce/flowerbase-client'
 
-import * as Realm from "realm-web";
+const app = new App({
+  id: 'your-app-id',
+  baseUrl: 'https://your-deployed-backend-url.com',
+  timeout: 10000
+})
 
-// Replace with your actual Realm App ID and your deployed backend URL
-const app = new Realm.App({
-  id: "your-realm-app-id", // e.g., my-app-abcde
-  baseUrl: "https://your-deployed-backend-url.com" // e.g., https://your-app-name.up.example.app
-});
-
-export default app;
-
+await app.logIn(Credentials.emailPassword('user@example.com', 'secret'))
 ```
 
->🔗 The baseUrl should point to the backend URL you deployed earlier using Flowerbase.
-This tells the frontend SDK where to send authentication and data requests.
+### 📦 Common client operations
+
+```ts
+const user = app.currentUser
+if (!user) throw new Error('User not logged in')
+
+const profile = await user.functions.getProfile()
+
+const todos = user.mongoClient('mongodb-atlas')
+  .db('my-db')
+  .collection('todos')
+
+await todos.insertOne({ title: 'Ship docs update', done: false })
+const openTodos = await todos.find({ done: false })
+```
+
+`@flowerforce/flowerbase-client` supports:
+- local-userpass / anon-user / custom-function authentication
+- function calls (`user.functions.<name>(...)`)
+- MongoDB operations via `user.mongoClient('mongodb-atlas')`
+- change streams with `watch()` async iterator
+- BSON/EJSON interoperability (`ObjectId`, `Date`, etc.)
+
+## 💡 Use Cases by Feature
+
+### 🔐 Authentication
+- Registration and login flows for SaaS dashboards using `local-userpass`.
+- Guest sessions for trial users with `anon-user`, then account upgrade with full registration.
+- Delegated enterprise login with `custom-function` auth when credentials must be validated by external identity logic.
+
+### 🔒 Rules
+- Multi-tenant isolation where each user can only read/write documents of their own workspace.
+- Field-level protection to hide private fields (for example billing or internal notes) from non-admin users.
+
+### ⚙️ Functions
+- Centralized business logic (pricing, counters, workflows) called from web and mobile clients.
+- Privileged server-side tasks invoked with `run_as_system` to perform safe internal operations.
+
+### 🔔 Triggers
+- Audit logging on insert/update/delete events into an activity collection.
+- Scheduled jobs (for example nightly cleanup, reminder generation, data aggregation).
+- Auth lifecycle reactions (welcome email on user creation, cleanup on user deletion).
+
+### 🌐 HTTP Endpoints
+- Public webhook ingestion from third-party systems.
+- Protected custom APIs for backoffice actions not exposed as direct database operations.
+
+### 📡 `flowerbase-client`
+- Real-time UI updates in task boards using `collection.watch()` change streams.
+- Frontend data access with Realm-style API surface to minimize integration complexity.
+- Shared client usage across web and React Native projects with consistent auth/session behavior.
+
+### 🖥 Monitoring UI
+- Live inspection of function invocations, endpoint calls, and trigger executions in staging/production.
+- Fast troubleshooting with event stream filters and user/session search tools.
