@@ -127,7 +127,7 @@ describe('mongodb-atlas cache', () => {
     }).db('db').collection('todos')
 
     expect(await hiddenOperators.findOne({ _id: id })).toEqual({})
-    expect(findOne).toHaveBeenCalledTimes(1)
+    expect(findOne).toHaveBeenCalledTimes(2)
   })
 
   it('invalidates the shared authorization context', async () => {
@@ -176,5 +176,70 @@ describe('mongodb-atlas cache', () => {
     expect(await firstUserOperators.count({ workspace: 'a' })).toBe(9)
     expect(await secondUserOperators.count({ workspace: 'a' })).toBe(11)
     expect(countDocuments).toHaveBeenCalledTimes(4)
+  })
+
+  it('does not serve cached count across different role configurations', async () => {
+    const countDocuments = jest
+      .fn()
+      .mockResolvedValueOnce(10)
+      .mockResolvedValueOnce(3)
+    const collection = {
+      collectionName: 'todos',
+      countDocuments
+    }
+
+    const permissiveOperators = MongoDbAtlas(
+      createAppWithCollection(collection) as any,
+      {
+        rules: createRules(),
+        user: { id: 'user-1' }
+      }
+    ).db('db').collection('todos')
+
+    const restrictiveOperators = MongoDbAtlas(
+      createAppWithCollection(collection) as any,
+      {
+        rules: createRules({
+          roles: [
+            {
+              name: 'readOnly',
+              apply_when: { 'user.custom_data.type': 'internal' },
+              insert: false,
+              delete: false,
+              search: true,
+              read: true,
+              write: false
+            }
+          ]
+        }),
+        user: { id: 'user-1' }
+      }
+    ).db('db').collection('todos')
+
+    expect(await permissiveOperators.count({ workspace: 'a' })).toBe(10)
+    expect(await restrictiveOperators.count({ workspace: 'a' })).toBe(3)
+    expect(countDocuments).toHaveBeenCalledTimes(2)
+  })
+
+  it('reuses cache entries across requests when only volatile user fields differ', async () => {
+    const countDocuments = jest.fn().mockResolvedValue(42)
+    const collection = {
+      collectionName: 'todos',
+      countDocuments
+    }
+
+    const firstRequest = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules(),
+      user: { id: 'user-1', custom_data: { tier: 'gold' }, iat: 1_700_000_000 }
+    }).db('db').collection('todos')
+
+    const secondRequest = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules(),
+      user: { id: 'user-1', custom_data: { tier: 'gold' }, iat: 1_700_000_999, exp: 9_999_999_999 }
+    }).db('db').collection('todos')
+
+    expect(await firstRequest.count({ workspace: 'a' })).toBe(42)
+    expect(await secondRequest.count({ workspace: 'a' })).toBe(42)
+    expect(countDocuments).toHaveBeenCalledTimes(1)
   })
 })

@@ -278,12 +278,56 @@ export const buildCollectionCacheTag = (database: string, collection: string) =>
 export const buildAuthorizationCacheTag = (payload: {
   database: string
   collection: string
-  runAsSystem?: boolean
   filters?: unknown
 }) =>
   `auth:${buildCacheKey({
     database: payload.database,
     collection: payload.collection,
-    runAsSystem: !!payload.runAsSystem,
     filters: payload.filters
   })}`
+
+/**
+ * Extracts a stable identity fingerprint from a user object for cache-key purposes.
+ * Uses `id` (+ `custom_data` when present) to strip volatile JWT noise (e.g., `iat`,
+ * `exp`, refresh tokens) while preserving per-principal isolation. Falls back to the
+ * full user when no recognizable id is available, which is the safe option.
+ */
+export const buildUserCacheIdentity = (user: unknown): unknown => {
+  if (!user || typeof user !== 'object') return user ?? null
+  const candidate = user as {
+    id?: unknown
+    _id?: unknown
+    sub?: unknown
+    custom_data?: unknown
+  }
+  const id =
+    typeof candidate.id === 'string' || typeof candidate.id === 'number'
+      ? candidate.id
+      : typeof candidate._id === 'string' || typeof candidate._id === 'number'
+        ? candidate._id
+        : typeof candidate.sub === 'string' || typeof candidate.sub === 'number'
+          ? candidate.sub
+          : undefined
+  if (typeof id === 'undefined') return user
+  return {
+    id,
+    ...(typeof candidate.custom_data !== 'undefined'
+      ? { custom_data: candidate.custom_data }
+      : {})
+  }
+}
+
+/**
+ * Produces a stable fingerprint of the authorization context (roles + filters)
+ * so that any change to permission logic (e.g., hot-reloaded rules, role edits)
+ * automatically produces a different cache key, preventing stale visibility
+ * leaks for aggregate results like `count` that cannot be re-validated on hit.
+ */
+export const buildRolesSignature = (payload: {
+  roles?: unknown
+  filters?: unknown
+}) =>
+  buildCacheKey({
+    roles: payload.roles ?? [],
+    filters: payload.filters ?? []
+  })

@@ -19,6 +19,8 @@ import {
 import {
   buildAuthorizationCacheTag,
   buildCacheKey,
+  buildRolesSignature,
+  buildUserCacheIdentity,
   CacheProvider
 } from '../../cache'
 import { Rules } from '../../features/rules/interface'
@@ -516,9 +518,9 @@ const buildReadOperationCacheKey = ({
   query,
   options,
   projection,
-  user,
+  authPrincipal,
+  rolesSignature,
   runAsSystem,
-  filters,
   extra
 }: {
   dbName: string
@@ -527,9 +529,9 @@ const buildReadOperationCacheKey = ({
   query?: unknown
   options?: unknown
   projection?: unknown
-  user?: unknown
+  authPrincipal: unknown
+  rolesSignature: string
   runAsSystem?: boolean
-  filters?: unknown
   extra?: unknown
 }) =>
   buildCacheKey({
@@ -539,9 +541,9 @@ const buildReadOperationCacheKey = ({
     query,
     options,
     projection,
-    user,
+    authPrincipal,
+    rolesSignature,
     runAsSystem: !!runAsSystem,
-    filters,
     extra
   })
 
@@ -633,9 +635,10 @@ const getOperators: GetOperatorsFunction = (
   const authorizationCacheTag = buildAuthorizationCacheTag({
     database: dbName,
     collection: collName,
-    runAsSystem: run_as_system,
     filters
   })
+  const authPrincipal = run_as_system ? 'system' : buildUserCacheIdentity(user)
+  const rolesSignature = buildRolesSignature({ roles, filters })
   const fallbackAccess = (doc: Document | null | undefined = undefined) => ({
     status: false,
     document: doc
@@ -685,15 +688,15 @@ const getOperators: GetOperatorsFunction = (
 
     const { status, document: validatedDocument } = winningRole
       ? await checkValidation(
-          winningRole,
-          {
-            type: 'read',
-            roles,
-            cursor: document,
-            expansions: getValidationExpansions(document)
-          },
-          user
-        )
+        winningRole,
+        {
+          type: 'read',
+          roles,
+          cursor: document,
+          expansions: getValidationExpansions(document)
+        },
+        user
+      )
       : fallbackAccess(document)
 
     return status ? validatedDocument : {}
@@ -726,9 +729,9 @@ const getOperators: GetOperatorsFunction = (
         const resolvedOptions =
           projection || normalizedOptions
             ? {
-                ...(normalizedOptions ?? {}),
-                ...(projection ? { projection } : {})
-              }
+              ...(normalizedOptions ?? {}),
+              ...(projection ? { projection } : {})
+            }
             : undefined
         const resolvedQuery = query ?? {}
         const cacheKey = buildReadOperationCacheKey({
@@ -738,9 +741,9 @@ const getOperators: GetOperatorsFunction = (
           query: resolvedQuery,
           options: resolvedOptions,
           projection,
-          user,
-          runAsSystem: run_as_system,
-          filters
+          authPrincipal,
+          rolesSignature,
+          runAsSystem: run_as_system
         })
         if (!run_as_system) {
           checkDenyOperation(
@@ -850,15 +853,15 @@ const getOperators: GetOperatorsFunction = (
           })
           const { status } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: 'delete',
-                  roles,
-                  cursor: result,
-                  expansions: getValidationExpansions(result)
-                },
-                user
-              )
+              winningRole,
+              {
+                type: 'delete',
+                roles,
+                cursor: result,
+                expansions: getValidationExpansions(result)
+              },
+              user
+            )
             : fallbackAccess(result)
 
           if (!status) {
@@ -911,15 +914,15 @@ const getOperators: GetOperatorsFunction = (
 
           const { status, document } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: 'insert',
-                  roles,
-                  cursor: data,
-                  expansions: getValidationExpansions()
-                },
-                user
-              )
+              winningRole,
+              {
+                type: 'insert',
+                roles,
+                cursor: data,
+                expansions: getValidationExpansions()
+              },
+              user
+            )
             : fallbackAccess(data)
 
           if (!status || !isEqual(data, document)) {
@@ -1008,15 +1011,15 @@ const getOperators: GetOperatorsFunction = (
           // Validate update permissions
           const { status, document } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: 'write',
-                  roles,
-                  cursor: docToCheck,
-                  expansions: getValidationExpansions(result)
-                },
-                user
-              )
+              winningRole,
+              {
+                type: 'write',
+                roles,
+                cursor: docToCheck,
+                expansions: getValidationExpansions(result)
+              },
+              user
+            )
             : fallbackAccess(docToCheck)
           // Ensure no unauthorized changes are made
           const areDocumentsEqual = areUpdatedFieldsAllowed(
@@ -1097,12 +1100,12 @@ const getOperators: GetOperatorsFunction = (
           } else {
             const [computedDoc] = Array.isArray(normalizedData)
               ? await collection
-                  .aggregate([
-                    { $match: buildAndQuery(safeQuery) },
-                    { $limit: 1 },
-                    ...normalizedData
-                  ])
-                  .toArray()
+                .aggregate([
+                  { $match: buildAndQuery(safeQuery) },
+                  { $limit: 1 },
+                  ...normalizedData
+                ])
+                .toArray()
               : [applyDocumentUpdateOperators(currentDoc, normalizedData as Document)]
             docToCheck = computedDoc
           }
@@ -1111,17 +1114,17 @@ const getOperators: GetOperatorsFunction = (
 
           const { status, document } = winningRole
             ? await checkValidation(
-                winningRole,
-                {
-                  type: validationType,
-                  roles,
-                  cursor: docToCheck,
-                  expansions: getValidationExpansions(
-                    validationType === 'insert' ? undefined : currentDoc
-                  )
-                },
-                user
-              )
+              winningRole,
+              {
+                type: validationType,
+                roles,
+                cursor: docToCheck,
+                expansions: getValidationExpansions(
+                  validationType === 'insert' ? undefined : currentDoc
+                )
+              },
+              user
+            )
             : fallbackAccess(docToCheck)
 
           const areDocumentsEqual = areUpdatedFieldsAllowed(
@@ -1135,10 +1138,10 @@ const getOperators: GetOperatorsFunction = (
 
           const updateResult = normalizedOptions
             ? await collection.findOneAndUpdate(
-                buildAndQuery(safeQuery),
-                normalizedData,
-                normalizedOptions
-              )
+              buildAndQuery(safeQuery),
+              normalizedData,
+              normalizedOptions
+            )
             : await collection.findOneAndUpdate(buildAndQuery(safeQuery), normalizedData)
           await invalidateCollectionCache()
           if (!updateResult) {
@@ -1149,15 +1152,15 @@ const getOperators: GetOperatorsFunction = (
           const readRole = getWinningRole(updateResult, user, roles)
           const readResult = readRole
             ? await checkValidation(
-                readRole,
-                {
-                  type: 'read',
-                  roles,
-                  cursor: updateResult,
-                  expansions: getValidationExpansions(updateResult)
-                },
-                user
-              )
+              readRole,
+              {
+                type: 'read',
+                roles,
+                cursor: updateResult,
+                expansions: getValidationExpansions(updateResult)
+              },
+              user
+            )
             : fallbackAccess(updateResult)
 
           const sanitizedDoc = readResult.status
@@ -1207,9 +1210,9 @@ const getOperators: GetOperatorsFunction = (
         const resolvedOptions =
           projection || normalizedOptions
             ? {
-                ...(normalizedOptions ?? {}),
-                ...(projection ? { projection } : {})
-              }
+              ...(normalizedOptions ?? {}),
+              ...(projection ? { projection } : {})
+            }
             : undefined
         const baseCacheKey = buildReadOperationCacheKey({
           dbName,
@@ -1218,9 +1221,9 @@ const getOperators: GetOperatorsFunction = (
           query,
           options: resolvedOptions,
           projection,
-          user,
-          runAsSystem: run_as_system,
-          filters
+          authPrincipal,
+          rolesSignature,
+          runAsSystem: run_as_system
         })
         if (!run_as_system) {
           checkDenyOperation(
@@ -1250,15 +1253,15 @@ const getOperators: GetOperatorsFunction = (
                   })
                   const { status, document } = winningRole
                     ? await checkValidation(
-                        winningRole,
-                        {
-                          type: 'read',
-                          roles,
-                          cursor: currentDoc,
-                          expansions: getValidationExpansions(currentDoc)
-                        },
-                        user
-                      )
+                      winningRole,
+                      {
+                        type: 'read',
+                        roles,
+                        cursor: currentDoc,
+                        expansions: getValidationExpansions(currentDoc)
+                      },
+                      user
+                    )
                     : fallbackAccess(currentDoc)
 
                   return status ? document : undefined
@@ -1280,15 +1283,15 @@ const getOperators: GetOperatorsFunction = (
                   })
                   const { status, document } = winningRole
                     ? await checkValidation(
-                        winningRole,
-                        {
-                          type: 'read',
-                          roles,
-                          cursor: currentDoc,
-                          expansions: getValidationExpansions(currentDoc)
-                        },
-                        user
-                      )
+                      winningRole,
+                      {
+                        type: 'read',
+                        roles,
+                        cursor: currentDoc,
+                        expansions: getValidationExpansions(currentDoc)
+                      },
+                      user
+                    )
                     : fallbackAccess(currentDoc)
 
                   return status ? document : undefined
@@ -1324,9 +1327,9 @@ const getOperators: GetOperatorsFunction = (
           operation: 'count',
           query,
           options,
-          user,
-          runAsSystem: run_as_system,
-          filters
+          authPrincipal,
+          rolesSignature,
+          runAsSystem: run_as_system
         })
         if (!run_as_system) {
           checkDenyOperation(
@@ -1373,9 +1376,9 @@ const getOperators: GetOperatorsFunction = (
           operation: 'countDocuments',
           query,
           options,
-          user,
-          runAsSystem: run_as_system,
-          filters
+          authPrincipal,
+          rolesSignature,
+          runAsSystem: run_as_system
         })
         if (!run_as_system) {
           checkDenyOperation(
@@ -1463,19 +1466,19 @@ const getOperators: GetOperatorsFunction = (
           const allowDeleteBypass = watchPipelineRequestsDelete(requestedPipeline)
           const firstStep = watchFormattedQuery.length
             ? {
-                $match: allowDeleteBypass
-                  ? {
-                      $or: [
-                        {
-                          $and: watchFormattedQuery
-                        },
-                        { operationType: 'delete' }
-                      ]
-                    }
-                  : {
+              $match: allowDeleteBypass
+                ? {
+                  $or: [
+                    {
                       $and: watchFormattedQuery
-                    }
-              }
+                    },
+                    { operationType: 'delete' }
+                  ]
+                }
+                : {
+                  $and: watchFormattedQuery
+                }
+            }
             : undefined
 
           const formattedPipeline = [firstStep, ...requestedPipeline].filter(
@@ -1498,29 +1501,29 @@ const getOperators: GetOperatorsFunction = (
 
             const fullDocumentValidation = winningRole
               ? await checkValidation(
-                  winningRole,
-                  {
-                    type: 'read',
-                    roles,
-                    cursor: fullDocument,
-                    expansions: getValidationExpansions(fullDocument)
-                  },
-                  user
-                )
+                winningRole,
+                {
+                  type: 'read',
+                  roles,
+                  cursor: fullDocument,
+                  expansions: getValidationExpansions(fullDocument)
+                },
+                user
+              )
               : fallbackAccess(fullDocument)
             const { status, document } = fullDocumentValidation
 
             const { status: updatedFieldsStatus, document: updatedFields } = winningRole
               ? await checkValidation(
-                  winningRole,
-                  {
-                    type: 'read',
-                    roles,
-                    cursor: updateDescription?.updatedFields,
-                    expansions: getValidationExpansions(fullDocument)
-                  },
-                  user
-                )
+                winningRole,
+                {
+                  type: 'read',
+                  roles,
+                  cursor: updateDescription?.updatedFields,
+                  expansions: getValidationExpansions(fullDocument)
+                },
+                user
+              )
               : fallbackAccess(updateDescription?.updatedFields)
 
             return {
@@ -1666,15 +1669,15 @@ const getOperators: GetOperatorsFunction = (
 
               const { status, document } = winningRole
                 ? await checkValidation(
-                    winningRole,
-                    {
-                      type: 'insert',
-                      roles,
-                      cursor: currentDoc,
-                      expansions: getValidationExpansions()
-                    },
-                    user
-                  )
+                  winningRole,
+                  {
+                    type: 'insert',
+                    roles,
+                    cursor: currentDoc,
+                    expansions: getValidationExpansions()
+                  },
+                  user
+                )
                 : fallbackAccess(currentDoc)
 
               return status ? document : undefined
@@ -1732,15 +1735,15 @@ const getOperators: GetOperatorsFunction = (
 
               const { status, document } = winningRole
                 ? await checkValidation(
-                    winningRole,
-                    {
-                      type: 'write',
-                      roles,
-                      cursor: currentDoc,
-                      expansions: getValidationExpansions(result[index])
-                    },
-                    user
-                  )
+                  winningRole,
+                  {
+                    type: 'write',
+                    roles,
+                    cursor: currentDoc,
+                    expansions: getValidationExpansions(result[index])
+                  },
+                  user
+                )
                 : fallbackAccess(currentDoc)
 
               return status ? document : undefined
@@ -1810,15 +1813,15 @@ const getOperators: GetOperatorsFunction = (
 
               const { status, document } = winningRole
                 ? await checkValidation(
-                    winningRole,
-                    {
-                      type: 'delete',
-                      roles,
-                      cursor: currentDoc,
-                      expansions: getValidationExpansions(currentDoc)
-                    },
-                    user
-                  )
+                  winningRole,
+                  {
+                    type: 'delete',
+                    roles,
+                    cursor: currentDoc,
+                    expansions: getValidationExpansions(currentDoc)
+                  },
+                  user
+                )
                 : fallbackAccess(currentDoc)
 
               return status ? document : undefined
