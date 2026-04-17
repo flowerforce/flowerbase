@@ -26,6 +26,8 @@ const INSERT_ONLY_COLLECTION = 'insertOnlyDocs'
 const APP_SETTINGS_COLLECTION = 'app_settings'
 const INTERNAL_CONTACTS_COLLECTION = 'internalContacts'
 const INTERNAL_READ_CONTACTS_COLLECTION = 'internalReadContacts'
+const INVENTORY_COLLECTION = 'inventory'
+const INVENTORY_HIDDEN_COLLECTION = 'inventoryHidden'
 const TRIGGER_ITEMS_INSERT_COLLECTION = 'trigger_items_insert'
 const TRIGGER_ITEMS_UPDATE_COLLECTION = 'trigger_items_update'
 const TRIGGER_ITEMS_DELETE_COLLECTION = 'trigger_items_delete'
@@ -104,6 +106,16 @@ const uploadIds = {
 }
 const appSettingsIds = {
   ownerGeneral: new ObjectId('000000000000000000000501')
+}
+const inventoryIds = {
+  ownerApple: new ObjectId('000000000000000000000601'),
+  ownerBanana: new ObjectId('000000000000000000000602'),
+  otherOrange: new ObjectId('000000000000000000000603')
+}
+const inventoryHiddenIds = {
+  ownerApple: new ObjectId('000000000000000000000611'),
+  ownerBanana: new ObjectId('000000000000000000000612'),
+  otherOrange: new ObjectId('000000000000000000000613')
 }
 const authUserIds = {
   owner: new ObjectId('000000000000000000000090'),
@@ -328,6 +340,10 @@ const getInternalContactsCollection = (user: TestUser | null) =>
   createCollectionProxy(INTERNAL_CONTACTS_COLLECTION, user)
 const getInternalReadContactsCollection = (user: TestUser | null) =>
   createCollectionProxy(INTERNAL_READ_CONTACTS_COLLECTION, user)
+const getInventoryCollection = (user: TestUser | null) =>
+  createCollectionProxy(INVENTORY_COLLECTION, user)
+const getInventoryHiddenCollection = (user: TestUser | null) =>
+  createCollectionProxy(INVENTORY_HIDDEN_COLLECTION, user)
 
 const registerAccessToken = (user: TestUser, authId: ObjectId) => {
   if (!appInstance) {
@@ -429,6 +445,8 @@ const resetCollections = async () => {
     db.collection(APP_SETTINGS_COLLECTION).deleteMany({}),
     db.collection(INTERNAL_CONTACTS_COLLECTION).deleteMany({}),
     db.collection(INTERNAL_READ_CONTACTS_COLLECTION).deleteMany({}),
+    db.collection(INVENTORY_COLLECTION).deleteMany({}),
+    db.collection(INVENTORY_HIDDEN_COLLECTION).deleteMany({}),
     db.collection(AUTH_USERS_COLLECTION).deleteMany({}),
     db.collection(AUTH_CONFIG.refreshTokensCollection).deleteMany({}),
     db.collection(RESET_PASSWORD_COLLECTION).deleteMany({}),
@@ -684,6 +702,63 @@ const resetCollections = async () => {
       name: 'Read HQ',
       address: 'Via Milano 2',
       phone: '+39-654321'
+    }
+  ])
+
+  await db.collection(INVENTORY_COLLECTION).insertMany([
+    {
+      _id: inventoryIds.ownerApple,
+      item: 'apple',
+      status: 'A',
+      ownerId: ownerUser.id,
+      price: 1.99,
+      secretCost: 0.42,
+      instock: { qty: 120, warehouse: 'north' }
+    },
+    {
+      _id: inventoryIds.ownerBanana,
+      item: 'banana',
+      status: 'B',
+      ownerId: ownerUser.id,
+      price: 0.49,
+      secretCost: 0.1,
+      instock: { qty: 40, warehouse: 'south' }
+    },
+    {
+      _id: inventoryIds.otherOrange,
+      item: 'orange',
+      status: 'A',
+      ownerId: guestUser.id,
+      price: 2.5,
+      secretCost: 0.9,
+      instock: { qty: 10, warehouse: 'east' }
+    }
+  ])
+
+  await db.collection(INVENTORY_HIDDEN_COLLECTION).insertMany([
+    {
+      _id: inventoryHiddenIds.ownerApple,
+      item: 'apple',
+      status: 'A',
+      ownerId: ownerUser.id,
+      price: 1.99,
+      instock: { qty: 120, warehouse: 'north' }
+    },
+    {
+      _id: inventoryHiddenIds.ownerBanana,
+      item: 'banana',
+      status: 'B',
+      ownerId: ownerUser.id,
+      price: 0.49,
+      instock: { qty: 40, warehouse: 'south' }
+    },
+    {
+      _id: inventoryHiddenIds.otherOrange,
+      item: 'orange',
+      status: 'A',
+      ownerId: guestUser.id,
+      price: 2.5,
+      instock: { qty: 10, warehouse: 'east' }
     }
   ])
 
@@ -1095,6 +1170,182 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       userId: ownerUser.id
     })
     expect(todo).not.toHaveProperty('sensitive')
+  })
+
+  describe('projection priority between rules and client', () => {
+    it('uses only the client projection when rules do not define one (find)', async () => {
+      // todos rules.json has no projection: only the client projection must apply.
+      // userId is kept because the todoOwner role matches on it.
+      const todos = (await getTodosCollection(ownerUser)
+        .find({}, { title: 1, userId: 1 })
+        .toArray()) as TodoDoc[]
+      expect(todos).toHaveLength(2)
+      for (const todo of todos) {
+        expect(todo).toHaveProperty('title')
+        expect(todo).toHaveProperty('userId', ownerUser.id)
+        expect(todo).not.toHaveProperty('sensitive')
+      }
+    })
+
+    it('uses only the client projection when rules do not define one (findOne)', async () => {
+      const todo = (await getTodosCollection(ownerUser).findOne(
+        { _id: todoIds.ownerFirst },
+        { title: 1, userId: 1 }
+      )) as TodoDoc | null
+      expect(todo).toBeDefined()
+      expect(todo).toHaveProperty('title', 'Owner task 1')
+      expect(todo).toHaveProperty('userId', ownerUser.id)
+      expect(todo).not.toHaveProperty('sensitive')
+    })
+
+    it('applies only the rules projection when no client projection is passed (find)', async () => {
+      // inventory rules.json defines projection { item: 1, status: 1, "instock.qty": 1 }
+      const docs = (await getInventoryCollection(ownerUser)
+        .find({})
+        .toArray()) as Document[]
+      expect(docs).toHaveLength(2)
+      for (const doc of docs) {
+        expect(doc).toHaveProperty('_id')
+        expect(doc).toHaveProperty('item')
+        expect(doc).toHaveProperty('status')
+        // Nested projection: only instock.qty must be present, warehouse must be stripped.
+        expect(doc.instock).toEqual({ qty: expect.any(Number) })
+        expect(doc).not.toHaveProperty('ownerId')
+        expect(doc).not.toHaveProperty('price')
+        expect(doc).not.toHaveProperty('secretCost')
+      }
+    })
+
+    it('applies only the rules projection when no client projection is passed (findOne)', async () => {
+      const doc = (await getInventoryCollection(ownerUser).findOne({
+        _id: inventoryIds.ownerApple
+      })) as Document | null
+      expect(doc).toBeDefined()
+      expect(doc).toMatchObject({ item: 'apple', status: 'A' })
+      expect(doc?.instock).toEqual({ qty: 120 })
+      expect(doc).not.toHaveProperty('price')
+      expect(doc).not.toHaveProperty('secretCost')
+      expect(doc).not.toHaveProperty('ownerId')
+    })
+
+    it('merges client projection with rules projection when fields differ (find)', async () => {
+      // Client asks for price; rules include item/status/instock.qty. Both should be present.
+      const docs = (await getInventoryCollection(ownerUser)
+        .find({}, { price: 1 })
+        .toArray()) as Document[]
+      expect(docs).toHaveLength(2)
+      for (const doc of docs) {
+        expect(doc).toHaveProperty('item')
+        expect(doc).toHaveProperty('status')
+        expect(doc.instock).toEqual({ qty: expect.any(Number) })
+        expect(doc).toHaveProperty('price')
+        // Fields not requested anywhere stay stripped.
+        expect(doc).not.toHaveProperty('secretCost')
+        expect(doc).not.toHaveProperty('ownerId')
+      }
+    })
+
+    it('rules projection wins on conflicting keys (client cannot re-map rules keys)', async () => {
+      // Client explicitly tries to re-include a key already present in rules projection
+      // alongside a new field. Rules wins on the conflicting key, client adds the new one.
+      const doc = (await getInventoryCollection(ownerUser).findOne(
+        { _id: inventoryIds.ownerApple },
+        { item: 1, price: 1 }
+      )) as Document | null
+
+      expect(doc).toBeDefined()
+      // Rules-provided keys are preserved as-is.
+      expect(doc).toHaveProperty('item', 'apple')
+      expect(doc).toHaveProperty('status', 'A')
+      expect(doc?.instock).toEqual({ qty: 120 })
+      // Client additional field is honoured when not in conflict with rules.
+      expect(doc).toHaveProperty('price', 1.99)
+      // Sensitive fields never appear.
+      expect(doc).not.toHaveProperty('secretCost')
+      expect(doc).not.toHaveProperty('ownerId')
+    })
+
+    it('rules projection cannot be bypassed via options.projection (find)', async () => {
+      // The client attempts to expose secretCost by smuggling it through options.projection.
+      const docs = (await getInventoryCollection(ownerUser)
+        .find({}, undefined, { projection: { secretCost: 1 } })
+        .toArray()) as Document[]
+      expect(docs).toHaveLength(2)
+      for (const doc of docs) {
+        // Rules projection is always applied: item/status/instock.qty are present.
+        expect(doc).toHaveProperty('item')
+        expect(doc).toHaveProperty('status')
+        expect(doc.instock).toEqual({ qty: expect.any(Number) })
+        // secretCost is only returned because client asked for it, but critical fields
+        // (price, ownerId) the client did not ask for are still excluded.
+        expect(doc).not.toHaveProperty('price')
+        expect(doc).not.toHaveProperty('ownerId')
+      }
+    })
+
+    it('rules filter query still restricts the docs returned even with projection merging', async () => {
+      // The inventory filter enforces ownerId == user.id. Guest must not see owner docs.
+      const guestDocs = (await getInventoryCollection(guestUser)
+        .find({}, { price: 1 })
+        .toArray()) as Document[]
+      expect(guestDocs).toHaveLength(1)
+      expect(guestDocs[0]).toHaveProperty('item', 'orange')
+      expect(guestDocs[0]).not.toHaveProperty('ownerId')
+
+      // Even when the guest explicitly tries to match owner docs the filter is enforced.
+      const sneak = (await getInventoryCollection(guestUser)
+        .find({ ownerId: ownerUser.id })
+        .toArray()) as Document[]
+      expect(sneak).toHaveLength(0)
+    })
+
+    it('rules projection supports dotted keys inside findOne', async () => {
+      const doc = (await getInventoryCollection(ownerUser).findOne({
+        _id: inventoryIds.ownerBanana
+      })) as Document | null
+      expect(doc).toBeDefined()
+      expect(doc?.instock).toEqual({ qty: 40 })
+      expect(doc?.instock).not.toHaveProperty('warehouse')
+    })
+
+    it('strips a whole sub-tree when rules exclude it, even if the client asked for a dotted sub-path (find)', async () => {
+      // Rules projection: { item: 1, status: 1, instock: 0 }
+      // Client projection: { item: 1, status: 1, 'instock.qty': 1 }
+      // Expected: `instock` must not appear at all in the response.
+      const docs = (await getInventoryHiddenCollection(ownerUser)
+        .find({}, { item: 1, status: 1, 'instock.qty': 1 })
+        .toArray()) as Document[]
+      expect(docs).toHaveLength(2)
+      for (const doc of docs) {
+        expect(doc).toHaveProperty('item')
+        expect(doc).toHaveProperty('status')
+        expect(doc).not.toHaveProperty('instock')
+        expect(doc).not.toHaveProperty('price')
+        expect(doc).not.toHaveProperty('ownerId')
+      }
+    })
+
+    it('strips a whole sub-tree when rules exclude it, even if the client asked for a dotted sub-path (findOne)', async () => {
+      const doc = (await getInventoryHiddenCollection(ownerUser).findOne(
+        { _id: inventoryHiddenIds.ownerApple },
+        { item: 1, status: 1, 'instock.qty': 1 }
+      )) as Document | null
+      expect(doc).toBeDefined()
+      expect(doc).toMatchObject({ item: 'apple', status: 'A' })
+      expect(doc).not.toHaveProperty('instock')
+    })
+
+    it('ignores every client sub-path attempt under a rules-excluded field', async () => {
+      const doc = (await getInventoryHiddenCollection(ownerUser).findOne(
+        { _id: inventoryHiddenIds.ownerApple },
+        { 'instock.qty': 1, 'instock.warehouse': 1 }
+      )) as Document | null
+      expect(doc).toBeDefined()
+      // Rules-included fields are still returned (rules priority), excluded sub-tree is gone.
+      expect(doc).toHaveProperty('item')
+      expect(doc).toHaveProperty('status')
+      expect(doc).not.toHaveProperty('instock')
+    })
   })
 
   it('denies inserting a todo for another user', async () => {

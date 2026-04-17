@@ -1,0 +1,29 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "inventoryHidden",
+  "filters": [
+    {
+      "name": "ownerScopeHideInstock",
+      "apply_when": {},
+      "query": {
+        "ownerId": "%%user.id"
+      },
+      "projection": {
+        "item": 1,
+        "status": 1,
+        "instock": 0
+      }
+    }
+  ],
+  "roles": [
+    {
+      "name": "inventoryHiddenOwner",
+      "apply_when": {},
+      "insert": true,
+      "delete": true,
+      "search": true,
+      "read": true,
+      "write": true
+    }
+  ]
+}

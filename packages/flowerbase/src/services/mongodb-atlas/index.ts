@@ -35,6 +35,7 @@ import {
   getFormattedProjection,
   getFormattedQuery,
   getHiddenFieldsFromRulesConfig,
+  mergeProjections,
   normalizeQuery
 } from './utils'
 
@@ -558,13 +559,6 @@ const getOperators: GetOperatorsFunction = (
           projectionOrOptions,
           options
         )
-        const resolvedOptions =
-          projection || normalizedOptions
-            ? {
-                ...(normalizedOptions ?? {}),
-                ...(projection ? { projection } : {})
-              }
-            : undefined
         const resolvedQuery = query ?? {}
         if (!run_as_system) {
           checkDenyOperation(
@@ -574,6 +568,17 @@ const getOperators: GetOperatorsFunction = (
           )
           // Apply access control filters to the query
           const formattedQuery = getFormattedQuery(filters, resolvedQuery, user)
+          // Rules-level projection has priority over client-provided projection.
+          // The merged projection is passed natively to MongoDB.
+          const rulesProjection = getFormattedProjection(filters, user)
+          const finalProjection = mergeProjections(projection, rulesProjection)
+          const resolvedOptions =
+            finalProjection || normalizedOptions
+              ? {
+                  ...(normalizedOptions ?? {}),
+                  ...(finalProjection ? { projection: finalProjection } : {})
+                }
+              : undefined
           logDebug('update formattedQuery', {
             collection: collName,
             query,
@@ -629,8 +634,15 @@ const getOperators: GetOperatorsFunction = (
           emitMongoEvent('findOne')
           return Promise.resolve(response)
         }
-        // System mode: no validation applied
-        const response = await collection.findOne(resolvedQuery, resolvedOptions)
+        // System mode: no validation applied, only client-provided projection/options.
+        const systemOptions =
+          projection || normalizedOptions
+            ? {
+                ...(normalizedOptions ?? {}),
+                ...(projection ? { projection } : {})
+              }
+            : undefined
+        const response = await collection.findOne(resolvedQuery, systemOptions)
         emitMongoEvent('findOne')
         return response
       } catch (error) {
@@ -1023,13 +1035,6 @@ const getOperators: GetOperatorsFunction = (
           projectionOrOptions,
           options
         )
-        const resolvedOptions =
-          projection || normalizedOptions
-            ? {
-                ...(normalizedOptions ?? {}),
-                ...(projection ? { projection } : {})
-              }
-            : undefined
         if (!run_as_system) {
           checkDenyOperation(
             normalizedRules,
@@ -1039,6 +1044,17 @@ const getOperators: GetOperatorsFunction = (
           // Pre-query filtering based on access control rules
           const formattedQuery = getFormattedQuery(filters, query, user)
           const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
+          // Rules-level projection has priority over client-provided projection.
+          // The merged projection is passed natively to MongoDB.
+          const rulesProjection = getFormattedProjection(filters, user)
+          const finalProjection = mergeProjections(projection, rulesProjection)
+          const resolvedOptions =
+            finalProjection || normalizedOptions
+              ? {
+                  ...(normalizedOptions ?? {}),
+                  ...(finalProjection ? { projection: finalProjection } : {})
+                }
+              : undefined
           // aggiunto filter per evitare questo errore: $and argument's entries must be objects
           const cursor = collection.find(currentQuery, resolvedOptions)
           const originalToArray = cursor.toArray.bind(cursor)
@@ -1084,8 +1100,15 @@ const getOperators: GetOperatorsFunction = (
           emitMongoEvent('find')
           return cursor
         }
-        // System mode: return original unfiltered cursor
-        const cursor = collection.find(query, resolvedOptions)
+        // System mode: return original unfiltered cursor (only client projection/options).
+        const systemOptions =
+          projection || normalizedOptions
+            ? {
+                ...(normalizedOptions ?? {}),
+                ...(projection ? { projection } : {})
+              }
+            : undefined
+        const cursor = collection.find(query, systemOptions)
         emitMongoEvent('find')
         return cursor
       } catch (error) {
@@ -1327,7 +1350,7 @@ const getOperators: GetOperatorsFunction = (
           formattedQuery,
           pipeline
         })
-        const projection = getFormattedProjection(filters)
+        const projection = getFormattedProjection(filters, user)
         const hiddenFields = getHiddenFieldsFromRulesConfig(rulesConfig)
 
         const sanitizedPipeline = applyAccessControlToPipeline(
