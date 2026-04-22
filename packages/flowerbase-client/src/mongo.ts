@@ -46,7 +46,7 @@ export const createMongoClient = (app: App, serviceName: MongoDbServiceName, use
           throw new Error('watch options must be an object')
         }
 
-        const typed = input as { ids?: unknown[]; filter?: Record<string, unknown>; [key: string]: unknown }
+        const typed = input as { ids?: unknown[]; filter?: Record<string, unknown>;[key: string]: unknown }
         const keys = Object.keys(typed)
         const hasOnlyAllowedKeys = keys.every((key) => key === 'ids' || key === 'filter')
         if (!hasOnlyAllowedKeys) {

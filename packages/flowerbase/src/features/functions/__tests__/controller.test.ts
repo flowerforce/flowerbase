@@ -15,13 +15,13 @@ describe('functionsController', () => {
     app = Fastify()
 
     app.decorate('jwtAuthentication', async (request: FastifyRequest, _reply: FastifyReply) => {
-      ;(request as any).user = {
+      ; (request as any).user = {
         id: '507f191e810c19729de860ea',
         typ: 'access'
       }
     })
 
-    ;(GenerateContext as jest.Mock).mockResolvedValue({ ok: true })
+      ; (GenerateContext as jest.Mock).mockResolvedValue({ ok: true })
 
     await app.register(functionsController, {
       functionsList: {

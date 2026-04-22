@@ -76,8 +76,8 @@ export const executeQuery = async ({
     typeof projection !== 'undefined'
       ? parsedProjection
       : parsedOptions &&
-          typeof parsedOptions === 'object' &&
-          'projection' in parsedOptions
+        typeof parsedOptions === 'object' &&
+        'projection' in parsedOptions
         ? (parsedOptions as Document).projection
         : undefined
   return {
