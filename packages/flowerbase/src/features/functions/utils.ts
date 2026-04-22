@@ -45,12 +45,14 @@ export const executeQuery = async ({
   currentMethod,
   query,
   update,
+  key,
   filter,
   projection,
   options,
   returnNewDocument,
   document,
   documents,
+  operations,
   pipeline,
   isClient = false
 }: ExecuteQueryParams) => {
@@ -113,6 +115,12 @@ export const executeQuery = async ({
         EJSON.deserialize(resolvedQuery),
         parsedOptions
       ),
+    distinct: () =>
+      (currentMethod as ReturnType<GetOperatorsFunction>['distinct'])(
+        key ?? '',
+        EJSON.deserialize(resolvedQuery),
+        parsedOptions
+      ),
     deleteOne: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['deleteOne'])(
         EJSON.deserialize(resolvedQuery),
@@ -143,6 +151,11 @@ export const executeQuery = async ({
     insertMany: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['insertMany'])(
         EJSON.deserialize(documents)
+      ),
+    bulkWrite: () =>
+      (currentMethod as ReturnType<GetOperatorsFunction>['bulkWrite'])(
+        EJSON.deserialize(operations ?? []),
+        parsedOptions
       ),
     updateMany: () =>
       (currentMethod as ReturnType<GetOperatorsFunction>['updateMany'])(

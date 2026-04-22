@@ -46,7 +46,7 @@ export const createMongoClient = (app: App, serviceName: MongoDbServiceName, use
           throw new Error('watch options must be an object')
         }
 
-        const typed = input as { ids?: unknown[]; filter?: Record<string, unknown>; [key: string]: unknown }
+        const typed = input as { ids?: unknown[]; filter?: Record<string, unknown>;[key: string]: unknown }
         const keys = Object.keys(typed)
         const hasOnlyAllowedKeys = keys.every((key) => key === 'ids' || key === 'filter')
         if (!hasOnlyAllowedKeys) {
@@ -77,6 +77,8 @@ export const createMongoClient = (app: App, serviceName: MongoDbServiceName, use
       return {
         find: (query = {}, options = {}) => callService('find', [{ query, options }]),
         findOne: (query = {}, options = {}) => callService('findOne', [{ query, options }]),
+        distinct: (key, filter = {}, options = {}) =>
+          callService('distinct', [{ key, query: filter, options }]),
         findOneAndUpdate: (filter, update, options = {}) =>
           callService('findOneAndUpdate', [{ filter, update, options }]),
         findOneAndReplace: (filter, replacement, options = {}) =>
@@ -86,6 +88,8 @@ export const createMongoClient = (app: App, serviceName: MongoDbServiceName, use
         count: (query = {}, options = {}) => callService('count', [{ query, options }]),
         insertOne: (document, options = {}) => callService('insertOne', [{ document, options }]),
         insertMany: (documents, options = {}) => callService('insertMany', [{ documents, options }]),
+        bulkWrite: (operations, options = {}) =>
+          callService('bulkWrite', [{ operations, options }]),
         updateOne: (filter, update, options = {}) =>
           callService('updateOne', [{ filter, update, options }]),
         updateMany: (filter, update, options = {}) =>
