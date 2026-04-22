@@ -1,12 +1,16 @@
 import fs from 'fs'
 import path from 'node:path'
 import cron from 'node-cron'
+import { EJSON } from 'bson'
 import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME, CHANGESTREAM } from '../../constants'
 import { createEventId, sanitize } from '../../monitoring/utils'
 import { StateManager } from '../../state'
 import { readJsonContent } from '../../utils'
 import { GenerateContext } from '../../utils/context'
 import { HandlerParams, Trigger, Triggers } from './interface'
+
+const normalizeTriggerPayload = <T>(value: T): T =>
+  EJSON.deserialize(EJSON.serialize(value, { relaxed: false })) as T
 
 const registerOnClose = (
   app: HandlerParams['app'],
@@ -150,7 +154,8 @@ const handleCronTrigger = async ({
         currentFunction: triggerHandler,
         functionName,
         functionsList,
-        services
+        services,
+        deserializeArgs: false
       })
     } catch (error) {
       emitTriggerEvent({
@@ -376,7 +381,7 @@ const handleAuthenticationTrigger = async ({
           meta: { ...baseMeta, event: 'LOGOUT' }
         })
         await GenerateContext({
-          args: [{ user: userData, ...op }],
+          args: [normalizeTriggerPayload({ user: userData, ...op })],
           app,
           rules: StateManager.select("rules"),
           user: {},  // TODO from currentUser ??
@@ -384,7 +389,8 @@ const handleAuthenticationTrigger = async ({
           functionName,
           functionsList,
           services,
-          runAsSystem: true
+          runAsSystem: true,
+          deserializeArgs: false
         })
       } catch (error) {
         emitTriggerEvent({
@@ -395,7 +401,6 @@ const handleAuthenticationTrigger = async ({
           meta: { ...baseMeta, event: 'LOGOUT' },
           error
         })
-        console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
       }
       return
     }
@@ -433,7 +438,7 @@ const handleAuthenticationTrigger = async ({
           meta: { ...baseMeta, event: 'LOGIN' }
         })
         await GenerateContext({
-          args: [{ user: userData, ...op }],
+          args: [normalizeTriggerPayload({ user: userData, ...op })],
           app,
           rules: StateManager.select("rules"),
           user: {},  // TODO from currentUser ??
@@ -441,7 +446,8 @@ const handleAuthenticationTrigger = async ({
           functionName,
           functionsList,
           services,
-          runAsSystem: true
+          runAsSystem: true,
+          deserializeArgs: false
         })
       } catch (error) {
         emitTriggerEvent({
@@ -452,7 +458,6 @@ const handleAuthenticationTrigger = async ({
           meta: { ...baseMeta, event: 'LOGIN' },
           error
         })
-        console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
       }
       return
     }
@@ -485,7 +490,9 @@ const handleAuthenticationTrigger = async ({
           meta: { ...baseMeta, event: 'DELETE' }
         })
         await GenerateContext({
-          args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
+          args: isAutoTrigger
+            ? [normalizeTriggerPayload(userData)]
+            : [normalizeTriggerPayload({ user: userData, ...op })],
           app,
           rules: StateManager.select("rules"),
           user: {},  // TODO from currentUser ??
@@ -493,7 +500,8 @@ const handleAuthenticationTrigger = async ({
           functionName,
           functionsList,
           services,
-          runAsSystem: true
+          runAsSystem: true,
+          deserializeArgs: false
         })
       } catch (error) {
         emitTriggerEvent({
@@ -504,7 +512,6 @@ const handleAuthenticationTrigger = async ({
           meta: { ...baseMeta, event: 'DELETE' },
           error
         })
-        console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
       }
       return
     }
@@ -539,7 +546,9 @@ const handleAuthenticationTrigger = async ({
           meta: { ...baseMeta, event: 'UPDATE' }
         })
         await GenerateContext({
-          args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
+          args: isAutoTrigger
+            ? [normalizeTriggerPayload(userData)]
+            : [normalizeTriggerPayload({ user: userData, ...op })],
           app,
           rules: StateManager.select("rules"),
           user: {},  // TODO from currentUser ??
@@ -547,7 +556,8 @@ const handleAuthenticationTrigger = async ({
           functionName,
           functionsList,
           services,
-          runAsSystem: true
+          runAsSystem: true,
+          deserializeArgs: false
         })
       } catch (error) {
         emitTriggerEvent({
@@ -558,7 +568,6 @@ const handleAuthenticationTrigger = async ({
           meta: { ...baseMeta, event: 'UPDATE' },
           error
         })
-        console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
       }
       return
     }
@@ -643,7 +652,9 @@ const handleAuthenticationTrigger = async ({
         meta: { ...baseMeta, event: 'CREATE' }
       })
       await GenerateContext({
-        args: isAutoTrigger ? [userData] : [{ user: userData, ...op }],
+        args: isAutoTrigger
+          ? [normalizeTriggerPayload(userData)]
+          : [normalizeTriggerPayload({ user: userData, ...op })],
         app,
         rules: StateManager.select("rules"),
         user: {},  // TODO from currentUser ??
@@ -651,7 +662,8 @@ const handleAuthenticationTrigger = async ({
         functionName,
         functionsList,
         services,
-        runAsSystem: true
+        runAsSystem: true,
+        deserializeArgs: false
       })
     } catch (error) {
       emitTriggerEvent({
@@ -662,7 +674,6 @@ const handleAuthenticationTrigger = async ({
         meta: { ...baseMeta, event: 'CREATE' },
         error
       })
-      console.log("🚀 ~ handleAuthenticationTrigger ~ error:", error)
     }
   })
   registerOnClose(
@@ -755,14 +766,15 @@ const handleDataBaseTrigger = async ({
     })
     try {
       await GenerateContext({
-        args: [change],
+        args: [normalizeTriggerPayload(change)],
         app,
         rules: StateManager.select("rules"),
         user: {}, // TODO add from?
         currentFunction: triggerHandler,
         functionName,
         functionsList,
-        services
+        services,
+        deserializeArgs: false
       })
     } catch (error) {
       emitTriggerEvent({
