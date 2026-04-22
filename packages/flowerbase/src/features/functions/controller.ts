@@ -352,6 +352,7 @@ export const functionsController: FunctionController = async (
       const [{
         database,
         collection,
+        key,
         query,
         filter,
         update,
@@ -360,6 +361,7 @@ export const functionsController: FunctionController = async (
         returnNewDocument,
         document,
         documents,
+        operations,
         pipeline = []
       }] = args
 
@@ -371,6 +373,7 @@ export const functionsController: FunctionController = async (
       const operatorsByType = await executeQuery({
         currentMethod,
         query,
+        key,
         filter,
         update,
         projection,
@@ -378,6 +381,7 @@ export const functionsController: FunctionController = async (
         returnNewDocument,
         document,
         documents,
+        operations,
         pipeline,
         isClient: true
       })

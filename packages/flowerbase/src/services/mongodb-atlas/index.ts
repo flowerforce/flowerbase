@@ -491,6 +491,26 @@ const areUpdatedFieldsAllowed = (
   return updatedPaths.every((path) => isEqual(get(filtered, path), get(updated, path)))
 }
 
+const appendDistinctValue = (values: unknown[], candidate: unknown) => {
+  if (typeof candidate === 'undefined') return
+  if (!values.some((entry) => isEqual(entry, candidate))) {
+    values.push(candidate)
+  }
+}
+
+const collectDistinctValues = (documents: Document[], key: string) =>
+  documents.reduce<unknown[]>((values, document) => {
+    const currentValue = get(document, key)
+
+    if (Array.isArray(currentValue)) {
+      currentValue.forEach((entry) => appendDistinctValue(values, entry))
+      return values
+    }
+
+    appendDistinctValue(values, currentValue)
+    return values
+  }, [])
+
 const getOperators: GetOperatorsFunction = (
   mongo,
   { rules, dbName, collName, user, run_as_system, monitoringOrigin }
@@ -534,7 +554,48 @@ const getOperators: GetOperatorsFunction = (
     })
   }
 
-  return {
+  const validateReadableDocument = async (currentDoc: Document) => {
+    const winningRole = getWinningRole(currentDoc, user, roles)
+
+    logDebug('find winningRole', {
+      collection: collName,
+      userId: getUserId(user),
+      winningRoleName: winningRole?.name ?? null,
+      rolesLength: roles.length
+    })
+
+    const { status, document } = winningRole
+      ? await checkValidation(
+          winningRole,
+          {
+            type: 'read',
+            roles,
+            cursor: currentDoc,
+            expansions: getValidationExpansions(currentDoc)
+          },
+          user
+        )
+      : fallbackAccess(currentDoc)
+
+    return status ? document : undefined
+  }
+
+  const getScopedQuery = (query: MongoFilter<Document> = {}) => {
+    const formattedQuery = getFormattedQuery(filters, query, user)
+    const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
+    const safeQuery = Array.isArray(formattedQuery)
+      ? normalizeQuery(formattedQuery)
+      : formattedQuery
+
+    return {
+      formattedQuery,
+      currentQuery,
+      safeQuery,
+      builtQuery: buildAndQuery(safeQuery)
+    }
+  }
+
+  const operators: ReturnType<GetOperatorsFunction> = {
     /**
      * Finds a single document in a MongoDB collection with optional role-based filtering and validation.
      *
@@ -1052,30 +1113,7 @@ const getOperators: GetOperatorsFunction = (
             const response = await originalToArray()
 
             const filteredResponse = await Promise.all(
-              response.map(async (currentDoc) => {
-                const winningRole = getWinningRole(currentDoc, user, roles)
-
-                logDebug('find winningRole', {
-                  collection: collName,
-                  userId: getUserId(user),
-                  winningRoleName: winningRole?.name ?? null,
-                  rolesLength: roles.length
-                })
-                const { status, document } = winningRole
-                  ? await checkValidation(
-                      winningRole,
-                      {
-                        type: 'read',
-                        roles,
-                        cursor: currentDoc,
-                        expansions: getValidationExpansions(currentDoc)
-                      },
-                      user
-                    )
-                  : fallbackAccess(currentDoc)
-
-                return status ? document : undefined
-              })
+              response.map((currentDoc) => validateReadableDocument(currentDoc))
             )
 
             return filteredResponse.filter(Boolean) as WithId<Document>[]
@@ -1138,6 +1176,45 @@ const getOperators: GetOperatorsFunction = (
         return result
       } catch (error) {
         emitMongoEvent('countDocuments', undefined, error)
+        throw error
+      }
+    },
+    distinct: async (key, query = {}, options) => {
+      try {
+        if (!key) {
+          throw new Error('distinct key is required')
+        }
+
+        if (!run_as_system) {
+          checkDenyOperation(
+            normalizedRules,
+            collection.collectionName,
+            CRUD_OPERATIONS.READ
+          )
+
+          const { currentQuery } = getScopedQuery(query)
+          const projectedOptions = {
+            ...(options ?? {}),
+            projection: { _id: 1, [key]: 1 }
+          } as FindOptions
+          const documents = await collection.find(currentQuery, projectedOptions).toArray()
+          const readableDocuments = (
+            await Promise.all(documents.map((currentDoc) => validateReadableDocument(currentDoc)))
+          ).filter(Boolean) as Document[]
+          const result = collectDistinctValues(readableDocuments, key)
+
+          emitMongoEvent('distinct')
+          return result
+        }
+
+        const result =
+          typeof options === 'undefined'
+            ? await collection.distinct(key, query)
+            : await collection.distinct(key, query, options)
+        emitMongoEvent('distinct')
+        return result
+      } catch (error) {
+        emitMongoEvent('distinct', undefined, error)
         throw error
       }
     },
@@ -1427,6 +1504,24 @@ const getOperators: GetOperatorsFunction = (
         throw error
       }
     },
+    bulkWrite: async (operations, options) => {
+      try {
+        if (!run_as_system) {
+          throw new Error('bulkWrite is available only when run_as_system is enabled')
+        }
+
+        const result = await collection.bulkWrite(operations, options)
+        emitMongoEvent('bulkWrite', { operations: operations.length })
+        return result
+      } catch (error) {
+        emitMongoEvent(
+          'bulkWrite',
+          { operations: Array.isArray(operations) ? operations.length : 0 },
+          error
+        )
+        throw error
+      }
+    },
     updateMany: async (query, data, options) => {
       try {
         const normalizedData = normalizeUpdatePayload(data as Document)
@@ -1579,6 +1674,8 @@ const getOperators: GetOperatorsFunction = (
       }
     }
   }
+
+  return operators
 }
 
 const MongodbAtlas: MongodbAtlasFunction = (

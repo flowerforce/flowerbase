@@ -178,6 +178,70 @@ describe('mongodb-atlas Realm compatibility', () => {
     )
   })
 
+  it('forwards bulkWrite to the underlying collection in system mode', async () => {
+    const operations = [
+      {
+        updateOne: {
+          filter: { done: false },
+          update: { $set: { done: true } }
+        }
+      }
+    ]
+    const bulkWriteResult = {
+      acknowledged: true,
+      matchedCount: 1,
+      modifiedCount: 1,
+      insertedCount: 0,
+      deletedCount: 0,
+      upsertedCount: 0,
+      insertedIds: {},
+      upsertedIds: {}
+    }
+    const bulkWrite = jest.fn().mockResolvedValue(bulkWriteResult)
+    const collection = {
+      collectionName: 'todos',
+      bulkWrite
+    }
+
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      run_as_system: true
+    }).db('db').collection('todos')
+
+    const result = await operators.bulkWrite(operations as any, { ordered: false } as any)
+
+    expect(result).toEqual(bulkWriteResult)
+    expect(bulkWrite).toHaveBeenCalledWith(operations, { ordered: false })
+  })
+
+  it('rejects bulkWrite outside run_as_system mode', async () => {
+    const bulkWrite = jest.fn()
+    const collection = {
+      collectionName: 'todos',
+      bulkWrite
+    }
+
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules(),
+      user: { id: 'user-1' }
+    }).db('db').collection('todos')
+
+    await expect(
+      operators.bulkWrite(
+        [
+          {
+            updateOne: {
+              filter: { done: false },
+              update: { $set: { done: true } }
+            }
+          }
+        ] as any,
+        { ordered: false } as any
+      )
+    ).rejects.toThrow('bulkWrite is available only when run_as_system is enabled')
+
+    expect(bulkWrite).not.toHaveBeenCalled()
+  })
+
   it('supports operator updates in updateMany without using invalid aggregate stages', async () => {
     const id = new ObjectId()
     const find = jest.fn().mockReturnValue({
@@ -511,6 +575,56 @@ describe('mongodb-atlas Realm compatibility', () => {
     const result = await operators.insertMany([{ a: 1 }, { a: 2 }])
 
     expect(result.insertedIds).toEqual([id0, id1])
+  })
+
+  it('computes distinct values from readable documents only', async () => {
+    const find = jest.fn().mockReturnValue({
+      toArray: jest.fn().mockResolvedValue([
+        { _id: new ObjectId(), visible: 'A', secret: 'internal-1' },
+        { _id: new ObjectId(), visible: 'A', secret: 'internal-2' },
+        { _id: new ObjectId(), visible: 'B', secret: 'internal-1' }
+      ])
+    })
+    const collection = {
+      collectionName: 'todos',
+      find
+    }
+    const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
+      rules: createRules({
+        roles: [
+          {
+            name: 'reader',
+            apply_when: {},
+            insert: true,
+            delete: true,
+            search: true,
+            read: true,
+            write: true,
+            fields: {
+              visible: { read: true },
+              secret: { read: false, write: false }
+            }
+          } as any
+        ]
+      }),
+      user: { id: 'user-1' }
+    }).db('db').collection('todos')
+
+    const visibleResult = await operators.distinct('visible', { archived: false })
+    const secretResult = await operators.distinct('secret', { archived: false })
+
+    expect(visibleResult).toEqual(['A', 'B'])
+    expect(secretResult).toEqual([])
+    expect(find).toHaveBeenNthCalledWith(
+      1,
+      { $and: [{ archived: false }] },
+      { projection: { _id: 1, visible: 1 } }
+    )
+    expect(find).toHaveBeenNthCalledWith(
+      2,
+      { $and: [{ archived: false }] },
+      { projection: { _id: 1, secret: 1 } }
+    )
   })
 
   it('exposes startSession and delegates to the underlying MongoClient', async () => {

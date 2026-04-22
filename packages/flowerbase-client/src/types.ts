@@ -30,6 +30,7 @@ export type MongoDbServiceName = 'mongodb-atlas'
 export type MongoDbServiceArgument = {
   database: string
   collection: string
+  key?: string
   query?: MongoDbDocument
   filter?: MongoDbDocument
   update?: MongoDbDocument | MongoDbDocument[]
@@ -38,6 +39,7 @@ export type MongoDbServiceArgument = {
   returnNewDocument?: boolean
   document?: MongoDbDocument
   documents?: MongoDbDocument[]
+  operations?: MongoDbDocument[]
   pipeline?: MongoDbDocument[]
   replacement?: MongoDbDocument
 }
@@ -74,6 +76,11 @@ export type WatchAsyncIterator<TChange = unknown> = AsyncIterableIterator<TChang
 export interface CollectionLike {
   find: (query?: Record<string, unknown>, options?: Record<string, unknown>) => Promise<unknown>
   findOne: (query?: Record<string, unknown>, options?: Record<string, unknown>) => Promise<unknown>
+  distinct: (
+    key: string,
+    filter?: Record<string, unknown>,
+    options?: Record<string, unknown>
+  ) => Promise<unknown[]>
   findOneAndUpdate: (
     filter: Record<string, unknown>,
     update: Record<string, unknown>,
@@ -89,6 +96,7 @@ export interface CollectionLike {
   count: (filter?: Record<string, unknown>, options?: Record<string, unknown>) => Promise<unknown>
   insertOne: (document: Record<string, unknown>, options?: Record<string, unknown>) => Promise<unknown>
   insertMany: (documents: Record<string, unknown>[], options?: Record<string, unknown>) => Promise<unknown>
+  bulkWrite: (operations: Record<string, unknown>[], options?: Record<string, unknown>) => Promise<unknown>
   updateOne: (
     filter: Record<string, unknown>,
     update: Record<string, unknown>,
