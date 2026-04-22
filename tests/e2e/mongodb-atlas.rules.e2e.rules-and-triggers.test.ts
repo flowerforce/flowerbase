@@ -21,6 +21,7 @@ const OID_STRING_TO_OID_COLLECTION = 'oidStringToOidDocs'
 const OID_TO_STRING_COLLECTION = 'oidToStringDocs'
 const ACTIVITIES_COLLECTION = 'activities'
 const COUNTERS_COLLECTION = 'counters'
+const COUNTERS_APPLY_WHEN_FUNCTION_COLLECTION = 'countersApplyWhenFunction'
 const UPLOADS_COLLECTION = 'uploads'
 const INSERT_ONLY_COLLECTION = 'insertOnlyDocs'
 const APP_SETTINGS_COLLECTION = 'app_settings'
@@ -97,6 +98,10 @@ const counterIds = {
   workspaceAll: new ObjectId('000000000000000000000202'),
   visibilityUsers: new ObjectId('000000000000000000000203'),
   adminOnly: new ObjectId('000000000000000000000204')
+}
+const counterApplyWhenFunctionIds = {
+  adminWorkspaceDoc: new ObjectId('000000000000000000000205'),
+  guestWorkspaceDoc: new ObjectId('000000000000000000000206')
 }
 const uploadIds = {
   owner: new ObjectId('000000000000000000000301'),
@@ -185,16 +190,16 @@ const callServiceOperation = async ({
 }: {
   collection: string
   method:
-    | 'find'
-    | 'findOne'
-    | 'count'
-    | 'countDocuments'
-    | 'findOneAndUpdate'
-    | 'deleteOne'
-    | 'deleteMany'
-    | 'insertOne'
-    | 'updateOne'
-    | 'aggregate'
+  | 'find'
+  | 'findOne'
+  | 'count'
+  | 'countDocuments'
+  | 'findOneAndUpdate'
+  | 'deleteOne'
+  | 'deleteMany'
+  | 'insertOne'
+  | 'updateOne'
+  | 'aggregate'
   user: TestUser | null
   query?: Document
   filter?: Document
@@ -318,6 +323,8 @@ const getActivitiesCollection = (user: TestUser | null) =>
   createCollectionProxy(ACTIVITIES_COLLECTION, user)
 const getCountersCollection = (user: TestUser | null) =>
   createCollectionProxy(COUNTERS_COLLECTION, user)
+const getCountersApplyWhenFunctionCollection = (user: TestUser | null) =>
+  createCollectionProxy(COUNTERS_APPLY_WHEN_FUNCTION_COLLECTION, user)
 const getUploadsCollection = (user: TestUser | null) =>
   createCollectionProxy(UPLOADS_COLLECTION, user)
 const getInsertOnlyCollection = (user: TestUser | null) =>
@@ -395,6 +402,15 @@ type CounterDoc = Document & {
   }
   value: number
 }
+type CounterApplyWhenFunctionDoc = Document & {
+  owner: string
+  workspace: string
+  visibility: {
+    type: string
+    users?: string[]
+  }
+  value: number
+}
 type UploadDoc = Document & {
   publisher: string
   status: string
@@ -424,6 +440,7 @@ const resetCollections = async () => {
     db.collection('activityLogs').deleteMany({}),
     db.collection(ACTIVITIES_COLLECTION).deleteMany({}),
     db.collection(COUNTERS_COLLECTION).deleteMany({}),
+    db.collection(COUNTERS_APPLY_WHEN_FUNCTION_COLLECTION).deleteMany({}),
     db.collection(UPLOADS_COLLECTION).deleteMany({}),
     db.collection(INSERT_ONLY_COLLECTION).deleteMany({}),
     db.collection(APP_SETTINGS_COLLECTION).deleteMany({}),
@@ -641,6 +658,27 @@ const resetCollections = async () => {
       value: 400,
       visibility: {
         type: 'private'
+      }
+    }
+  ])
+
+  await db.collection(COUNTERS_APPLY_WHEN_FUNCTION_COLLECTION).insertMany([
+    {
+      _id: counterApplyWhenFunctionIds.adminWorkspaceDoc,
+      owner: 'user-external',
+      workspace: 'workspace-1',
+      value: 610,
+      visibility: {
+        type: 'private'
+      }
+    },
+    {
+      _id: counterApplyWhenFunctionIds.guestWorkspaceDoc,
+      owner: guestUser.id,
+      workspace: 'workspace-2',
+      value: 710,
+      visibility: {
+        type: 'onlyme'
       }
     }
   ])
@@ -1132,9 +1170,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const summary = (await getTodosCollection(ownerUser)
       .aggregate(pipeline)
       .toArray()) as Array<{
-      _id: string
-      count: number
-    }>
+        _id: string
+        count: number
+      }>
 
     expect(summary).toHaveLength(1)
     expect(summary[0]).toEqual({ _id: ownerUser.id, count: 2 })
@@ -1811,6 +1849,40 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       _id: counterIds.adminOnly
     })) as CounterDoc | null
     expect(adminCounter?.value).toBe(500)
+  })
+
+  it('evaluates nested %function inside role apply_when for counters-like rules', async () => {
+    const ownerDoc = (await getCountersApplyWhenFunctionCollection(ownerUser).findOne({
+      _id: counterApplyWhenFunctionIds.adminWorkspaceDoc
+    })) as CounterApplyWhenFunctionDoc | null
+
+    expect(ownerDoc).not.toEqual({})
+    expect(ownerDoc?._id).toEqual(counterApplyWhenFunctionIds.adminWorkspaceDoc)
+    expect(ownerDoc?.owner).toBe('user-external')
+
+    const ownerUpdate = await getCountersApplyWhenFunctionCollection(ownerUser).updateOne(
+      { _id: counterApplyWhenFunctionIds.adminWorkspaceDoc },
+      { $set: { value: 615 } }
+    )
+    expect(ownerUpdate.matchedCount).toBe(1)
+
+    const updatedOwnerDoc =
+      (await getCountersApplyWhenFunctionCollection(ownerUser).findOne({
+        _id: counterApplyWhenFunctionIds.adminWorkspaceDoc
+      })) as CounterApplyWhenFunctionDoc | null
+    expect(updatedOwnerDoc?.value).toBe(615)
+
+    const guestDoc = await getCountersApplyWhenFunctionCollection(guestUser).findOne({
+      _id: counterApplyWhenFunctionIds.adminWorkspaceDoc
+    })
+    expect(guestDoc).toBeNull()
+
+    await expect(
+      getCountersApplyWhenFunctionCollection(guestUser).updateOne(
+        { _id: counterApplyWhenFunctionIds.adminWorkspaceDoc },
+        { $set: { value: 999 } }
+      )
+    ).rejects.toThrow('Update not permitted')
   })
 
   it('allows status update when the role grants field-level write', async () => {

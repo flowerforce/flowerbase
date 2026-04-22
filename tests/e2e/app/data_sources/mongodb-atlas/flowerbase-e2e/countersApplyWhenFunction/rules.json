@@ -1,0 +1,90 @@
+{
+  "database": "flowerbase-e2e",
+  "collection": "countersApplyWhenFunction",
+  "filters": [
+    {
+      "name": "only workspaces valid",
+      "query": {
+        "$or": [
+          {
+            "owner": "%%user.id"
+          },
+          {
+            "visibility.type": "all"
+          },
+          {
+            "visibility.users": {
+              "$in": [
+                "%%user.id"
+              ]
+            }
+          },
+          {
+            "$and": [
+              {
+                "workspace": {
+                  "$in": "%%user.custom_data.adminIn"
+                }
+              },
+              {
+                "visibility.type": {
+                  "$ne": "onlyme"
+                }
+              }
+            ]
+          }
+        ],
+        "workspace": {
+          "$in": "%%user.custom_data.workspaces"
+        }
+      },
+      "apply_when": {
+        "%%true": true
+      }
+    }
+  ],
+  "roles": [
+    {
+      "name": "hasWorkspace",
+      "apply_when": {
+        "%or": [
+          {
+            "owner": "%%user.id"
+          },
+          {
+            "%and": [
+              {
+                "%%user.custom_data.type": "internal"
+              },
+              {
+                "%%true": {
+                  "%function": {
+                    "arguments": [
+                      "%%root"
+                    ],
+                    "name": "isAuthorizedAdmin"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "insert": true,
+      "delete": true,
+      "search": true,
+      "read": true,
+      "write": {
+        "%%true": {
+          "%function": {
+            "arguments": [
+              "%%root"
+            ],
+            "name": "isAuthorizedAdmin"
+          }
+        }
+      },
+      "additional_fields": {}
+    }
+  ]
+}
