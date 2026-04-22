@@ -19,7 +19,7 @@ import {
 import { Rules } from '../../features/rules/interface'
 import { buildRulesMeta } from '../../monitoring/utils'
 import { checkValidation } from '../../utils/roles/machines'
-import { getWinningRole } from '../../utils/roles/machines/utils'
+import { getWinningRoleAsync } from '../../utils/roles/machines/utils'
 import { emitServiceEvent } from '../monitoring'
 import { CHANGESTREAM } from '../../constants'
 import {
@@ -609,7 +609,7 @@ const getOperators: GetOperatorsFunction = (
             return null
           }
 
-          const winningRole = getWinningRole(result, user, roles)
+          const winningRole = await getWinningRoleAsync(result, user, roles)
 
           logDebug('findOne winningRole', {
             collection: collName,
@@ -681,7 +681,7 @@ const getOperators: GetOperatorsFunction = (
 
           // Retrieve the document to check permissions before deleting
           const result = await collection.findOne(buildAndQuery(formattedQuery))
-          const winningRole = getWinningRole(result, user, roles)
+          const winningRole = await getWinningRoleAsync(result, user, roles)
 
           logDebug('delete winningRole', {
             collection: collName,
@@ -745,7 +745,7 @@ const getOperators: GetOperatorsFunction = (
             collection.collectionName,
             CRUD_OPERATIONS.CREATE
           )
-          const winningRole = getWinningRole(data, user, roles)
+          const winningRole = await getWinningRoleAsync(data, user, roles)
 
           const { status, document } = winningRole
             ? await checkValidation(
@@ -835,7 +835,7 @@ const getOperators: GetOperatorsFunction = (
             throw new Error('Update not permitted')
           }
 
-          const winningRole = getWinningRole(result, user, roles)
+          const winningRole = await getWinningRoleAsync(result, user, roles)
 
           // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
           const updatedPaths = getUpdatedPaths(normalizedData)
@@ -940,7 +940,7 @@ const getOperators: GetOperatorsFunction = (
             docToCheck = computedDoc
           }
 
-          const winningRole = getWinningRole(docToCheck, user, roles)
+          const winningRole = await getWinningRoleAsync(docToCheck, user, roles)
 
           const { status, document } = winningRole
             ? await checkValidation(
@@ -978,7 +978,7 @@ const getOperators: GetOperatorsFunction = (
             return updateResult
           }
 
-          const readRole = getWinningRole(updateResult, user, roles)
+          const readRole = await getWinningRoleAsync(updateResult, user, roles)
           const readResult = readRole
             ? await checkValidation(
               readRole,
@@ -1069,7 +1069,7 @@ const getOperators: GetOperatorsFunction = (
 
             const filteredResponse = await Promise.all(
               response.map(async (currentDoc) => {
-                const winningRole = getWinningRole(currentDoc, user, roles)
+                const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
                 logDebug('find winningRole', {
                   collection: collName,
@@ -1244,7 +1244,7 @@ const getOperators: GetOperatorsFunction = (
           const isValidChange = async (change: Document) => {
             const { fullDocument, updateDescription } = change
             const hasFullDocument = !!fullDocument
-            const winningRole = getWinningRole(fullDocument, user, roles)
+            const winningRole = await getWinningRoleAsync(fullDocument, user, roles)
 
             const fullDocumentValidation = winningRole
               ? await checkValidation(
@@ -1412,7 +1412,7 @@ const getOperators: GetOperatorsFunction = (
           // Validate each document against user's roles
           const filteredItems = await Promise.all(
             documents.map(async (currentDoc) => {
-              const winningRole = getWinningRole(currentDoc, user, roles)
+              const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
               const { status, document } = winningRole
                 ? await checkValidation(
@@ -1476,7 +1476,7 @@ const getOperators: GetOperatorsFunction = (
 
           const filteredItems = await Promise.all(
             docsToCheck.map(async (currentDoc, index) => {
-              const winningRole = getWinningRole(currentDoc, user, roles)
+              const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
               const { status, document } = winningRole
                 ? await checkValidation(
@@ -1552,7 +1552,7 @@ const getOperators: GetOperatorsFunction = (
           // Filter and validate each document based on user's roles
           const filteredItems = await Promise.all(
             data.map(async (currentDoc) => {
-              const winningRole = getWinningRole(currentDoc, user, roles)
+              const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
               const { status, document } = winningRole
                 ? await checkValidation(

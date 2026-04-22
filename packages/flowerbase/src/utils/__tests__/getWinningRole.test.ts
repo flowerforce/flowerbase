@@ -70,4 +70,21 @@ describe('getWinningRole', () => {
     const result = getWinningRole(null, mockUser, mockRoles)
     expect(result).toEqual(mockRoles[0])
   })
+
+  it('should return the first matching role asynchronously', async () => {
+    const mockCheckApplyWhenAsync = jest
+      .spyOn(Utils, 'checkApplyWhenAsync')
+      .mockResolvedValueOnce(true)
+
+    await expect(Utils.getWinningRoleAsync(mockDocument, mockUser, mockRoles)).resolves.toEqual(
+      mockRoles[0]
+    )
+    expect(mockCheckApplyWhenAsync).toHaveBeenCalledWith(
+      mockRoles[0].apply_when,
+      mockUser,
+      mockDocument
+    )
+    expect(mockCheckApplyWhenAsync).toHaveBeenCalledTimes(1)
+    mockCheckApplyWhenAsync.mockReset()
+  })
 })

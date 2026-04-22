@@ -10,7 +10,10 @@ export interface FunctionConfig {
   disable_arg_logs?: boolean
 }
 
-export type Function = Omit<FunctionConfig, 'name'> & { code: string }
+export type Function = Omit<FunctionConfig, 'name'> & {
+  code: string
+  sourcePath?: string
+}
 
 export type Functions = Record<string, Function>
 
