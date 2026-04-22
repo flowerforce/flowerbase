@@ -27,7 +27,7 @@ export const loadFunctions = async (rootDir = process.cwd()): Promise<Functions>
       throw new Error(`File ${name}.js or ${name}.ts not found`)
     }
     code = fs.readFileSync(fnPath, 'utf-8')
-    acc[name] = { code, ...opts }
+    acc[name] = { code, sourcePath: fnPath, ...opts }
 
     return acc
   }, {} as Functions)

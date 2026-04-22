@@ -19,7 +19,7 @@ import {
 import { Rules } from '../../features/rules/interface'
 import { buildRulesMeta } from '../../monitoring/utils'
 import { checkValidation } from '../../utils/roles/machines'
-import { getWinningRole } from '../../utils/roles/machines/utils'
+import { getWinningRoleAsync } from '../../utils/roles/machines/utils'
 import { emitServiceEvent } from '../monitoring'
 import { CHANGESTREAM } from '../../constants'
 import {
@@ -35,6 +35,7 @@ import {
   getFormattedProjection,
   getFormattedQuery,
   getHiddenFieldsFromRulesConfig,
+  mergeProjections,
   normalizeQuery
 } from './utils'
 
@@ -555,7 +556,7 @@ const getOperators: GetOperatorsFunction = (
   }
 
   const validateReadableDocument = async (currentDoc: Document) => {
-    const winningRole = getWinningRole(currentDoc, user, roles)
+    const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
     logDebug('find winningRole', {
       collection: collName,
@@ -619,13 +620,6 @@ const getOperators: GetOperatorsFunction = (
           projectionOrOptions,
           options
         )
-        const resolvedOptions =
-          projection || normalizedOptions
-            ? {
-              ...(normalizedOptions ?? {}),
-              ...(projection ? { projection } : {})
-            }
-            : undefined
         const resolvedQuery = query ?? {}
         if (!run_as_system) {
           checkDenyOperation(
@@ -635,6 +629,17 @@ const getOperators: GetOperatorsFunction = (
           )
           // Apply access control filters to the query
           const formattedQuery = getFormattedQuery(filters, resolvedQuery, user)
+          // Rules-level projection has priority over client-provided projection.
+          // The merged projection is passed natively to MongoDB.
+          const rulesProjection = getFormattedProjection(filters, user)
+          const finalProjection = mergeProjections(projection, rulesProjection)
+          const resolvedOptions =
+            finalProjection || normalizedOptions
+              ? {
+                ...(normalizedOptions ?? {}),
+                ...(finalProjection ? { projection: finalProjection } : {})
+              }
+              : undefined
           logDebug('update formattedQuery', {
             collection: collName,
             query,
@@ -665,7 +670,7 @@ const getOperators: GetOperatorsFunction = (
             return null
           }
 
-          const winningRole = getWinningRole(result, user, roles)
+          const winningRole = await getWinningRoleAsync(result, user, roles)
 
           logDebug('findOne winningRole', {
             collection: collName,
@@ -690,8 +695,15 @@ const getOperators: GetOperatorsFunction = (
           emitMongoEvent('findOne')
           return Promise.resolve(response)
         }
-        // System mode: no validation applied
-        const response = await collection.findOne(resolvedQuery, resolvedOptions)
+        // System mode: no validation applied, only client-provided projection/options.
+        const systemOptions =
+          projection || normalizedOptions
+            ? {
+              ...(normalizedOptions ?? {}),
+              ...(projection ? { projection } : {})
+            }
+            : undefined
+        const response = await collection.findOne(resolvedQuery, systemOptions)
         emitMongoEvent('findOne')
         return response
       } catch (error) {
@@ -730,7 +742,7 @@ const getOperators: GetOperatorsFunction = (
 
           // Retrieve the document to check permissions before deleting
           const result = await collection.findOne(buildAndQuery(formattedQuery))
-          const winningRole = getWinningRole(result, user, roles)
+          const winningRole = await getWinningRoleAsync(result, user, roles)
 
           logDebug('delete winningRole', {
             collection: collName,
@@ -794,7 +806,7 @@ const getOperators: GetOperatorsFunction = (
             collection.collectionName,
             CRUD_OPERATIONS.CREATE
           )
-          const winningRole = getWinningRole(data, user, roles)
+          const winningRole = await getWinningRoleAsync(data, user, roles)
 
           const { status, document } = winningRole
             ? await checkValidation(
@@ -884,7 +896,7 @@ const getOperators: GetOperatorsFunction = (
             throw new Error('Update not permitted')
           }
 
-          const winningRole = getWinningRole(result, user, roles)
+          const winningRole = await getWinningRoleAsync(result, user, roles)
 
           // Check if the update data contains MongoDB update operators (e.g., $set, $inc)
           const updatedPaths = getUpdatedPaths(normalizedData)
@@ -989,7 +1001,7 @@ const getOperators: GetOperatorsFunction = (
             docToCheck = computedDoc
           }
 
-          const winningRole = getWinningRole(docToCheck, user, roles)
+          const winningRole = await getWinningRoleAsync(docToCheck, user, roles)
 
           const { status, document } = winningRole
             ? await checkValidation(
@@ -1027,7 +1039,7 @@ const getOperators: GetOperatorsFunction = (
             return updateResult
           }
 
-          const readRole = getWinningRole(updateResult, user, roles)
+          const readRole = await getWinningRoleAsync(updateResult, user, roles)
           const readResult = readRole
             ? await checkValidation(
               readRole,
@@ -1084,13 +1096,6 @@ const getOperators: GetOperatorsFunction = (
           projectionOrOptions,
           options
         )
-        const resolvedOptions =
-          projection || normalizedOptions
-            ? {
-              ...(normalizedOptions ?? {}),
-              ...(projection ? { projection } : {})
-            }
-            : undefined
         if (!run_as_system) {
           checkDenyOperation(
             normalizedRules,
@@ -1100,6 +1105,17 @@ const getOperators: GetOperatorsFunction = (
           // Pre-query filtering based on access control rules
           const formattedQuery = getFormattedQuery(filters, query, user)
           const currentQuery = formattedQuery.length ? { $and: formattedQuery } : {}
+          // Rules-level projection has priority over client-provided projection.
+          // The merged projection is passed natively to MongoDB.
+          const rulesProjection = getFormattedProjection(filters, user)
+          const finalProjection = mergeProjections(projection, rulesProjection)
+          const resolvedOptions =
+            finalProjection || normalizedOptions
+              ? {
+                ...(normalizedOptions ?? {}),
+                ...(finalProjection ? { projection: finalProjection } : {})
+              }
+              : undefined
           // aggiunto filter per evitare questo errore: $and argument's entries must be objects
           const cursor = collection.find(currentQuery, resolvedOptions)
           const originalToArray = cursor.toArray.bind(cursor)
@@ -1122,8 +1138,15 @@ const getOperators: GetOperatorsFunction = (
           emitMongoEvent('find')
           return cursor
         }
-        // System mode: return original unfiltered cursor
-        const cursor = collection.find(query, resolvedOptions)
+        // System mode: return original unfiltered cursor (only client projection/options).
+        const systemOptions =
+          projection || normalizedOptions
+            ? {
+              ...(normalizedOptions ?? {}),
+              ...(projection ? { projection } : {})
+            }
+            : undefined
+        const cursor = collection.find(query, systemOptions)
         emitMongoEvent('find')
         return cursor
       } catch (error) {
@@ -1298,7 +1321,7 @@ const getOperators: GetOperatorsFunction = (
           const isValidChange = async (change: Document) => {
             const { fullDocument, updateDescription } = change
             const hasFullDocument = !!fullDocument
-            const winningRole = getWinningRole(fullDocument, user, roles)
+            const winningRole = await getWinningRoleAsync(fullDocument, user, roles)
 
             const fullDocumentValidation = winningRole
               ? await checkValidation(
@@ -1404,7 +1427,7 @@ const getOperators: GetOperatorsFunction = (
           formattedQuery,
           pipeline
         })
-        const projection = getFormattedProjection(filters)
+        const projection = getFormattedProjection(filters, user)
         const hiddenFields = getHiddenFieldsFromRulesConfig(rulesConfig)
 
         const sanitizedPipeline = applyAccessControlToPipeline(
@@ -1466,7 +1489,7 @@ const getOperators: GetOperatorsFunction = (
           // Validate each document against user's roles
           const filteredItems = await Promise.all(
             documents.map(async (currentDoc) => {
-              const winningRole = getWinningRole(currentDoc, user, roles)
+              const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
               const { status, document } = winningRole
                 ? await checkValidation(
@@ -1548,7 +1571,7 @@ const getOperators: GetOperatorsFunction = (
 
           const filteredItems = await Promise.all(
             docsToCheck.map(async (currentDoc, index) => {
-              const winningRole = getWinningRole(currentDoc, user, roles)
+              const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
               const { status, document } = winningRole
                 ? await checkValidation(
@@ -1624,7 +1647,7 @@ const getOperators: GetOperatorsFunction = (
           // Filter and validate each document based on user's roles
           const filteredItems = await Promise.all(
             data.map(async (currentDoc) => {
-              const winningRole = getWinningRole(currentDoc, user, roles)
+              const winningRole = await getWinningRoleAsync(currentDoc, user, roles)
 
               const { status, document } = winningRole
                 ? await checkValidation(

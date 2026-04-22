@@ -1,3 +1,5 @@
+/// <reference types="jest" />
+
 import { ObjectId } from 'mongodb'
 import MongoDbAtlas from '..'
 import { Rules } from '../../../features/rules/interface'

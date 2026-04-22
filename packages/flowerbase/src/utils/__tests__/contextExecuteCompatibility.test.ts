@@ -1,5 +1,8 @@
 import { GenerateContextSync } from '../context'
 import { Functions } from '../../features/functions/interface'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 const mockServices = {
   api: jest.fn().mockReturnValue({}),
@@ -116,5 +119,42 @@ describe('context.functions.execute compatibility', () => {
     })
 
     expect(result).toBe(true)
+  })
+
+  it('loads same-directory helper modules for sandboxed functions', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flowerbase-context-'))
+    const helperPath = path.join(tempDir, 'getFreightRate.ts')
+
+    fs.writeFileSync(
+      helperPath,
+      'export function getFreightRate([address, amount, freightRateValues]) { return { address, total: amount * freightRateValues.multiplier } }'
+    )
+
+    const functionsList = {
+      caller: {
+        sourcePath: path.join(tempDir, 'caller.ts'),
+        code: `
+          import { getFreightRate } from './getFreightRate'
+
+          module.exports = function() {
+            return getFreightRate(['rome', 4, { multiplier: 2.5 }])
+          }
+        `
+      }
+    } as Functions
+
+    const result = GenerateContextSync({
+      args: [],
+      app: {} as any,
+      rules: {} as any,
+      user: {} as any,
+      currentFunction: functionsList.caller,
+      functionsList,
+      services: mockServices,
+      functionName: 'caller'
+    })
+
+    expect(result).toEqual({ address: 'rome', total: 10 })
+    fs.rmSync(tempDir, { recursive: true, force: true })
   })
 })

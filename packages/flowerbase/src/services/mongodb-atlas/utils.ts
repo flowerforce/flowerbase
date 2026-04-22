@@ -76,18 +76,87 @@ export const getFormattedProjection = (
   filters: Filter[] = [],
   user?: User
 ): Projection | null => {
-  const projections = filters
-    .filter((filter) => {
-      if (filter.projection) {
-        const preFilter = getValidRule({ filters, user })
-        const isValidPreFilter = !!preFilter?.length
-        return isValidPreFilter
-      }
-      return false
-    })
-    .map((f) => f.projection)
+  const projections = getValidRule({ filters, user })
+    .filter((f) => !!f.projection)
+    .map((f) => f.projection as Projection)
   if (!projections.length) return null
   return Object.assign({}, ...projections)
+}
+
+/**
+ * Merges a client-provided projection with the one computed from rules filters.
+ *
+ * Rules have higher priority over the client:
+ * - If rules exclude a top-level field (e.g. `{ instock: 0 }`), every client
+ *   reference to that field — including dotted sub-paths such as
+ *   `"instock.qty": 1` — is dropped from the final projection.
+ * - If rules include a field (value `1`), it is always part of the final
+ *   projection and overrides any conflicting client value.
+ * - The returned projection is always a valid MongoDB projection (no mixing of
+ *   inclusion and exclusion on non-`_id` keys), so it can be passed as-is to
+ *   native MongoDB methods.
+ * - Returns `undefined` when neither side provided a meaningful projection.
+ */
+export const mergeProjections = (
+  clientProjection: Projection | Document | undefined,
+  rulesProjection: Projection | null | undefined
+): Projection | Document | undefined => {
+  const hasClient = !!clientProjection && Object.keys(clientProjection).length > 0
+  const hasRules = !!rulesProjection && Object.keys(rulesProjection).length > 0
+  if (!hasClient && !hasRules) return undefined
+
+  const client = (hasClient ? (clientProjection as Projection) : {}) as Projection
+  const rules = (hasRules ? (rulesProjection as Projection) : {}) as Projection
+
+  const getTopLevel = (key: string) => key.split('.')[0]
+
+  const rulesEntries = Object.entries(rules)
+  const rulesIncludeKeys = rulesEntries
+    .filter(([, value]) => value === 1)
+    .map(([key]) => key)
+  const rulesExcludeKeys = rulesEntries
+    .filter(([, value]) => value === 0)
+    .map(([key]) => key)
+
+  // Top-level fields excluded by rules (excluding `_id` which has special
+  // MongoDB semantics and is allowed alongside inclusion projections).
+  const excludedTopLevel = new Set(
+    rulesExcludeKeys.map(getTopLevel).filter((key) => key !== '_id')
+  )
+
+  const filteredClient: Record<string, 0 | 1> = {}
+  for (const [key, value] of Object.entries(client)) {
+    if (excludedTopLevel.has(getTopLevel(key))) continue
+    filteredClient[key] = value as 0 | 1
+  }
+
+  const hasInclusion =
+    rulesIncludeKeys.some((key) => key !== '_id') ||
+    Object.entries(filteredClient).some(([key, value]) => value === 1 && key !== '_id')
+
+  const merged: Record<string, 0 | 1> = {}
+
+  if (hasInclusion) {
+    // Inclusion mode: keep only client inclusions, then overlay rules inclusions.
+    // Client exclusions (other than `_id: 0`) are incompatible with inclusion
+    // mode and are dropped; not-included fields are implicitly excluded anyway.
+    for (const [key, value] of Object.entries(filteredClient)) {
+      if (value === 1 || key === '_id') merged[key] = value
+    }
+    for (const key of rulesIncludeKeys) merged[key] = 1
+    // Allow `_id: 0` to be forced by rules in inclusion mode.
+    for (const key of rulesExcludeKeys) {
+      if (key === '_id') merged[key] = 0
+    }
+  } else {
+    // Pure exclusion mode: combine all exclusions from both sides.
+    for (const [key, value] of Object.entries(filteredClient)) {
+      if (value === 0) merged[key] = 0
+    }
+    for (const key of rulesExcludeKeys) merged[key] = 0
+  }
+
+  return Object.keys(merged).length > 0 ? merged : undefined
 }
 
 export const applyAccessControlToPipeline = (
@@ -120,7 +189,7 @@ export const applyAccessControlToPipeline = (
       checkDenyOperation(rules as Rules, currentCollection, CRUD_OPERATIONS.READ)
       const lookupRules = rules[currentCollection] || {}
       const formattedQuery = getFormattedQuery(lookupRules.filters, {}, user)
-      const projection = getFormattedProjection(lookupRules.filters)
+      const projection = getFormattedProjection(lookupRules.filters, user)
 
       const nestedPipeline = applyAccessControlToPipeline(
         lookUpStage.pipeline || [],
@@ -155,7 +224,7 @@ export const applyAccessControlToPipeline = (
       checkDenyOperation(rules as Rules, currentCollection, CRUD_OPERATIONS.READ)
       const unionRules = rules[currentCollection] || {}
       const formattedQuery = getFormattedQuery(unionRules.filters, {}, user)
-      const projection = getFormattedProjection(unionRules.filters)
+      const projection = getFormattedProjection(unionRules.filters, user)
 
       if (isSimpleStage) {
         return stage
