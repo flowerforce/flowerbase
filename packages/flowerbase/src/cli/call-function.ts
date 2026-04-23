@@ -233,7 +233,8 @@ const executeLocal = async ({
         url: 'cli://local',
         host: 'cli',
         id: 'cli',
-        hostname: 'cli'
+        hostname: 'cli',
+        headers: {}
       }
     })
   } finally {
