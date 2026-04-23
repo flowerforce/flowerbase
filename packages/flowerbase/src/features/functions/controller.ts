@@ -441,7 +441,8 @@ export const functionsController: FunctionController = async (
         currentFunction,
         functionName: String(method),
         functionsList,
-        services
+        services,
+        request: req
       })
       const normalizedResult = await normalizeFunctionResult(result)
       if (isReturnedError(normalizedResult)) {
