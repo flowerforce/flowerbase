@@ -157,4 +157,25 @@ describe('context.functions.execute compatibility', () => {
     expect(result).toEqual({ address: 'rome', total: 10 })
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
+
+  it('exposes native fetch in the sandbox global scope', () => {
+    const functionsList = {
+      caller: {
+        code: 'module.exports = function() { return fetch === globalThis.fetch && typeof fetch === "function" }'
+      }
+    } as Functions
+
+    const result = GenerateContextSync({
+      args: [],
+      app: {} as any,
+      rules: {} as any,
+      user: {} as any,
+      currentFunction: functionsList.caller,
+      functionsList,
+      services: mockServices,
+      functionName: 'caller'
+    })
+
+    expect(result).toBe(true)
+  })
 })

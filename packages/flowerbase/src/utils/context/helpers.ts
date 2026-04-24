@@ -176,6 +176,7 @@ export const generateContextData = ({
     BSON,
     EJSON,
     Buffer,
+    fetch,
     utils,
     console: {
       log: (...args: Arguments) => {

@@ -47,7 +47,7 @@ describe('generateContextData', () => {
 
   it('should return an object with context configuration', async () => {
     const mockApp = Fastify()
-    const { context, console: contextConsole, BSON } = generateContextData({
+    const { context, console: contextConsole, BSON, fetch } = generateContextData({
       services,
       app: mockApp,
       functionsList: mockFunctions,
@@ -65,6 +65,8 @@ describe('generateContextData', () => {
     expect(context.environment.tag).toBe(mockEnv.NODE_ENV)
 
     expect(context.user).toEqual(mockUser)
+
+    expect(fetch).toBe(global.fetch)
 
     const mockedLog = jest.spyOn(console, 'log').mockImplementation(() => { })
     contextConsole.log('Test', 'generateContextData')
