@@ -9,6 +9,29 @@ import { Base64Function, FunctionCallBase64Dto, FunctionCallDto } from './dtos'
 import { FunctionController } from './interface'
 import { executeQuery } from './utils'
 
+const SUPPORTED_QUERY_METHODS = [
+  'find',
+  'findOne',
+  'count',
+  'countDocuments',
+  'distinct',
+  'deleteOne',
+  'insertOne',
+  'updateOne',
+  'findOneAndUpdate',
+  'aggregate',
+  'insertMany',
+  'bulkWrite',
+  'updateMany',
+  'deleteMany'
+] as const
+
+type SupportedQueryMethod = (typeof SUPPORTED_QUERY_METHODS)[number]
+
+const isSupportedQueryMethod = (value: unknown): value is SupportedQueryMethod =>
+  typeof value === 'string' &&
+  (SUPPORTED_QUERY_METHODS as readonly string[]).includes(value)
+
 const normalizeUser = (payload: Record<string, any> | undefined) => {
   if (!payload) return undefined
   const nestedUser =
@@ -352,6 +375,7 @@ export const functionsController: FunctionController = async (
       const [{
         database,
         collection,
+        key,
         query,
         filter,
         update,
@@ -360,8 +384,13 @@ export const functionsController: FunctionController = async (
         returnNewDocument,
         document,
         documents,
+        operations,
         pipeline = []
       }] = args
+
+      if (!isSupportedQueryMethod(method)) {
+        throw new Error(`Unsupported service method "${String(method)}"`)
+      }
 
       const currentMethod = serviceFn(app, { rules, user })
         .db(database)
@@ -371,6 +400,7 @@ export const functionsController: FunctionController = async (
       const operatorsByType = await executeQuery({
         currentMethod,
         query,
+        key,
         filter,
         update,
         projection,
@@ -378,10 +408,15 @@ export const functionsController: FunctionController = async (
         returnNewDocument,
         document,
         documents,
+        operations,
         pipeline,
         isClient: true
       })
-      const serviceResult = await operatorsByType[method as keyof typeof operatorsByType]()
+      const operator = operatorsByType[method]
+      if (typeof operator !== 'function') {
+        throw new Error(`Unsupported service method "${method}"`)
+      }
+      const serviceResult = await operator()
       res.type('application/json')
       return serializeEjson(serviceResult)
     }

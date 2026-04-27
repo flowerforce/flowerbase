@@ -1,4 +1,4 @@
-import { ObjectId } from 'bson'
+import { EJSON, ObjectId } from 'bson'
 import { App } from '../app'
 import { Credentials } from '../credentials'
 
@@ -66,18 +66,46 @@ describe('flowerbase-client mongo service wrapper', () => {
     await app.logIn(Credentials.emailPassword('john@doe.com', 'secret123'))
 
     const collection = app.currentUser!.mongoClient('mongodb-atlas').db('testdb').collection('todos')
+    const bulkOperations = [
+      {
+        updateOne: {
+          filter: { done: false },
+          update: { $set: { done: true } }
+        }
+      }
+    ]
 
     await collection.findOneAndUpdate({ done: false }, { $set: { done: true } })
     await collection.findOneAndReplace({ done: true }, { done: true, title: 'done' })
     await collection.findOneAndDelete({ done: true })
     await collection.aggregate([{ $match: { done: true } }])
     await collection.count({ done: true })
+    await collection.distinct('status', { done: true }, { maxTimeMS: 1000 })
     await collection.insertMany([{ title: 'A' }, { title: 'B' }])
     await collection.deleteMany({ done: true })
+    await collection.bulkWrite(bulkOperations, { ordered: false })
 
     const calls = (global.fetch as jest.Mock).mock.calls
-    const lastBody = JSON.parse(calls[calls.length - 1][1].body)
-    expect(lastBody.service).toBe('mongodb-atlas')
-    expect(lastBody.name).toBe('deleteMany')
+    const parsedBodies = calls
+      .map(([, request]) => request?.body)
+      .filter((body): body is string => typeof body === 'string')
+      .map((body) => EJSON.deserialize(JSON.parse(body)))
+    const distinctBody = parsedBodies.find((body) => body.name === 'distinct')
+    const bulkWriteBody = parsedBodies.find((body) => body.name === 'bulkWrite')
+
+    expect(distinctBody.service).toBe('mongodb-atlas')
+    expect(distinctBody.name).toBe('distinct')
+    expect(distinctBody.arguments[0]).toMatchObject({
+      key: 'status',
+      query: { done: true },
+      options: { maxTimeMS: 1000 }
+    })
+
+    expect(bulkWriteBody.service).toBe('mongodb-atlas')
+    expect(bulkWriteBody.name).toBe('bulkWrite')
+    expect(bulkWriteBody.arguments[0]).toMatchObject({
+      operations: bulkOperations,
+      options: { ordered: false }
+    })
   })
 })
