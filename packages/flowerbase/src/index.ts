@@ -24,6 +24,17 @@ export type CorsConfig = {
   methods: ALLOWED_METHODS[]
 }
 
+export type FastifyTimeoutConfig = {
+  /** Milliseconds to wait for a new connection (default: 0 = disabled) */
+  connectionTimeout?: number
+  /** Milliseconds to keep idle keep-alive connections open (default: 72000) */
+  keepAliveTimeout?: number
+  /** Milliseconds to wait for an incoming request body (default: 0 = disabled) */
+  requestTimeout?: number
+  /** Milliseconds to wait for a plugin to load (default: 10000) */
+  pluginTimeout?: number
+}
+
 export type InitializeConfig = {
   projectId: string
   mongodbUrl?: string
@@ -33,6 +44,7 @@ export type InitializeConfig = {
   corsConfig?: CorsConfig
   basePath?: string
   mongodbEncryptionConfig?: MongoDbEncryptionConfig
+  timeoutConfig?: FastifyTimeoutConfig
 }
 
 /**
@@ -51,7 +63,8 @@ export async function initialize({
   mongodbUrl = DEFAULT_CONFIG.MONGODB_URL,
   corsConfig = DEFAULT_CONFIG.CORS_OPTIONS,
   basePath,
-  mongodbEncryptionConfig
+  mongodbEncryptionConfig,
+  timeoutConfig
 }: InitializeConfig) {
   if (!jwtSecret || jwtSecret.trim().length === 0) {
     throw new Error('JWT secret missing: set JWT_SECRET or pass jwtSecret to initialize()')
@@ -59,7 +72,11 @@ export async function initialize({
 
   const resolvedBasePath = basePath ?? require.main?.path ?? process.cwd()
   const fastify = Fastify({
-    logger: !!DEFAULT_CONFIG.ENABLE_LOGGER
+    logger: !!DEFAULT_CONFIG.ENABLE_LOGGER,
+    ...(timeoutConfig?.connectionTimeout !== undefined && { connectionTimeout: timeoutConfig.connectionTimeout }),
+    ...(timeoutConfig?.keepAliveTimeout !== undefined && { keepAliveTimeout: timeoutConfig.keepAliveTimeout }),
+    ...(timeoutConfig?.requestTimeout !== undefined && { requestTimeout: timeoutConfig.requestTimeout }),
+    ...(timeoutConfig?.pluginTimeout !== undefined && { pluginTimeout: timeoutConfig.pluginTimeout })
   })
 
   const isTest = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined
