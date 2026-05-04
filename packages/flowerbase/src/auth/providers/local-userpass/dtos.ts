@@ -61,3 +61,9 @@ export interface ConfirmUserDto {
     tokenId: string
   }
 }
+
+export interface ConfirmUserSendDto {
+  Body: {
+    email: string
+  }
+}

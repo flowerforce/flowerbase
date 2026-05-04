@@ -81,6 +81,8 @@ export const CONFIRM_USER_SCHEMA = {
   }
 }
 
+export const CONFIRM_SEND_SCHEMA = RESET_SEND_SCHEMA
+
 export const RESET_SCHEMA = RESET_SEND_SCHEMA
 
 export const REGISTRATION_SCHEMA = {
@@ -104,6 +106,7 @@ export enum AUTH_ENDPOINTS {
   LOGIN = '/login',
   REGISTRATION = '/register',
   CONFIRM = '/confirm',
+  CONFIRM_SEND = '/confirm/send',
   PROFILE = '/profile',
   SESSION = '/session',
   RESET = '/reset/send',
