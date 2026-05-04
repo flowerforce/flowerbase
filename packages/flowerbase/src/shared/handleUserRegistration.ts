@@ -1,9 +1,112 @@
+import type { FastifyInstance } from "fastify/types/instance"
 import { AUTH_CONFIG, AUTH_DB_NAME } from "../constants"
 import { emitServiceEvent } from "../services/monitoring"
 import { StateManager } from "../state"
 import { GenerateContext } from "../utils/context"
 import { generateToken, hashPassword } from "../utils/crypto"
 import { HandleUserRegistration } from "./models/handleUserRegistration.model"
+
+type ConfirmationResult = { status?: 'success' | 'pending' | 'fail' }
+
+export const sendConfirmationRequest = async (
+    app: FastifyInstance,
+    email: string
+) => {
+    const { authCollection } = AUTH_CONFIG
+    const localUserpassConfig = AUTH_CONFIG.localUserpassConfig
+    const autoConfirm = localUserpassConfig?.autoConfirm === true
+    const runConfirmationFunction = localUserpassConfig?.runConfirmationFunction === true
+    const confirmationFunctionName = localUserpassConfig?.confirmationFunctionName
+    const normalizedEmail = email.toLowerCase()
+    const mongo = app?.mongo
+    const db = mongo.client.db(AUTH_DB_NAME)
+    const authUser = await db?.collection(authCollection!).findOne({ email: normalizedEmail }) as {
+        status?: string
+    } | null
+
+    if (!authUser) {
+        return null
+    }
+
+    if (authUser.status === 'confirmed' || autoConfirm) {
+        return { status: 'success' as const }
+    }
+
+    if (!runConfirmationFunction) {
+        throw new Error('Missing confirmation function')
+    }
+
+    if (!confirmationFunctionName) {
+        throw new Error('Missing confirmation function name')
+    }
+
+    const functionsList = StateManager.select('functions')
+    const services = StateManager.select('services')
+    const confirmationFunction = functionsList[confirmationFunctionName]
+    if (!confirmationFunction) {
+        throw new Error(`Confirmation function not found: ${confirmationFunctionName}`)
+    }
+
+    const token = generateToken()
+    const tokenId = generateToken()
+    await db?.collection(authCollection!).updateOne(
+        { email: normalizedEmail },
+        {
+            $set: {
+                status: 'pending',
+                confirmationToken: token,
+                confirmationTokenId: tokenId
+            }
+        }
+    )
+
+    let confirmationStatus: ConfirmationResult['status'] = 'fail'
+    try {
+        const response = await GenerateContext({
+            args: [{
+                token,
+                tokenId,
+                username: normalizedEmail
+            }],
+            app,
+            rules: {},
+            user: {},
+            currentFunction: confirmationFunction,
+            functionName: confirmationFunctionName,
+            functionsList,
+            services,
+            runAsSystem: true
+        }) as ConfirmationResult
+        confirmationStatus = response?.status ?? 'fail'
+    } catch {
+        confirmationStatus = 'fail'
+    }
+
+    if (confirmationStatus === 'success') {
+        await db?.collection(authCollection!).updateOne(
+            { email: normalizedEmail },
+            {
+                $set: { status: 'confirmed' },
+                $unset: { confirmationToken: '', confirmationTokenId: '' }
+            }
+        )
+        return { status: 'success' as const }
+    }
+
+    if (confirmationStatus === 'pending') {
+        return { status: 'pending' as const }
+    }
+
+    await db?.collection(authCollection!).updateOne(
+        { email: normalizedEmail },
+        {
+            $set: { status: 'failed' },
+            $unset: { confirmationToken: '', confirmationTokenId: '' }
+        }
+    )
+
+    return { status: 'fail' as const }
+}
 
 /**
  * Register user
@@ -32,8 +135,6 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
         const { authCollection } = AUTH_CONFIG
         const localUserpassConfig = AUTH_CONFIG.localUserpassConfig
         const autoConfirm = localUserpassConfig?.autoConfirm === true
-        const runConfirmationFunction = localUserpassConfig?.runConfirmationFunction === true
-        const confirmationFunctionName = localUserpassConfig?.confirmationFunctionName
         const mongo = app?.mongo
         const db = mongo.client.db(AUTH_DB_NAME)
         const hashedPassword = await hashPassword(password)
@@ -79,78 +180,7 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
             return result
         }
 
-        if (!runConfirmationFunction) {
-            throw new Error('Missing confirmation function')
-        }
-
-        if (!confirmationFunctionName) {
-            throw new Error('Missing confirmation function name')
-        }
-
-        const functionsList = StateManager.select('functions')
-        const services = StateManager.select('services')
-        const confirmationFunction = functionsList[confirmationFunctionName]
-        if (!confirmationFunction) {
-            throw new Error(`Confirmation function not found: ${confirmationFunctionName}`)
-        }
-
-        const token = generateToken()
-        const tokenId = generateToken()
-        await db?.collection(authCollection!).updateOne(
-            { _id: result.insertedId },
-            {
-                $set: {
-                    confirmationToken: token,
-                    confirmationTokenId: tokenId
-                }
-            }
-        )
-
-        type ConfirmationResult = { status?: 'success' | 'pending' | 'fail' }
-        let confirmationStatus: ConfirmationResult['status'] = 'fail'
-        try {
-            const response = await GenerateContext({
-                args: [{
-                    token,
-                    tokenId,
-                    username: email
-                }],
-                app,
-                rules: {},
-                user: {},
-                currentFunction: confirmationFunction,
-                functionName: confirmationFunctionName,
-                functionsList,
-                services,
-                runAsSystem: true
-            }) as ConfirmationResult
-            confirmationStatus = response?.status ?? 'fail'
-        } catch {
-            confirmationStatus = 'fail'
-        }
-
-        if (confirmationStatus === 'success') {
-            await db?.collection(authCollection!).updateOne(
-                { _id: result.insertedId },
-                {
-                    $set: { status: 'confirmed' },
-                    $unset: { confirmationToken: '', confirmationTokenId: '' }
-                }
-            )
-            return result
-        }
-
-        if (confirmationStatus === 'pending') {
-            return result
-        }
-
-        await db?.collection(authCollection!).updateOne(
-            { _id: result.insertedId },
-            {
-                $set: { status: 'failed' },
-                $unset: { confirmationToken: '', confirmationTokenId: '' }
-            }
-        )
+        await sendConfirmationRequest(app, email)
         return result
     } catch (error) {
         emitServiceEvent({

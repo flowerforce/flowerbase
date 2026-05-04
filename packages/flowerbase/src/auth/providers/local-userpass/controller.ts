@@ -15,6 +15,7 @@ import {
   AUTH_ENDPOINTS,
   AUTH_ERRORS,
   CONFIRM_RESET_SCHEMA,
+  CONFIRM_SEND_SCHEMA,
   CONFIRM_USER_SCHEMA,
   LOGIN_SCHEMA,
   REGISTRATION_SCHEMA,
@@ -23,12 +24,14 @@ import {
 } from '../../utils'
 import {
   ConfirmResetPasswordDto,
+  ConfirmUserSendDto,
   ConfirmUserDto,
   LoginDto,
   RegistrationDto,
   ResetPasswordCallDto,
   ResetPasswordSendDto
 } from './dtos'
+import { sendConfirmationRequest } from '../../../shared/handleUserRegistration'
 
 const rateLimitStore = new Map<string, number[]>()
 
@@ -264,6 +267,29 @@ export async function localUserPassController(app: FastifyInstance) {
 
       res.status(200)
       return { status: 'confirmed' }
+    }
+  )
+
+  app.post<ConfirmUserSendDto>(
+    AUTH_ENDPOINTS.CONFIRM_SEND,
+    {
+      schema: CONFIRM_SEND_SCHEMA
+    },
+    async (req, res) => {
+      const localUserpassProvider = resolveLocalUserpassProvider()
+      if (!localUserpassProvider || localUserpassProvider.disabled) {
+        throw new Error('Local userpass authentication disabled')
+      }
+      const key = `confirm-send:${req.ip}`
+      if (isRateLimited(key, resetMaxAttempts, rateLimitWindowMs)) {
+        res.status(429).send({ message: 'Too many requests' })
+        return
+      }
+
+      await sendConfirmationRequest(app, req.body.email)
+
+      res.status(202)
+      return { status: 'ok' }
     }
   )
 
