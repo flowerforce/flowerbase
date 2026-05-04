@@ -120,7 +120,7 @@ describe('localUserPassController reset call', () => {
   })
 
   it('hashes and applies the password when the custom reset function returns success', async () => {
-    ;(GenerateContext as jest.Mock).mockResolvedValue({ status: 'success' })
+    ; (GenerateContext as jest.Mock).mockResolvedValue({ status: 'success' })
     const { app, authUsersCollection, resetCollection, routeHandlerRef } = buildApp()
 
     await localUserPassController(app as never)
@@ -158,7 +158,7 @@ describe('localUserPassController reset call', () => {
   })
 
   it('returns pending without changing the password when the custom reset function returns pending', async () => {
-    ;(GenerateContext as jest.Mock).mockResolvedValue({ status: 'pending' })
+    ; (GenerateContext as jest.Mock).mockResolvedValue({ status: 'pending' })
     const { app, authUsersCollection, resetCollection, routeHandlerRef } = buildApp()
 
     await localUserPassController(app as never)
@@ -183,7 +183,7 @@ describe('localUserPassController reset call', () => {
   })
 
   it('rejects the request when the custom reset function returns fail', async () => {
-    ;(GenerateContext as jest.Mock).mockResolvedValue({ status: 'fail' })
+    ; (GenerateContext as jest.Mock).mockResolvedValue({ status: 'fail' })
     const { app, authUsersCollection, resetCollection, routeHandlerRef } = buildApp()
 
     await localUserPassController(app as never)
@@ -207,7 +207,7 @@ describe('localUserPassController reset call', () => {
   })
 
   it('resends the confirmation email for local-userpass users', async () => {
-    ;(GenerateContext as jest.Mock).mockResolvedValue({ status: 'pending' })
+    ; (GenerateContext as jest.Mock).mockResolvedValue({ status: 'pending' })
     const { app, authUsersCollection, routeHandlerRef } = buildApp()
 
     await localUserPassController(app as never)
