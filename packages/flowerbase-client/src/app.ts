@@ -41,7 +41,7 @@ export class App {
   private readonly listeners = new Set<() => void>()
 
   emailPasswordAuth: {
-    registerUser: (input: { email: string; password: string }) => Promise<unknown>
+    registerUser: (input: { email: string; password: string; payload?: Record<string, unknown> }) => Promise<unknown>
     confirmUser: (input: { token: string; tokenId: string }) => Promise<unknown>
     resendConfirmationEmail: (input: { email: string }) => Promise<unknown>
     retryCustomConfirmation: (input: { email: string }) => Promise<unknown>
@@ -69,8 +69,8 @@ export class App {
     this.sessionBootstrapPromise = this.bootstrapSessionOnLoad()
 
     this.emailPasswordAuth = {
-      registerUser: ({ email, password }) =>
-        this.postProvider('/local-userpass/register', { email, password }),
+      registerUser: ({ email, password, payload }) =>
+        this.postProvider('/local-userpass/register', { email, password, payload }),
       confirmUser: ({ token, tokenId }) =>
         this.postProvider('/local-userpass/confirm', { token, tokenId }),
       resendConfirmationEmail: ({ email }) =>

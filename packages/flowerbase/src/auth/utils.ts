@@ -94,7 +94,8 @@ export const REGISTRATION_SCHEMA = {
         minLength: 5,
         maxLength: 254
       },
-      password: { type: 'string', ...PASSWORD_RULES }
+      password: { type: 'string', ...PASSWORD_RULES },
+      payload: { type: 'object', additionalProperties: true }
     },
     required: ['email', 'password']
   }

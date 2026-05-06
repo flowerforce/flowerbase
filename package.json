@@ -101,6 +101,7 @@
     "@fastify/swagger-ui": "^5.2.4",
     "bson": "^6.10.4",
     "fastify-raw-body": "^5.0.0",
+    "flowerbase": "file:flowerbase-1.0.0.tgz",
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^4.2.1",
     "undici": "^7.18.2"
