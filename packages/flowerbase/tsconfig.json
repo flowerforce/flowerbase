@@ -8,13 +8,8 @@
     "declarationMap": true,
     "noImplicitAny": true,
     "strict": true,
-    "moduleResolution": "node",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "baseUrl": ".",  
-    "paths": {
-      "*": ["../../node_modules/*"]
-    },
     "lib": ["ES2021", "DOM"]
   },
   "include": ["src/**/*"],
