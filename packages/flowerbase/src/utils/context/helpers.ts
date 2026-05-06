@@ -187,8 +187,24 @@ export const generateContextData = ({
     },
     context: {
       request: {
-        ...request,
-        remoteIPAddress: request?.ip
+        remoteIPAddress: request?.ip ?? '',
+        requestHeaders: request?.headers
+          ? Object.fromEntries(
+            Object.entries(request.headers).map(([key, value]) => [
+              key,
+              Array.isArray(value) ? value : value !== undefined ? [value] : []
+            ])
+          )
+          : {},
+        webhookUrl: request?.url?.split('?')[0],
+        httpMethod: request?.method,
+        rawQueryString: request?.url?.includes('?')
+          ? request.url.substring(request.url.indexOf('?'))
+          : '',
+        httpReferrer: request?.headers?.referer as string | undefined,
+        httpUserAgent: request?.headers?.['user-agent'] as string | undefined,
+        service: '',
+        action: ''
       },
       user,
       environment: {
