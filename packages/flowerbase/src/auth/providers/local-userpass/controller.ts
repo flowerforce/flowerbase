@@ -188,8 +188,6 @@ export async function localUserPassController(app: FastifyInstance) {
 
       let result
       try {
-        console.log("REGISTER BODY:", req.body)
-        console.log("REGISTER PAYLOAD:", req.body.payload)
         result = await handleUserRegistration(app, {
           run_as_system: true,
           provider: PROVIDER.LOCAL_USERPASS

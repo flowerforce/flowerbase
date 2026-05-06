@@ -343,7 +343,8 @@ const handleAuthenticationTrigger = async ({
         id: (currentUser as { _id: { toString: () => string } })._id.toString(),
         data: {
           _id: (currentUser as { _id: { toString: () => string } })._id.toString(),
-          email: (currentUser as { email?: string }).email
+          email: (currentUser as { email?: string }).email,
+          payload: (currentUser as { custom_data?: Record<string, unknown> }).custom_data
         }
       }
     }

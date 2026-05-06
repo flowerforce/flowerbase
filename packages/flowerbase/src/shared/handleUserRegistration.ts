@@ -42,7 +42,6 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
         if (existingUser && !skipUserCheck) {
             throw new Error('This email address is already used')
         }
-        console.log("payload", payload)
         const result = await db?.collection(authCollection!).insertOne({
             email,
             password: hashedPassword,
