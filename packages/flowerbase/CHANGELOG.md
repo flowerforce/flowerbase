@@ -1,3 +1,27 @@
+## 1.9.0 (2026-05-06)
+
+
+### 🚀 Features
+
+- implement async role evaluation and add apply_when function rules ([#58](https://github.com/flowerforce/flowerbase/pull/58))
+
+- add timeout configuration options to Fastify initialization ([f73a0e2](https://github.com/flowerforce/flowerbase/commit/f73a0e2))
+
+- add distinct and bulkWrite methods to MongoDB service ([#64](https://github.com/flowerforce/flowerbase/pull/64))
+
+
+### 🩹 Fixes
+
+- normalize trigger payloads in authentication and database handlers ([#56](https://github.com/flowerforce/flowerbase/pull/56))
+
+- local import inside functions ([#60](https://github.com/flowerforce/flowerbase/pull/60))
+
+- mongodb query projections ([#61](https://github.com/flowerforce/flowerbase/pull/61))
+
+- update request handling in context and controller functions ([#65](https://github.com/flowerforce/flowerbase/pull/65))
+
+- resend mail ([#66](https://github.com/flowerforce/flowerbase/pull/66))
+
 ## 1.8.3 (2026-04-02)
 
 
