@@ -311,7 +311,7 @@ export async function localUserPassController(app: FastifyInstance) {
           ? await customUserDb
             .collection(userCollection)
             .findOne({ [user_id_field]: authUser._id.toString() })
-          : {}
+          : authUser.custom_data ?? {}
       delete authUser?.password
 
       const userWithCustomData = {

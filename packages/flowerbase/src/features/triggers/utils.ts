@@ -338,13 +338,22 @@ const handleAuthenticationTrigger = async ({
       const currentUser = { ...document }
       delete (currentUser as { password?: unknown }).password
 
+      const idString = (currentUser as { _id: { toString: () => string } })._id.toString()
+
+      const authCustomData =
+        (currentUser as { custom_data?: Record<string, unknown> }).custom_data ?? {}
+
       return {
         ...currentUser,
-        id: (currentUser as { _id: { toString: () => string } })._id.toString(),
+        id: idString,
+        custom_data: authCustomData,
+        user_data: authCustomData,
         data: {
-          _id: (currentUser as { _id: { toString: () => string } })._id.toString(),
+          _id: idString,
+          id: idString,
           email: (currentUser as { email?: string }).email,
-          payload: (currentUser as { custom_data?: Record<string, unknown> }).custom_data
+          payload: authCustomData,
+          custom_data: authCustomData
         }
       }
     }

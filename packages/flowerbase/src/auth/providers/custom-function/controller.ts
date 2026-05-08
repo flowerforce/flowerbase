@@ -115,7 +115,7 @@ export async function customFunctionController(app: FastifyInstance) {
           ? await customUserDb
             .collection(userCollection)
             .findOne({ [user_id_field]: authUser._id.toString() })
-          : {}
+          : authUser.custom_data ?? {}
 
       const currentUserData = {
         _id: authUser._id,

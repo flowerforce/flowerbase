@@ -72,7 +72,7 @@ export async function authController(app: FastifyInstance) {
       ? await customUserDb
         .collection<Record<string, unknown>>(userCollection)
         .findOne({ [AUTH_CONFIG.user_id_field]: req.user.id })
-      : null
+      : authUser?.custom_data
 
     const params = (req as unknown as { params?: { appId?: string } }).params
     const stateProjectId = StateManager.select('projectId')
@@ -139,7 +139,7 @@ export async function authController(app: FastifyInstance) {
 
       const user = userCollection && AUTH_CONFIG.user_id_field
         ? (await customUserDb.collection(userCollection).findOne({ [AUTH_CONFIG.user_id_field]: req.user.sub }))
-        : {}
+        : auth_user.custom_data ?? {}
 
       res.status(201)
       return {
