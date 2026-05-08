@@ -795,6 +795,39 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(loginBody.user_id).toBe(authUserIds.owner.toString())
   })
 
+  it('persists registration payload as custom_data', async () => {
+    const email = 'payload-user@example.com'
+
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email,
+        password: 'payload-pass',
+        payload: {
+          tryingToAddCustomData: true,
+          role: 'student'
+        }
+      }
+    })
+
+    expect(registration.statusCode).toBe(201)
+
+    const registrationBody = registration.json() as { userId?: string }
+    expect(registrationBody.userId).toBeDefined()
+
+    const authUser = await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .findOne({ _id: new ObjectId(registrationBody.userId) })
+
+    expect(authUser).toBeDefined()
+    expect(authUser?.custom_data).toEqual({
+      tryingToAddCustomData: true,
+      role: 'student'
+    })
+  })
+
   it('runs confirmation function when autoConfirm is false', async () => {
     const originalConfig = AUTH_CONFIG.localUserpassConfig
     AUTH_CONFIG.localUserpassConfig = {
@@ -1136,6 +1169,40 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       })
 
     expect(afterCount).toBe(beforeCount)
+  })
+
+  it('passes custom_data to on_user_creation function on auto-confirmed registrations', async () => {
+    const email = 'autoconfirm-trigger-payload@example.com'
+
+    const registration = await appInstance!.inject({
+      method: 'POST',
+      url: `${AUTH_BASE_URL}/register`,
+      payload: {
+        email,
+        password: 'auto-pass',
+        payload: {
+          tryingToAddCustomData: true,
+          role: 'student'
+        }
+      }
+    })
+
+    expect(registration.statusCode).toBe(201)
+
+    const registrationBody = registration.json() as { userId?: string }
+    expect(registrationBody.userId).toBeDefined()
+
+    const creationEvent = await waitForTriggerEventType(
+      registrationBody.userId!,
+      'on_user_creation'
+    )
+
+    expect(creationEvent).toBeDefined()
+    expect(creationEvent?.email).toBe(email)
+    expect(creationEvent?.customData).toEqual({
+      tryingToAddCustomData: true,
+      role: 'student'
+    })
   })
 
   it('fires delete trigger when auth user is removed', async () => {

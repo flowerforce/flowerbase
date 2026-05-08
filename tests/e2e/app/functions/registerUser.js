@@ -2,7 +2,8 @@ module.exports = async function (payload) {
   const authService = context.services.get('auth')
   const result = await authService.emailPasswordAuth.registerUser({
     email: payload?.email,
-    password: payload?.password
+    password: payload?.password,
+    payload: payload?.payload
   })
 
   return {

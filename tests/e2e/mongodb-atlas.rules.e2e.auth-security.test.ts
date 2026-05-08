@@ -162,16 +162,16 @@ const callServiceOperation = async ({
 }: {
   collection: string
   method:
-    | 'find'
-    | 'findOne'
-    | 'count'
-    | 'countDocuments'
-    | 'findOneAndUpdate'
-    | 'deleteOne'
-    | 'deleteMany'
-    | 'insertOne'
-    | 'updateOne'
-    | 'aggregate'
+  | 'find'
+  | 'findOne'
+  | 'count'
+  | 'countDocuments'
+  | 'findOneAndUpdate'
+  | 'deleteOne'
+  | 'deleteMany'
+  | 'insertOne'
+  | 'updateOne'
+  | 'aggregate'
   user: TestUser | null
   query?: Document
   filter?: Document
@@ -602,9 +602,9 @@ const withDisabledProvider = (providerName: string) => {
   const next = cloneAuthProviders()
   const existing = (next as Record<string, unknown>)[providerName]
   if (existing && typeof existing === 'object') {
-    ;(existing as { disabled?: boolean }).disabled = true
+    (existing as { disabled?: boolean }).disabled = true
   } else {
-    ;(next as Record<string, unknown>)[providerName] = {
+    (next as Record<string, unknown>)[providerName] = {
       name: providerName,
       type: providerName,
       disabled: true
@@ -924,6 +924,51 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       ? (JSON.parse(secondBody.error) as { message?: string })
       : {}
     expect(parsedError.message).toBe('This email address is already used')
+  })
+
+  it('passes payload through auth service registerUser function', async () => {
+    const email = 'function-payload-user@example.com'
+
+    const response = await appInstance!.inject({
+      method: 'POST',
+      url: FUNCTION_CALL_URL,
+      headers: {
+        authorization: `Bearer ${getTokenFor(ownerUser)}`
+      },
+      payload: {
+        name: 'registerUser',
+        arguments: [
+          {
+            email,
+            password: 'function-payload-pass',
+            payload: {
+              tryingToAddCustomData: true,
+              source: 'function'
+            }
+          }
+        ]
+      }
+    })
+
+    expect(response.statusCode).toBe(200)
+
+    const body = response.json() as {
+      result?: {
+        insertedId?: string
+      }
+    }
+
+    expect(body.result?.insertedId).toBeDefined()
+
+    const authUser = await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .findOne({ email })
+
+    expect(authUser?.custom_data).toEqual({
+      tryingToAddCustomData: true,
+      source: 'function'
+    })
   })
 
   it('deletes auth users via deleteUser function', async () => {
@@ -1543,8 +1588,8 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const res = (await getTodosCollection(ownerUser)
       .aggregate(pipeline)
       .toArray()) as Array<{
-      projects?: ProjectDoc[]
-    }>
+        projects?: ProjectDoc[]
+      }>
 
     const projects = res.flatMap((item) => item.projects ?? [])
     expect(projects.length).toBeGreaterThan(0)

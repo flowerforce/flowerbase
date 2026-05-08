@@ -3,11 +3,14 @@ module.exports = async function (payload) {
   const mongoService = context.services.get('mongodb-atlas')
   const collection = mongoService.db('flowerbase-e2e').collection('triggerEvents')
   const documentId = user?.id?.toString() ?? 'unknown'
+
   await collection.insertOne({
     documentId,
     type: 'on_user_creation',
     email: user?.email ?? user?.data?.email ?? null,
+    customData: user?.custom_data ?? user?.data?.payload ?? null,
     createdAt: new Date().toISOString()
   })
+
   return { recorded: true, documentId }
 }
