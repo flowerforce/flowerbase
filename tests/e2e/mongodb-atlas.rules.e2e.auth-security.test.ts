@@ -952,13 +952,12 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
     expect(response.statusCode).toBe(200)
 
-    const body = response.json() as {
-      result?: {
-        insertedId?: string
-      }
+    const body = EJSON.deserialize(response.json()) as {
+      insertedId?: string | null
     }
 
-    expect(body.result?.insertedId).toBeDefined()
+    expect(body.insertedId).toBeDefined()
+    expect(body.insertedId).not.toBeNull()
 
     const authUser = await client
       .db(DB_NAME)
