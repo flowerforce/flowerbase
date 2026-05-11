@@ -36,6 +36,9 @@ export const Registration = () => {
       await app.emailPasswordAuth.registerUser({
         email: data.email,
         password: data.password,
+        payload: {
+          tryingToAddCustomData: true,
+        }
       });
     } catch (err) {
       alert("Error during registration");

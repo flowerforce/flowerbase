@@ -115,7 +115,7 @@ export const sendConfirmationRequest = async (
  * @param {Object} [opt] The options from the context
  * @returns {Promise<InsertOneResult<Document>>} A promise resolving to the result of the insert operation.
  */
-const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ email, password }) => {
+const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ email, password, payload }) => {
     const { run_as_system, skipUserCheck, provider } = opt ?? {}
     const origin = opt?.monitoring?.invokedFrom
     const meta = { action: 'registerUser', email, provider }
@@ -143,15 +143,12 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
         if (existingUser && !skipUserCheck) {
             throw new Error('This email address is already used')
         }
-
         const result = await db?.collection(authCollection!).insertOne({
             email,
             password: hashedPassword,
             status: (skipUserCheck || autoConfirm) ? 'confirmed' : 'pending',
             createdAt: new Date(),
-            custom_data: {
-                // TODO: aggiungere dati personalizzati alla registrazione
-            },
+            custom_data: payload ?? {},
             identities: [
                 {
                     provider_type: provider,

@@ -5,6 +5,7 @@ import { Rules } from "../../features/rules/interface"
 type RegistrationParams = {
   email: string
   password: string
+  payload?: Record<string, unknown>
 }
 
 export type Options = {

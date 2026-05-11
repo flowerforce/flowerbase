@@ -1,6 +1,7 @@
 export type RegisterUserDto = {
   email: string
   password: string
+  payload?: Record<string, unknown>
 }
 
 export type LoginUserDto = {

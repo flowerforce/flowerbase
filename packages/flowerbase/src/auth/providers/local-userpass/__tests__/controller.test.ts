@@ -32,6 +32,152 @@ jest.mock('../../../../constants', () => ({
   }
 }))
 
+const loadLocalUserPassControllerWithConfig = async (
+  authConfigOverrides: Record<string, unknown>
+) => {
+  jest.resetModules()
+
+  jest.doMock('../../../../constants', () => ({
+    AUTH_CONFIG: {
+      authCollection: 'auth_users',
+      refreshTokensCollection: 'refresh_tokens',
+      resetPasswordCollection: 'reset_password_requests',
+      userCollection: 'users',
+      user_id_field: 'id',
+      authProviders: {
+        'local-userpass': {
+          disabled: false
+        }
+      },
+      resetPasswordConfig: {
+        runResetFunction: true,
+        resetFunctionName: 'customReset'
+      },
+      ...authConfigOverrides
+    },
+    AUTH_DB_NAME: 'test-auth-db',
+    DB_NAME: 'test-db',
+    DEFAULT_CONFIG: {
+      RESET_PASSWORD_TTL_SECONDS: 3600,
+      AUTH_RATE_LIMIT_WINDOW_MS: 60000,
+      AUTH_LOGIN_MAX_ATTEMPTS: 100,
+      AUTH_REGISTER_MAX_ATTEMPTS: 100,
+      AUTH_RESET_MAX_ATTEMPTS: 100,
+      REFRESH_TOKEN_TTL_DAYS: 1
+    }
+  }))
+
+  jest.doMock('../../../../state', () => ({
+    StateManager: {
+      select: jest.fn((key: string) => {
+        if (key === 'functions') {
+          return {
+            customReset: {
+              name: 'customReset',
+              code: 'exports = async () => ({ status: "success" })'
+            }
+          }
+        }
+
+        if (key === 'services') {
+          return {}
+        }
+
+        return {}
+      })
+    }
+  }))
+
+  jest.doMock('../../../../utils/context', () => ({
+    GenerateContext: jest.fn()
+  }))
+
+  jest.doMock('../../../../utils/crypto', () => ({
+    comparePassword: jest.fn(async () => true),
+    generateToken: jest.fn(() => 'generated-token'),
+    hashPassword: jest.fn(async (password: string) => `hashed:${password}`),
+    hashToken: jest.fn(() => 'hashed-token')
+  }))
+
+  return import('../controller')
+}
+
+const buildLoginTestApp = ({
+  authUser,
+  customUser
+}: {
+  authUser: Record<string, unknown>
+  customUser?: Record<string, unknown> | null
+}) => {
+  let loginHandler:
+    | ((req: any, res: any) => Promise<unknown>)
+    | undefined
+
+  const authUsersCollection = {
+    findOne: jest.fn().mockResolvedValue(authUser),
+    updateOne: jest.fn().mockResolvedValue({ acknowledged: true })
+  }
+
+  const usersCollection = {
+    findOne: jest.fn().mockResolvedValue(customUser ?? null)
+  }
+
+  const resetCollection = {
+    createIndex: jest.fn().mockResolvedValue('ok'),
+    updateOne: jest.fn(),
+    deleteOne: jest.fn(),
+    findOne: jest.fn()
+  }
+
+  const refreshCollection = {
+    createIndex: jest.fn().mockResolvedValue('ok'),
+    insertOne: jest.fn().mockResolvedValue({ insertedId: 'refresh-token-id' })
+  }
+
+  const db = {
+    collection: jest.fn((name: string) => {
+      if (name === 'auth_users') return authUsersCollection
+      if (name === 'users') return usersCollection
+      if (name === 'reset_password_requests') return resetCollection
+      if (name === 'refresh_tokens') return refreshCollection
+      return {}
+    })
+  }
+
+  const app: any = {
+    mongo: {
+      client: {
+        db: jest.fn().mockReturnValue(db)
+      }
+    },
+    createAccessToken: jest.fn((user) => ({
+      tokenType: 'access',
+      user
+    })),
+    createRefreshToken: jest.fn(() => 'refresh-token')
+  }
+
+  app.post = jest.fn(
+    (
+      path: string,
+      _opts: unknown,
+      handler: (req: any, res: any) => Promise<unknown>
+    ) => {
+      if (path === '/login') {
+        loginHandler = handler.bind(app)
+      }
+    }
+  )
+
+  return {
+    app,
+    usersCollection,
+    authUsersCollection,
+    refreshCollection,
+    getLoginHandler: () => loginHandler
+  }
+}
+
 jest.mock('../../../../state', () => ({
   StateManager: {
     select: jest.fn((key: string) => {

@@ -210,4 +210,37 @@ describe('flowerbase-client auth', () => {
       })
     )
   })
+
+  it('sends payload when registering a user', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ status: 'ok' })
+    }) as unknown as typeof fetch
+
+    const app = new App({ id: 'my-app', baseUrl: 'http://localhost:3000' })
+
+    await app.emailPasswordAuth.registerUser({
+      email: 'john@doe.com',
+      password: 'secret123',
+      payload: {
+        tryingToAddCustomData: true,
+        role: 'student'
+      }
+    })
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/api/client/v2.0/app/my-app/auth/providers/local-userpass/register',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          email: 'john@doe.com',
+          password: 'secret123',
+          payload: {
+            tryingToAddCustomData: true,
+            role: 'student'
+          }
+        })
+      })
+    )
+  })
 })

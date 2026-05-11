@@ -14,6 +14,7 @@ const monitEnabled = typeof monitEnabledEnv === 'string'
   : false
 
 const {
+  enabled: customUserDataEnabled = false,
   database_name = 'main',
   collection_name = 'users',
   user_id_field = 'id',
@@ -73,14 +74,20 @@ type AuthProviders = Record<string, { disabled?: boolean; config?: unknown }>
 // TODO spostare nell'oggetto providers anche le altre configurazioni
 export const AUTH_CONFIG = {
   authCollection: auth_collection,
-  userCollection: collection_name,
+
+  customUserDataEnabled,
+
+  userCollection: customUserDataEnabled ? collection_name : undefined,
+  user_id_field: customUserDataEnabled ? user_id_field : undefined,
+  on_user_creation_function_name: customUserDataEnabled
+    ? on_user_creation_function_name
+    : undefined,
+
   resetPasswordCollection: 'reset_password_requests',
   refreshTokensCollection: 'auth_refresh_tokens',
   resetPasswordConfig: configuration['local-userpass']?.config,
   localUserpassConfig: configuration['local-userpass']?.config,
   authProviders: configuration as unknown as AuthProviders,
-  user_id_field,
-  on_user_creation_function_name,
   providers: {
     "custom-function": configuration['custom-function']?.config,
     "anon-user": configuration['anon-user']
