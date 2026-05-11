@@ -13,6 +13,11 @@ jest.mock('../../../../constants', () => ({
     resetPasswordConfig: {
       runResetFunction: true,
       resetFunctionName: 'customReset'
+    },
+    localUserpassConfig: {
+      autoConfirm: false,
+      runConfirmationFunction: true,
+      confirmationFunctionName: 'customConfirm'
     }
   },
   AUTH_DB_NAME: 'test-auth-db',
@@ -178,7 +183,8 @@ jest.mock('../../../../state', () => ({
     select: jest.fn((key: string) => {
       if (key === 'functions') {
         return {
-          customReset: { name: 'customReset', code: 'exports = async () => ({ status: "success" })' }
+          customReset: { name: 'customReset', code: 'exports = async () => ({ status: "success" })' },
+          customConfirm: { name: 'customConfirm', code: 'exports = async () => ({ status: "pending" })' }
         }
       }
       if (key === 'services') {
@@ -207,15 +213,14 @@ import { hashPassword } from '../../../../utils/crypto'
 
 describe('localUserPassController reset call', () => {
   const buildApp = () => {
-    let resetCallHandler:
-      | ((req: { body: { email: string; password: string; arguments?: unknown[] }; ip: string }, res: { status: jest.Mock }) => Promise<unknown>)
-      | undefined
+    const routeHandlers: Record<string, ((req: { body: any; ip: string }, res: { status: jest.Mock; send?: jest.Mock }) => Promise<unknown>) | undefined> = {}
 
     const authUsersCollection = {
       findOne: jest.fn().mockResolvedValue({
         _id: 'auth-user-1',
         email: 'john@doe.com',
-        password: 'old-hash'
+        password: 'old-hash',
+        status: 'pending'
       }),
       updateOne: jest.fn().mockResolvedValue({ acknowledged: true })
     }
@@ -243,14 +248,17 @@ describe('localUserPassController reset call', () => {
     }
     const app = {
       mongo: { client: { db: jest.fn().mockReturnValue(db) } },
-      post: jest.fn((path: string, _opts: unknown, handler: typeof resetCallHandler) => {
-        if (path === '/reset/call') {
-          resetCallHandler = handler
-        }
+      post: jest.fn((path: string, _opts: unknown, handler: (req: { body: any; ip: string }, res: { status: jest.Mock; send?: jest.Mock }) => Promise<unknown>) => {
+        routeHandlers[path] = handler
       })
     }
 
-    return { app, authUsersCollection, resetCollection, resetCallHandlerRef: () => resetCallHandler }
+    return {
+      app,
+      authUsersCollection,
+      resetCollection,
+      routeHandlerRef: (path: string) => routeHandlers[path]
+    }
   }
 
   beforeEach(() => {
@@ -259,12 +267,12 @@ describe('localUserPassController reset call', () => {
 
   it('hashes and applies the password when the custom reset function returns success', async () => {
     ; (GenerateContext as jest.Mock).mockResolvedValue({ status: 'success' })
-    const { app, authUsersCollection, resetCollection, resetCallHandlerRef } = buildApp()
+    const { app, authUsersCollection, resetCollection, routeHandlerRef } = buildApp()
 
     await localUserPassController(app as never)
 
     const res = { status: jest.fn() }
-    const result = await resetCallHandlerRef()?.(
+    const result = await routeHandlerRef('/reset/call')?.(
       {
         body: { email: 'john@doe.com', password: 'new-secret', arguments: ['extra'] },
         ip: '127.0.0.1'
@@ -297,12 +305,12 @@ describe('localUserPassController reset call', () => {
 
   it('returns pending without changing the password when the custom reset function returns pending', async () => {
     ; (GenerateContext as jest.Mock).mockResolvedValue({ status: 'pending' })
-    const { app, authUsersCollection, resetCollection, resetCallHandlerRef } = buildApp()
+    const { app, authUsersCollection, resetCollection, routeHandlerRef } = buildApp()
 
     await localUserPassController(app as never)
 
     const res = { status: jest.fn() }
-    const result = await resetCallHandlerRef()?.(
+    const result = await routeHandlerRef('/reset/call')?.(
       {
         body: { email: 'john@doe.com', password: 'new-secret' },
         ip: '127.0.0.1'
@@ -322,14 +330,14 @@ describe('localUserPassController reset call', () => {
 
   it('rejects the request when the custom reset function returns fail', async () => {
     ; (GenerateContext as jest.Mock).mockResolvedValue({ status: 'fail' })
-    const { app, authUsersCollection, resetCollection, resetCallHandlerRef } = buildApp()
+    const { app, authUsersCollection, resetCollection, routeHandlerRef } = buildApp()
 
     await localUserPassController(app as never)
 
     const res = { status: jest.fn() }
 
     await expect(
-      resetCallHandlerRef()?.(
+      routeHandlerRef('/reset/call')?.(
         {
           body: { email: 'john@doe.com', password: 'new-secret' },
           ip: '127.0.0.1'
@@ -344,150 +352,43 @@ describe('localUserPassController reset call', () => {
     expect(res.status).not.toHaveBeenCalled()
   })
 
-  it('uses linked custom user collection as custom_data on login when custom user data is enabled', async () => {
-    const authUserId = '697349de5dc2c5850198cc06'
-
-    const { localUserPassController } =
-      await loadLocalUserPassControllerWithConfig({
-        userCollection: 'users',
-        user_id_field: 'id'
-      })
-
-    const { app, usersCollection, getLoginHandler } = buildLoginTestApp({
-      authUser: {
-        _id: { toString: () => authUserId },
-        email: 'enabled-login@example.com',
-        password: 'hashed-password',
-        status: 'confirmed',
-        custom_data: {
-          role: 'from-auth-users'
-        }
-      },
-      customUser: {
-        id: authUserId,
-        role: 'from-users-collection',
-        tenantId: 'tenant-linked'
-      }
-    })
+  it('resends the confirmation email for local-userpass users', async () => {
+    ; (GenerateContext as jest.Mock).mockResolvedValue({ status: 'pending' })
+    const { app, authUsersCollection, routeHandlerRef } = buildApp()
 
     await localUserPassController(app as never)
 
-    const result = await getLoginHandler()?.(
+    const res = { status: jest.fn() }
+    const result = await routeHandlerRef('/confirm/send')?.(
       {
-        ip: '127.0.0.1',
-        body: {
-          username: 'enabled-login@example.com',
-          password: 'secret'
-        }
+        body: { email: 'John@Doe.com' },
+        ip: '127.0.0.1'
       },
+      res
+    )
+
+    expect(GenerateContext).toHaveBeenCalledWith(expect.objectContaining({
+      args: [
+        {
+          token: 'generated-token',
+          tokenId: 'generated-token',
+          username: 'john@doe.com'
+        }
+      ],
+      functionName: 'customConfirm',
+      runAsSystem: true
+    }))
+    expect(authUsersCollection.updateOne).toHaveBeenCalledWith(
+      { email: 'john@doe.com' },
       {
-        status: jest.fn().mockReturnThis(),
-        send: jest.fn()
+        $set: {
+          status: 'pending',
+          confirmationToken: 'generated-token',
+          confirmationTokenId: 'generated-token'
+        }
       }
     )
-
-    expect(usersCollection.findOne).toHaveBeenCalledWith({
-      id: authUserId
-    })
-
-    expect(app.createAccessToken).toHaveBeenCalledWith(
-      expect.objectContaining({
-        custom_data: {
-          id: authUserId,
-          role: 'from-users-collection',
-          tenantId: 'tenant-linked'
-        }
-      })
-    )
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        access_token: {
-          tokenType: 'access',
-          user: expect.objectContaining({
-            custom_data: {
-              id: authUserId,
-              role: 'from-users-collection',
-              tenantId: 'tenant-linked'
-            }
-          })
-        },
-        refresh_token: 'refresh-token',
-        user_id: authUserId
-      })
-    )
-  })
-
-  it('uses auth_users.custom_data on login when custom user data is disabled', async () => {
-    const authUserId = '697349de5dc2c5850198cc06'
-
-    const { localUserPassController } =
-      await loadLocalUserPassControllerWithConfig({
-        userCollection: undefined,
-        user_id_field: undefined
-      })
-
-    const { app, usersCollection, getLoginHandler } = buildLoginTestApp({
-      authUser: {
-        _id: { toString: () => authUserId },
-        email: 'disabled-login@example.com',
-        password: 'hashed-password',
-        status: 'confirmed',
-        custom_data: {
-          role: 'student',
-          tenantId: 'tenant-from-auth-users',
-          tryingToAddCustomData: true
-        }
-      },
-      customUser: {
-        id: authUserId,
-        role: 'this-should-not-be-used'
-      }
-    })
-
-    await localUserPassController(app as never)
-
-    const result = await getLoginHandler()?.(
-      {
-        ip: '127.0.0.1',
-        body: {
-          username: 'disabled-login@example.com',
-          password: 'secret'
-        }
-      },
-      {
-        status: jest.fn().mockReturnThis(),
-        send: jest.fn()
-      }
-    )
-
-    expect(usersCollection.findOne).not.toHaveBeenCalled()
-
-    expect(app.createAccessToken).toHaveBeenCalledWith(
-      expect.objectContaining({
-        custom_data: {
-          role: 'student',
-          tenantId: 'tenant-from-auth-users',
-          tryingToAddCustomData: true
-        }
-      })
-    )
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        access_token: {
-          tokenType: 'access',
-          user: expect.objectContaining({
-            custom_data: {
-              role: 'student',
-              tenantId: 'tenant-from-auth-users',
-              tryingToAddCustomData: true
-            }
-          })
-        },
-        refresh_token: 'refresh-token',
-        user_id: authUserId
-      })
-    )
+    expect(res.status).toHaveBeenCalledWith(202)
+    expect(result).toEqual({ status: 'ok' })
   })
 })

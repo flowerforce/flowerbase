@@ -121,11 +121,23 @@ Metodi disponibili su `collection`:
 
 - `find(query?, options?)`
 - `findOne(query?, options?)`
+- `findOneAndUpdate(filter, update, options?)`
+- `findOneAndReplace(filter, replacement, options?)`
+- `findOneAndDelete(filter, options?)`
+- `aggregate(pipeline)`
+- `count(query?, options?)`
+- `countDocuments(query?, options?)`
+- `distinct(key, filter?, options?)`
 - `insertOne(document, options?)`
+- `insertMany(documents, options?)`
+- `bulkWrite(operations, options?)` solo dentro funzioni server privilegiate eseguite con `run_as_system: true`
 - `updateOne(filter, update, options?)`
 - `updateMany(filter, update, options?)`
 - `deleteOne(filter, options?)`
+- `deleteMany(filter, options?)`
 - `watch(options?)`
+
+`bulkWrite()` e' esposto per compatibilita' con la surface MongoDB/Realm, ma una chiamata normale dal client viene rifiutata. Funziona solo quando il backend esegue la funzione in modalita' `run_as_system`.
 
 ## Watch / Change streams
 

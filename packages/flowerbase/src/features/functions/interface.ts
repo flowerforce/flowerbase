@@ -27,12 +27,14 @@ export type ExecuteQueryParams = {
   currentMethod: ReturnType<GetOperatorsFunction>[keyof ReturnType<GetOperatorsFunction>]
   query: Parameters<GetOperatorsFunction>
   update: Document
+  key?: string
   filter?: Document
   projection?: Document
   options?: Document
   returnNewDocument?: boolean
   document: Document
   documents: Document[]
+  operations?: Document[]
   pipeline: Document[]
   isClient?: boolean
 }

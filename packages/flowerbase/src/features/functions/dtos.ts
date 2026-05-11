@@ -23,6 +23,7 @@ export type FunctionCallBase64Dto = {
 type ArgumentsData = Arguments<{
   database: string
   collection: string
+  key?: string
   filter?: Document
   query: Parameters<GetOperatorsFunction>
   update: Document
@@ -31,6 +32,7 @@ type ArgumentsData = Arguments<{
   returnNewDocument?: boolean
   document: Document
   documents: Document[]
+  operations?: Document[]
   pipeline?: Document[]
 }>
 

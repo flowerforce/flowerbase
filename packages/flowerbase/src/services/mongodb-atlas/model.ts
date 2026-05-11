@@ -93,6 +93,14 @@ export type GetOperatorsFunction = (
   aggregate: (
     ...params: [...Parameters<Method<'aggregate'>>, isClient: boolean]
   ) => ReturnType<Method<'aggregate'>>
+  distinct: (
+    key: Parameters<Method<'distinct'>>[0],
+    filter?: Parameters<Method<'distinct'>>[1],
+    options?: Parameters<Method<'distinct'>>[2]
+  ) => ReturnType<Method<'distinct'>>
+  bulkWrite: (
+    ...params: Parameters<Method<'bulkWrite'>>
+  ) => ReturnType<Method<'bulkWrite'>>
   insertMany: (
     ...params: Parameters<Method<'insertMany'>>
   ) => ReturnType<Method<'insertMany'>>

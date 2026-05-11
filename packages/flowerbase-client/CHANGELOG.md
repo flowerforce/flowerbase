@@ -1,3 +1,19 @@
+## 0.4.0 (2026-05-06)
+
+
+### 🚀 Features
+
+- implement async role evaluation and add apply_when function rules ([#58](https://github.com/flowerforce/flowerbase/pull/58))
+
+- add distinct and bulkWrite methods to MongoDB service ([#64](https://github.com/flowerforce/flowerbase/pull/64))
+
+
+### 🩹 Fixes
+
+- mongodb query projections ([#61](https://github.com/flowerforce/flowerbase/pull/61))
+
+- update request handling in context and controller functions ([#65](https://github.com/flowerforce/flowerbase/pull/65))
+
 ## 0.3.2 (2026-04-02)
 
 

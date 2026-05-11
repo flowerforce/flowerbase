@@ -75,7 +75,8 @@ export async function customFunctionController(app: FastifyInstance) {
           url,
           method,
           ip,
-          id
+          id,
+          headers: req.headers
         }
       }) as CustomFunctionAuthResult
 

@@ -652,6 +652,7 @@ const todos = user.mongoClient('mongodb-atlas')
 
 await todos.insertOne({ title: 'Ship docs update', done: false })
 const openTodos = await todos.find({ done: false })
+const labels = await todos.distinct('label', { done: false })
 ```
 
 `@flowerforce/flowerbase-client` supports:
@@ -660,6 +661,8 @@ const openTodos = await todos.find({ done: false })
 - MongoDB operations via `user.mongoClient('mongodb-atlas')`
 - change streams with `watch()` async iterator
 - BSON/EJSON interoperability (`ObjectId`, `Date`, etc.)
+
+`bulkWrite()` is available on the MongoDB Atlas wrapper only for privileged functions executed with `run_as_system: true`. Regular client-scoped calls continue to use the per-operation methods (`insertOne`, `updateOne`, `updateMany`, `deleteOne`, `deleteMany`, `insertMany`).
 
 ## 💡 Use Cases by Feature
 
