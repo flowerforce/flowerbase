@@ -35,7 +35,7 @@ jobs:
         run: npm ci --include=optional
       - name: Prepare release and push commit
         run: |
-          npm run prepare:release
+          npm_config_legacy_peer_deps=false npm run prepare:release
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
