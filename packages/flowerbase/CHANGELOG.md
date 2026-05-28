@@ -1,3 +1,10 @@
+## 1.10.0 (2026-05-28)
+
+
+### 🚀 Features
+
+- enhance rule evaluation and testing for scalar equality with array ([#71](https://github.com/flowerforce/flowerbase/pull/71))
+
 ## 1.9.0 (2026-05-06)
 
 
