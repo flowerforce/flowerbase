@@ -34,7 +34,7 @@ jobs:
       - name: Install deps
         run: npm ci --include=optional
       - name: Prepare release and push commit
-        run: |
+        run: | # See issue https://github.com/nrwl/nx/issues/26660
           npm_config_legacy_peer_deps=false npm run prepare:release
           git push
         env:
