@@ -86,7 +86,7 @@ describe('rule function', () => {
     expect(result.name).toBe('user.authId___%oidToString')
   })
 
-  it('does not treat scalar equality as array membership in compact rules', () => {
+  it('treats scalar equality as array membership in compact rules', () => {
     const data = {
       doc: {
         owners: ['user-1', 'user-2']
@@ -97,7 +97,7 @@ describe('rule function', () => {
       prefix: 'doc'
     })
 
-    expect(result.valid).toBe(false)
+    expect(result.valid).toBe(true)
     expect(result.name).toBe('doc.owners___$eq')
   })
 

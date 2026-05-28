@@ -1,7 +1,58 @@
-import { ensureClientPipelineStages, getHiddenFieldsFromRulesConfig, prependUnsetStage, applyAccessControlToPipeline, mergeProjections } from '../utils'
+import {
+  ensureClientPipelineStages,
+  getHiddenFieldsFromRulesConfig,
+  prependUnsetStage,
+  applyAccessControlToPipeline,
+  mergeProjections,
+  getValidRule
+} from '../utils'
 import { Role } from '../../../utils/roles/interface'
 
 describe('MongoDB Atlas aggregate helpers', () => {
+  describe('getValidRule', () => {
+    it('matches legacy scalar apply_when syntax against array-valued custom data', () => {
+      const validRules = getValidRule({
+        filters: [
+          {
+            apply_when: {
+              '%%user.custom_data.roles': 'Admin'
+            },
+            query: {}
+          }
+        ] as any,
+        user: {
+          custom_data: {
+            roles: ['Admin', 'SCM']
+          }
+        } as any,
+        record: null
+      })
+
+      expect(validRules).toHaveLength(1)
+    })
+
+    it('does not match legacy scalar apply_when syntax when the array does not contain the value', () => {
+      const validRules = getValidRule({
+        filters: [
+          {
+            apply_when: {
+              '%%user.custom_data.roles': 'Admin'
+            },
+            query: {}
+          }
+        ] as any,
+        user: {
+          custom_data: {
+            roles: ['Editor']
+          }
+        } as any,
+        record: null
+      })
+
+      expect(validRules).toHaveLength(0)
+    })
+  })
+
   describe('ensureClientPipelineStages', () => {
     it('allows safe stages', () => {
       expect(() =>

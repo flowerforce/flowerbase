@@ -53,7 +53,7 @@ type TestUser = User & {
   custom_data?: {
     type?: string
     key?: string
-    accountRole?: string
+    accountRole?: string | string[]
     company?: string
     workspaces: string[]
     adminIn?: string[]
@@ -134,7 +134,7 @@ const ownerUser: TestUser = {
   custom_data: {
     role: 'owner',
     type: 'internal',
-    accountRole: 'collaborator',
+    accountRole: ['collaborator', 'reviewer'],
     company: oidDocIds.ownerCompany.toHexString(),
     key: 'publisher-owner',
     workspaces: ['workspace-1'],
@@ -1657,7 +1657,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(projects[0]).toHaveProperty('summary')
   })
 
-  it('returns only allowed fields when read is undefined and field-level read is configured', async () => {
+  it('returns only allowed fields when read is undefined and apply_when matches array-valued custom data', async () => {
     const docs = (await getTeamDocsCollection(ownerUser).find({}).toArray()) as TeamDoc[]
     expect(docs).toHaveLength(1)
     expect(docs[0]).toEqual({

@@ -119,4 +119,27 @@ describe('evaluateExpression', () => {
       })
     )
   })
+
+  it('supports scalar equality against array-valued custom data', async () => {
+    const expression = {
+      '%%user.custom_data.roles': 'Admin'
+    }
+
+    const params = {
+      type: 'read',
+      cursor: { _id: 'doc-1' },
+      expansions: {
+        '%%prevRoot': undefined
+      },
+      roles: []
+    } as Params
+
+    const user = {
+      custom_data: {
+        roles: ['Admin', 'SCM']
+      }
+    }
+
+    await expect(evaluateExpression(params, expression, user as never)).resolves.toBe(true)
+  })
 })

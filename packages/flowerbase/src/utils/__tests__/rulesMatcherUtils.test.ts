@@ -27,8 +27,8 @@ describe('rulesMatcherUtils', () => {
     // isFunction
     expect(isFunction(2)).toBe(false)
     expect(isFunction('ciao')).toBe(false)
-    expect(isFunction(() => {})).toBe(true)
-    expect(isFunction(function test() {})).toBe(true)
+    expect(isFunction(() => { })).toBe(true)
+    expect(isFunction(function test() { })).toBe(true)
     // isString
     expect(isString(2)).toBe(false)
     expect(isString('2')).toBe(true)
@@ -93,5 +93,14 @@ describe('rulesMatcherUtils', () => {
         {}
       )
     ).toBe(false)
+  })
+
+  it('matches scalar equality against array-valued fields', () => {
+    const data = {
+      '%%user': { custom_data: { roles: ['Admin', 'SCM'] } }
+    }
+
+    expect(checkRule({ '%%user.custom_data.roles': 'Admin' } as any, data, {})).toBe(true)
+    expect(checkRule({ '%%user.custom_data.roles': 'Manager' } as any, data, {})).toBe(false)
   })
 })

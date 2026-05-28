@@ -58,6 +58,14 @@ const includesWithSemanticEquality = (value: unknown, candidate: unknown): boole
         )
     )
 
+const hasScalarArrayMembershipMatch = (left: unknown, right: unknown): boolean => {
+  if (Array.isArray(left) === Array.isArray(right)) {
+    return false
+  }
+
+  return includesWithSemanticEquality(left, right)
+}
+
 const resolveRefPath = (data: unknown, refPath: string, prefix?: string): unknown => {
   const exactMatch = _get(data, refPath, undefined)
 
@@ -306,7 +314,7 @@ export const operators: Operators = {
   $exists: (a, b) => !rulesMatcherUtils.isEmpty(a) === b,
   '%exists': (a, b) => !rulesMatcherUtils.isEmpty(a) === b,
 
-  $eq: (a, b) => areSemanticallyEqual(a, b),
+  $eq: (a, b) => areSemanticallyEqual(a, b) || hasScalarArrayMembershipMatch(a, b),
 
   $ne: (a, b) => !areSemanticallyEqual(a, b),
 
