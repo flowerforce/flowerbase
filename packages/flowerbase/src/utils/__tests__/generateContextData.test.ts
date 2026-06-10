@@ -4,7 +4,7 @@ import { User } from '../../auth/dtos'
 import { Functions } from '../../features/functions/interface'
 import { Rules } from '../../features/rules/interface'
 import { services } from '../../services'
-import { generateContextData } from '../context/helpers'
+import { contextUserForRun, generateContextData, REALM_SYSTEM_USER } from '../context/helpers'
 
 const originalEnv = process.env
 
@@ -112,5 +112,50 @@ describe('generateContextData', () => {
     expect(Buffer.from(binaryValue).toString('utf8')).toBe('test')
     const binaryObject = Binary.fromBase64Binary(base64, 0)
     expect(binaryObject).toBeInstanceOf(BSON.Binary)
+  })
+
+  it('exposes Realm system user and runningAsSystem when run_as_system is enabled', () => {
+    const mockApp = Fastify()
+    const systemFunction = { ...currentFunction, run_as_system: true }
+    const { context } = generateContextData({
+      services,
+      app: mockApp,
+      functionsList: mockFunctions,
+      currentFunction: systemFunction,
+      GenerateContext: GenerateContextMock,
+      GenerateContextSync: GenerateContextSyncMock,
+      user: REALM_SYSTEM_USER,
+      rules: mockRules
+    })
+
+    expect(context.user).toEqual(REALM_SYSTEM_USER)
+    expect(context.runningAsSystem()).toBe(true)
+  })
+
+  it('runningAsSystem is false for regular function execution', () => {
+    const mockApp = Fastify()
+    const { context } = generateContextData({
+      services,
+      app: mockApp,
+      functionsList: mockFunctions,
+      currentFunction,
+      GenerateContext: GenerateContextMock,
+      GenerateContextSync: GenerateContextSyncMock,
+      user: { id: 'user-1', type: 'normal', data: {}, custom_data: {}, identities: [] },
+      rules: mockRules
+    })
+
+    expect(context.runningAsSystem()).toBe(false)
+  })
+})
+
+describe('contextUserForRun', () => {
+  it('returns Realm system user for empty user with run_as_system', () => {
+    expect(contextUserForRun({}, true)).toEqual(REALM_SYSTEM_USER)
+  })
+
+  it('returns the user unchanged when not running as system', () => {
+    const user = { id: 'user-1' }
+    expect(contextUserForRun(user, false)).toBe(user)
   })
 })

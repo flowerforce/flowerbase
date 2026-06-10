@@ -1,9 +1,23 @@
 import { mongodb } from '@fastify/mongodb'
 import { EJSON } from 'bson'
 import * as jwt from 'jsonwebtoken'
-import { Arguments } from '../../auth/dtos'
+import { Arguments, User } from '../../auth/dtos'
 import { Function } from '../../features/functions/interface'
 import { GenerateContextDataParams } from './interface'
+
+/** Realm-compatible system user for run_as_system execution with no authenticated caller. */
+export const REALM_SYSTEM_USER = {
+  type: 'system',
+  data: {},
+  custom_data: {},
+  identities: []
+} as const
+
+const isEmptyUser = (user: User) =>
+  user != null && typeof user === 'object' && !Array.isArray(user) && Object.keys(user).length === 0
+
+export const contextUserForRun = (user: User, runAsSystem: boolean): User =>
+  runAsSystem && isEmptyUser(user) ? REALM_SYSTEM_USER : user
 
 type JwtUtils = {
   encode: (
@@ -207,6 +221,7 @@ export const generateContextData = ({
         action: ''
       },
       user,
+      runningAsSystem: () => Boolean(currentFunction.run_as_system),
       environment: {
         tag: process.env.NODE_ENV
       },
