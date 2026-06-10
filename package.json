@@ -44,7 +44,7 @@
     "@nx/js": "19.4.1",
     "@nx/react": "19.4.1",
     "@nx/rollup": "19.4.1",
-    "@nx/webpack": "19.4.1",
+    "@nx/webpack": "19.8.14",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.7",
     "@svgr/webpack": "^8.0.1",
     "@swc-node/register": "^1.11.1",
