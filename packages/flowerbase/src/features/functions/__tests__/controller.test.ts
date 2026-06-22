@@ -61,6 +61,51 @@ describe('functionsController', () => {
     )
   })
 
+  it('reconstructs realm-web flattened options (sort/limit/project) into the options arg', async () => {
+    const cursor: any = {
+      sort: jest.fn(() => cursor),
+      skip: jest.fn(() => cursor),
+      limit: jest.fn(() => cursor),
+      toArray: () => Promise.resolve([])
+    }
+    const find = jest.fn().mockReturnValue(cursor)
+    services['mongodb-atlas'] = jest.fn(() => ({
+      db: jest.fn().mockReturnValue({
+        collection: jest.fn().mockReturnValue({ find })
+      })
+    })) as any
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/call',
+      payload: {
+        service: 'mongodb-atlas',
+        name: 'find',
+        arguments: [
+          {
+            database: 'app',
+            collection: 'todos',
+            query: { archived: false },
+            // realm-web flattens these to the top level; `projection` is `project`
+            sort: { createdAt: -1 },
+            limit: 5,
+            project: { name: 1 }
+          }
+        ]
+      }
+    })
+
+    expect(response.statusCode).toBe(200)
+    const [, , passedOptions] = find.mock.calls[0]
+    expect(passedOptions).toEqual(
+      expect.objectContaining({
+        sort: { createdAt: -1 },
+        limit: 5,
+        projection: { name: 1 }
+      })
+    )
+  })
+
   it('passes mongodb-atlas distinct service arguments through POST /call', async () => {
     const distinct = jest.fn().mockResolvedValue(['open'])
     services['mongodb-atlas'] = jest.fn(() => ({

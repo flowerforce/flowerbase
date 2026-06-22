@@ -84,6 +84,27 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
   return prototype === Object.prototype || prototype === null
 }
 
+// realm-web flattens these option fields to the top level of the service call.
+const FLATTENED_OPTION_KEYS = ['sort', 'limit', 'skip', 'upsert', 'returnNewDocument'] as const
+
+const mergeRealmOptions = (
+  rawArgs: Record<string, unknown>,
+  options: unknown
+): Record<string, unknown> | undefined => {
+  const flattened: Record<string, unknown> = {}
+  for (const k of FLATTENED_OPTION_KEYS) {
+    if (typeof rawArgs[k] !== 'undefined') flattened[k] = rawArgs[k]
+  }
+  // find/findOne send `project`; findOneAnd* send `projection`.
+  const projection = rawArgs.project ?? rawArgs.projection
+  if (typeof projection !== 'undefined') flattened.projection = projection
+
+  // Nested `options` (flowerbase-client wire format) wins over flattened fields.
+  const nested = isRecord(options) ? options : undefined
+  if (!nested && !Object.keys(flattened).length) return undefined
+  return { ...flattened, ...(nested ?? {}) }
+}
+
 const isCursorLike = (
   value: unknown
 ): value is { toArray: () => Promise<unknown> | unknown } => {
@@ -372,7 +393,8 @@ export const functionsController: FunctionController = async (
         if (!serviceFn) {
           throw new Error(`Service "${req.body.service}" does not exist`)
         }
-      const [{
+      const [rawArgs] = args
+      const {
         database,
         collection,
         key,
@@ -386,11 +408,17 @@ export const functionsController: FunctionController = async (
         documents,
         operations,
         pipeline = []
-      }] = args
+      } = rawArgs
 
       if (!isSupportedQueryMethod(method)) {
         throw new Error(`Unsupported service method "${String(method)}"`)
       }
+
+      // The realm-web SDK flattens query options (sort, limit, skip, upsert,
+      // returnNewDocument and projection — renamed `project` for find/findOne)
+      // to the top level instead of nesting them under `options`. Reconstruct an
+      // options object from those flattened fields so the operators honor them.
+      const mergedOptions = mergeRealmOptions(rawArgs, options)
 
       const currentMethod = serviceFn(app, { rules, user })
         .db(database)
@@ -404,7 +432,7 @@ export const functionsController: FunctionController = async (
         filter,
         update,
         projection,
-        options,
+        options: mergedOptions,
         returnNewDocument,
         document,
         documents,
