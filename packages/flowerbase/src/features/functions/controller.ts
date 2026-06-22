@@ -110,12 +110,29 @@ type SharedWatchStream = {
     on: (event: 'change' | 'error', listener: (payload: any) => void) => void
     off: (event: 'change' | 'error', listener: (payload: any) => void) => void
     close: () => Promise<void> | void
+    resumeToken?: unknown
+    closed?: boolean
   }
   subscribers: Map<string, WatchSubscriber>
 }
 
 const sharedWatchStreams = new Map<string, SharedWatchStream>()
 let watchSubscriberCounter = 0
+
+// The driver populates resumeToken once the initial aggregate has opened the
+// cursor server-side; until then the stream isn't actually watching. Poll for
+// it so a write following the subscriber's 200 can't outrace the open cursor.
+// ponytail: 5s poll ceiling; if a stream legitimately takes longer we serve
+// anyway rather than hang the request.
+const waitForChangeStreamReady = async (
+  stream: SharedWatchStream['stream'],
+  { intervalMs = 20, maxAttempts = 250 } = {}
+) => {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (stream.resumeToken || stream.closed) return
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+}
 const maxSharedWatchStreams = Number(process.env.MAX_SHARED_WATCH_STREAMS || 200)
 const debugWatchStreams = process.env.DEBUG_FUNCTIONS === 'true'
 
@@ -530,9 +547,6 @@ export const functionsController: FunctionController = async (
       logWatchStats('hub-reused', { streamKey, database, collection })
     }
 
-    res.raw.writeHead(200, headers)
-    res.raw.flushHeaders();
-
     const ensureHubListeners = (currentHub: SharedWatchStream) => {
       if ((currentHub as SharedWatchStream & { listenersBound?: boolean }).listenersBound) {
         return
@@ -615,8 +629,6 @@ export const functionsController: FunctionController = async (
         ; (currentHub as SharedWatchStream & { listenersBound?: boolean }).listenersBound = true
     }
 
-    ensureHubListeners(hub)
-
     const subscriber: WatchSubscriber = {
       id: subscriberId,
       user,
@@ -628,8 +640,18 @@ export const functionsController: FunctionController = async (
         return mapped as Document
       })()
     }
+    // Register the subscriber and attach the change-stream listener (which opens
+    // the cursor) BEFORE responding, then wait until the cursor is established on
+    // the server. Otherwise the client unblocks on the 200 and a write can race
+    // ahead of the open cursor, dropping the event entirely.
     hub.subscribers.set(subscriberId, subscriber)
     logWatchStats('subscriber-added', { streamKey, subscriberId })
+
+    ensureHubListeners(hub)
+    await waitForChangeStreamReady(hub.stream)
+
+    res.raw.writeHead(200, headers)
+    res.raw.flushHeaders();
 
     req.raw.on('close', () => {
       const currentHub = sharedWatchStreams.get(streamKey)

@@ -741,7 +741,9 @@ const getOperators: GetOperatorsFunction = (
           const formattedQuery = getFormattedQuery(filters, query, user)
 
           // Retrieve the document to check permissions before deleting
-          const result = await collection.findOne(buildAndQuery(formattedQuery))
+          const result = await collection.findOne(buildAndQuery(formattedQuery), {
+            session: options?.session
+          })
           const winningRole = await getWinningRoleAsync(result, user, roles)
 
           logDebug('delete winningRole', {
