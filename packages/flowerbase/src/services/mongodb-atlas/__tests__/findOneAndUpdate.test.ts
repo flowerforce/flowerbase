@@ -67,6 +67,27 @@ describe('mongodb-atlas findOneAndUpdate', () => {
     expect(result).toEqual(updatedDoc)
   })
 
+  it('passes the transaction session to the permission pre-check read', async () => {
+    const id = new ObjectId()
+    const session = { id: 'txn-session' } as any
+    const existingDoc = { _id: id, title: 'Old', userId: 'user-1' }
+    const findOne = jest.fn().mockResolvedValue(existingDoc)
+    const findOneAndUpdate = jest.fn().mockResolvedValue(existingDoc)
+    const collection = { collectionName: 'todos', findOne, findOneAndUpdate }
+
+    const app = createAppWithCollection(collection)
+    const operators = MongoDbAtlas(app as any, {
+      rules: createRules(),
+      user: { id: 'user-1' }
+    })
+      .db('db')
+      .collection('todos')
+
+    await operators.findOneAndUpdate({ _id: id }, { $set: { title: 'New' } }, { session })
+
+    expect(findOne).toHaveBeenCalledWith({ $and: [{ _id: id }] }, { session })
+  })
+
   it('rejects updates when write permission is denied', async () => {
     const id = new ObjectId()
     const existingDoc = { _id: id, title: 'Old', userId: 'user-1' }

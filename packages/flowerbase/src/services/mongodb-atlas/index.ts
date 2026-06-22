@@ -881,7 +881,11 @@ const getOperators: GetOperatorsFunction = (
             ? normalizeQuery(formattedQuery)
             : formattedQuery
 
-          const result = await collection.findOne(buildAndQuery(safeQuery))
+          // Read inside the active transaction so the pre-check sees writes
+          // made earlier in the same session (read-your-own-write).
+          const result = await collection.findOne(buildAndQuery(safeQuery), {
+            session: options?.session
+          })
 
           if (!result) {
             if (options?.upsert) {
@@ -970,7 +974,10 @@ const getOperators: GetOperatorsFunction = (
           const normalizedData = Array.isArray(data)
             ? data
             : normalizeUpdatePayload(data as Document)
-          const currentDoc = await collection.findOne(buildAndQuery(safeQuery))
+          // Read inside the active transaction (read-your-own-write).
+          const currentDoc = await collection.findOne(buildAndQuery(safeQuery), {
+            session: options?.session
+          })
           const updatedPaths = Array.isArray(normalizedData)
             ? []
             : getUpdatedPaths(normalizedData as Document)
@@ -991,11 +998,14 @@ const getOperators: GetOperatorsFunction = (
           } else {
             const [computedDoc] = Array.isArray(normalizedData)
               ? await collection
-                .aggregate([
-                  { $match: buildAndQuery(safeQuery) },
-                  { $limit: 1 },
-                  ...normalizedData
-                ])
+                .aggregate(
+                  [
+                    { $match: buildAndQuery(safeQuery) },
+                    { $limit: 1 },
+                    ...normalizedData
+                  ],
+                  { session: options?.session }
+                )
                 .toArray()
               : [applyDocumentUpdateOperators(currentDoc, normalizedData as Document)]
             docToCheck = computedDoc
@@ -1557,8 +1567,11 @@ const getOperators: GetOperatorsFunction = (
           // Apply access control filters
           const formattedQuery = getFormattedQuery(filters, query, user)
 
-          // Retrieve the document to check permissions before updating
-          const result = await collection.find({ $and: formattedQuery }).toArray()
+          // Retrieve the document to check permissions before updating.
+          // Read inside the active transaction (read-your-own-write).
+          const result = await collection
+            .find({ $and: formattedQuery }, { session: options?.session })
+            .toArray()
           if (!result) {
             throw new Error('Update not permitted')
           }
