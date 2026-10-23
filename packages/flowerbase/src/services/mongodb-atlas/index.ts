@@ -4,6 +4,7 @@ import isEqual from 'lodash/isEqual'
 import set from 'lodash/set'
 import unset from 'lodash/unset'
 import {
+  BSON,
   ChangeStreamOptions,
   ClientSession,
   ClientSessionOptions,
@@ -19,6 +20,7 @@ import {
 import { Rules } from '../../features/rules/interface'
 import { buildRulesMeta } from '../../monitoring/utils'
 import { checkValidation } from '../../utils/roles/machines'
+import { evaluateExpression } from '../../utils/roles/helpers'
 import { getWinningRoleAsync } from '../../utils/roles/machines/utils'
 import { emitServiceEvent } from '../monitoring'
 import { CHANGESTREAM } from '../../constants'
@@ -300,7 +302,7 @@ const hasAtomicOperators = (data: Document) =>
 const normalizeUpdatePayload = (data: Document) =>
   hasAtomicOperators(data) ? data : { $set: data }
 
-const hasOperatorExpressions = (value: unknown) =>
+const hasOperatorExpressions = (value: unknown): value is Record<string, unknown> =>
   isPlainObject(value) && Object.keys(value).some((key) => key.startsWith('$'))
 
 const matchesPullCondition = (item: unknown, operand: unknown) => {
@@ -462,6 +464,117 @@ const applyDocumentUpdateOperators = (
   }
 
   return updated
+}
+
+const supportedUpsertOperators = new Set([
+  '$set',
+  '$setOnInsert',
+  '$unset',
+  '$inc',
+  '$rename',
+  '$push'
+])
+
+const checkUpsertValue = (value: unknown) => {
+  if (['undefined', 'function', 'symbol', 'bigint'].includes(typeof value)) {
+    throw new Error('Upsert value cannot be validated')
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) checkUpsertValue(entry)
+  } else if (isTraversablePlainObject(value)) {
+    Object.values(value).forEach(checkUpsertValue)
+  } else if (
+    value !== null &&
+    typeof value === 'object' &&
+    (!(
+      value instanceof Date ||
+      value instanceof BSON.ObjectId ||
+      value instanceof BSON.Decimal128 ||
+      value instanceof BSON.Binary
+    ) ||
+      (value instanceof Date && !Number.isFinite(value.getTime())) ||
+      typeof (value as { toBSON?: unknown }).toBSON !== 'undefined')
+  ) {
+    throw new Error('Upsert value cannot be validated')
+  }
+}
+
+const checkUpsertPath = (path: string) => {
+  if (
+    path
+      .split('.')
+      .some(
+        (part) =>
+          !part ||
+          part.startsWith('$') ||
+          /[\[\]]/.test(part) ||
+          /^\d+$/.test(part) ||
+          ['__proto__', 'constructor', 'prototype'].includes(part)
+      )
+  ) {
+    throw new Error('Upsert path cannot be validated')
+  }
+}
+
+const buildUpsertDocument = (query: Document[], update: Document): Document => {
+  checkUpsertValue(query)
+  checkUpsertValue(update)
+  const seed: Document = {}
+  // MongoDB seeds an upsert from query equalities, including access filters.
+  // Reject other query shapes rather than authorize an incomplete candidate.
+  const addEqualities = (clause: Document) => {
+    for (const [path, condition] of Object.entries(clause)) {
+      if (path === '$and' && Array.isArray(condition)) {
+        condition.forEach((entry) => {
+          if (!isTraversablePlainObject(entry)) {
+            throw new Error('Upsert filter cannot be validated')
+          }
+          addEqualities(entry)
+        })
+        continue
+      }
+      checkUpsertPath(path)
+      let value = condition
+      if (hasOperatorExpressions(condition)) {
+        if (Object.keys(condition).length !== 1 || Object.keys(condition)[0] !== '$eq') {
+          throw new Error('Upsert filter cannot be validated')
+        }
+        value = condition.$eq
+      }
+      set(seed, path, cloneDeep(value))
+    }
+  }
+  query.forEach(addEqualities)
+
+  for (const [operator, payload] of Object.entries(update)) {
+    if (!supportedUpsertOperators.has(operator) || !isTraversablePlainObject(payload)) {
+      throw new Error('Upsert update cannot be validated')
+    }
+    for (const [path, value] of Object.entries(payload)) {
+      checkUpsertPath(path)
+      if (operator === '$rename') {
+        if (typeof value !== 'string') {
+          throw new Error('Upsert path cannot be validated')
+        }
+        checkUpsertPath(value)
+      }
+      if (operator === '$inc' && (typeof value !== 'number' || !Number.isFinite(value))) {
+        throw new Error('Upsert update cannot be validated')
+      }
+      if (
+        operator === '$push' &&
+        hasOperatorExpressions(value) &&
+        (Object.keys(value).length !== 1 || !Array.isArray(value.$each))
+      ) {
+        throw new Error('Upsert update cannot be validated')
+      }
+    }
+  }
+
+  const insertSeed = applyDocumentUpdateOperators(seed, {
+    $set: update.$setOnInsert ?? {}
+  })
+  return applyDocumentUpdateOperators(insertSeed, update)
 }
 
 const getUpdatedPaths = (update: Document) => {
@@ -885,6 +998,29 @@ const getOperators: GetOperatorsFunction = (
 
           if (!result) {
             if (options?.upsert) {
+              const candidate = buildUpsertDocument(safeQuery, normalizedData)
+              const winningRole = await getWinningRoleAsync(candidate, user, roles)
+              const insertParams = {
+                type: 'insert' as const,
+                roles,
+                cursor: candidate,
+                expansions: getValidationExpansions()
+              }
+              if (
+                winningRole &&
+                typeof winningRole.insert !== 'undefined' &&
+                !(await evaluateExpression(insertParams, winningRole.insert, user))
+              ) {
+                throw new Error('Update not permitted')
+              }
+              const { status, document } = winningRole
+                ? await checkValidation(winningRole, insertParams, user)
+                : fallbackAccess(candidate)
+
+              if (!status || !isEqual(candidate, document)) {
+                throw new Error('Update not permitted')
+              }
+
               const upsertResult = await collection.updateOne(
                 buildAndQuery(safeQuery),
                 normalizedData,
@@ -927,7 +1063,7 @@ const getOperators: GetOperatorsFunction = (
           const res = await collection.updateOne(
             buildAndQuery(safeQuery),
             normalizedData,
-            options
+            options?.upsert ? { ...options, upsert: false } : options
           )
           emitMongoEvent('updateOne')
           return res
