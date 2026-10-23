@@ -1,4 +1,5 @@
 import { GenerateEndpointsParams } from './interface'
+import { createEndpointAuthorization } from './authorization'
 import { generateHandler, getMethodsConfig } from './utils'
 
 /**
@@ -14,10 +15,13 @@ export const generateEndpoints = async ({
   endpointsList,
   rulesList
 }: GenerateEndpointsParams) => {
-  endpointsList.forEach(({ http_method, route, disabled, function_name }) => {
-    const currentFunction = functionsList[function_name]
+  const enabledEndpoints = endpointsList
+    .filter(({ disabled, function_name }) => !disabled && !!functionsList[function_name])
+    .map((endpoint) => ({ endpoint, authorize: createEndpointAuthorization(endpoint) }))
 
-    if (disabled || !currentFunction) return
+  enabledEndpoints.forEach(({ endpoint, authorize }) => {
+    const { http_method, route, function_name } = endpoint
+    const currentFunction = functionsList[function_name]
 
     const handler = generateHandler({
       app,
@@ -27,7 +31,7 @@ export const generateEndpoints = async ({
       functionsList,
       http_method
     })
-    const currentMethod = getMethodsConfig(app, handler, `/app/:appId/endpoint/${route.replace(/^\//, "")}`)[
+    const currentMethod = getMethodsConfig(app, handler, `/app/:appId/endpoint/${route.replace(/^\//, "")}`, authorize)[
       http_method
     ]
     currentMethod()

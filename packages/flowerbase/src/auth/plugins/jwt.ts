@@ -1,16 +1,11 @@
 import fastifyJwt from '@fastify/jwt'
 import fp from 'fastify-plugin'
+import { randomUUID } from 'node:crypto'
 import { Document, ObjectId, WithId } from 'mongodb'
 import { AUTH_CONFIG, AUTH_DB_NAME, DEFAULT_CONFIG } from '../../constants'
 
 type Options = {
   secret: string
-}
-
-type JwtAccessWithTimestamp = {
-  typ: 'access'
-  sub: string
-  iat?: number
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -47,13 +42,15 @@ export default fp(async function (fastify, opts: Options) {
       return
     }
 
-    if (request.user?.typ !== 'access') {
+    if (request.user?.typ !== 'access' && request.user?.typ !== 'refresh') {
+      reply.code(401).send(unauthorizedSessionError)
       return
     }
 
     const db = fastify.mongo?.client?.db(AUTH_DB_NAME)
     if (!db) {
-      fastify.log.warn('Mongo client unavailable while checking logout state')
+      fastify.log.warn('Mongo client unavailable while checking authentication state')
+      reply.code(401).send(unauthorizedSessionError)
       return
     }
 
@@ -73,26 +70,24 @@ export default fp(async function (fastify, opts: Options) {
       return
     }
 
-    if (!authUser) {
+    if (!authUser || authUser.status === 'disabled') {
       reply.code(401).send(unauthorizedSessionError)
       return
     }
 
-    const lastLogoutAt = authUser.lastLogoutAt ? new Date(authUser.lastLogoutAt) : null
-    const accessUser = request.user as JwtAccessWithTimestamp
-    const rawIssuedAt = accessUser.iat
-    const issuedAt =
-      typeof rawIssuedAt === 'number'
-        ? rawIssuedAt
-        : typeof rawIssuedAt === 'string'
-          ? Number(rawIssuedAt)
-          : undefined
     if (
-      lastLogoutAt &&
-      !Number.isNaN(lastLogoutAt.getTime()) &&
-      typeof issuedAt === 'number' &&
-      !Number.isNaN(issuedAt) &&
-      lastLogoutAt.getTime() >= issuedAt * 1000
+      request.user.typ === 'access' &&
+      (!Number.isSafeInteger(request.user.sessionVersion) ||
+        request.user.sessionVersion !== authUser.sessionVersion)
+    ) {
+      reply.code(401).send(unauthorizedSessionError)
+      return
+    }
+
+    if (
+      request.user.typ === 'refresh' &&
+      (!Number.isSafeInteger(request.user.credentialsVersion) ||
+        request.user.credentialsVersion !== authUser.credentialsVersion)
     ) {
       reply.code(401).send(unauthorizedSessionError)
       return
@@ -113,6 +108,7 @@ export default fp(async function (fastify, opts: Options) {
     return this.jwt.sign(
       {
         typ: 'access',
+        sessionVersion: user.sessionVersion,
         id,
         data: authData,
         user_data: customData,
@@ -131,10 +127,12 @@ export default fp(async function (fastify, opts: Options) {
     return this.jwt.sign(
       {
         typ: 'refresh',
+        credentialsVersion: user.credentialsVersion,
         baas_id: BAAS_ID
       },
       {
         sub: user._id.toJSON(),
+        jti: randomUUID(),
         expiresIn: `${DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS}d`
       }
     )

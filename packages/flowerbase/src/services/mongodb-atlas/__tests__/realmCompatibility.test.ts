@@ -1,8 +1,9 @@
 /// <reference types="jest" />
 
-import { ObjectId } from 'mongodb'
+import { Document, ObjectId } from 'mongodb'
 import MongoDbAtlas from '..'
 import { Rules } from '../../../features/rules/interface'
+import { projectReadableDocument } from '../authorizedFindCursor'
 
 const createAppWithCollection = (collection: Record<string, unknown>) => ({
   mongo: {
@@ -36,20 +37,30 @@ const createRules = (overrides: Partial<Rules[keyof Rules]> = {}): Rules => ({
 
 describe('mongodb-atlas Realm compatibility', () => {
   it('allows updateOne upsert when no document matches', async () => {
-    const updateResult = { acknowledged: true, matchedCount: 0, modifiedCount: 0, upsertedCount: 1 }
     const id = new ObjectId()
+    const updateResult = {
+      acknowledged: true,
+      matchedCount: 0,
+      modifiedCount: 0,
+      upsertedCount: 1,
+      upsertedId: id
+    }
     const findOne = jest.fn().mockResolvedValue(null)
     const updateOne = jest.fn().mockResolvedValue(updateResult)
+    const insertOne = jest.fn().mockResolvedValue({ acknowledged: true, insertedId: id })
     const collection = {
       collectionName: 'todos',
       findOne,
-      updateOne
+      updateOne,
+      insertOne
     }
 
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       rules: createRules(),
       user: { id: 'user-1' }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const result = await operators.updateOne(
       { _id: id },
@@ -58,15 +69,17 @@ describe('mongodb-atlas Realm compatibility', () => {
     )
 
     expect(result).toEqual(updateResult)
-    expect(updateOne).toHaveBeenCalledWith(
-      { $and: [{ _id: id }] },
-      { $set: { label: 'created-by-upsert' } },
-      { upsert: true }
-    )
+    expect(updateOne).not.toHaveBeenCalled()
+    expect(insertOne).toHaveBeenCalledWith({ _id: id, label: 'created-by-upsert' }, {})
   })
 
   it('accepts plain documents in updateOne by normalizing them to $set', async () => {
-    const updateResult = { acknowledged: true, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 }
+    const updateResult = {
+      acknowledged: true,
+      matchedCount: 1,
+      modifiedCount: 1,
+      upsertedCount: 0
+    }
     const id = new ObjectId()
     const findOne = jest.fn().mockResolvedValue({ _id: id, label: 'before' })
     const aggregate = jest.fn().mockReturnValue({
@@ -83,16 +96,18 @@ describe('mongodb-atlas Realm compatibility', () => {
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       rules: createRules(),
       user: { id: 'user-1' }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const replacementLikePayload = { label: 'after', count: 5 }
     const result = await operators.updateOne({ _id: id }, replacementLikePayload)
 
     expect(result).toEqual(updateResult)
     expect(updateOne).toHaveBeenCalledWith(
-      { $and: [{ _id: id }] },
+      { $and: [{ _id: id }, { _id: id }] },
       { $set: replacementLikePayload },
-      undefined
+      { collation: { locale: 'simple' } }
     )
   })
 
@@ -116,14 +131,16 @@ describe('mongodb-atlas Realm compatibility', () => {
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       rules: createRules(),
       user: { id: 'user-1' }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     await operators.updateOne({ _id: id }, { $inc: { count: 1 } })
 
     expect(updateOne).toHaveBeenCalledWith(
-      { $and: [{ _id: id }] },
+      { $and: [{ _id: id }, { _id: id }] },
       { $inc: { count: 1 } },
-      undefined
+      { collation: { locale: 'simple' } }
     )
     expect(aggregate).not.toHaveBeenCalled()
   })
@@ -134,7 +151,9 @@ describe('mongodb-atlas Realm compatibility', () => {
     const aggregate = jest.fn(() => {
       throw new Error('aggregate should not be used for operator simulation')
     })
-    const findOneAndUpdate = jest.fn().mockResolvedValue({ _id: id, tags: ['old', 'new'] })
+    const findOneAndUpdate = jest
+      .fn()
+      .mockResolvedValue({ _id: id, tags: ['old', 'new'] })
     const collection = {
       collectionName: 'todos',
       findOne,
@@ -144,13 +163,16 @@ describe('mongodb-atlas Realm compatibility', () => {
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       rules: createRules(),
       user: { id: 'user-1' }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     await operators.findOneAndUpdate({ _id: id }, { $push: { tags: 'new' } } as any)
 
     expect(findOneAndUpdate).toHaveBeenCalledWith(
-      { $and: [{ _id: id }] },
-      { $push: { tags: 'new' } }
+      { $and: [{ _id: id }, { _id: id }] },
+      { $push: { tags: 'new' } },
+      { collation: { locale: 'simple' } }
     )
     expect(aggregate).not.toHaveBeenCalled()
   })
@@ -164,7 +186,9 @@ describe('mongodb-atlas Realm compatibility', () => {
     }
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       run_as_system: true
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const result = await operators.findOneAndUpdate(
       { _id: id },
@@ -207,7 +231,9 @@ describe('mongodb-atlas Realm compatibility', () => {
 
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       run_as_system: true
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const result = await operators.bulkWrite(operations as any, { ordered: false } as any)
 
@@ -225,7 +251,9 @@ describe('mongodb-atlas Realm compatibility', () => {
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       rules: createRules(),
       user: { id: 'user-1' }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     await expect(
       operators.bulkWrite(
@@ -266,14 +294,16 @@ describe('mongodb-atlas Realm compatibility', () => {
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       rules: createRules(),
       user: { id: 'user-1' }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     await operators.updateMany({ _id: id }, { $push: { tags: 'new' } } as any)
 
     expect(updateMany).toHaveBeenCalledWith(
-      { $and: [{ _id: id }] },
+      { $and: [{ _id: id }, { _id: id }] },
       { $push: { tags: 'new' } },
-      undefined
+      { collation: { locale: 'simple' } }
     )
     expect(aggregate).not.toHaveBeenCalled()
   })
@@ -287,7 +317,9 @@ describe('mongodb-atlas Realm compatibility', () => {
     const session = { id: 'tx-1' }
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       run_as_system: true
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     await operators.findOne({ key: 'value' }, { session } as any)
 
@@ -309,7 +341,9 @@ describe('mongodb-atlas Realm compatibility', () => {
     const session = { id: 'tx-2' }
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       run_as_system: true
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     operators.find({ active: true }, { session } as any)
 
@@ -326,12 +360,14 @@ describe('mongodb-atlas Realm compatibility', () => {
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       rules: createRules(),
       user: { id: 'user-1' }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const result = await operators.findOne({})
 
     expect(result).toEqual(doc)
-    expect(findOne).toHaveBeenCalledWith({}, undefined)
+    expect(findOne).toHaveBeenCalledWith({}, { collation: { locale: 'simple' } })
   })
 
   it('returns null from findOne when no document matches, even with permissive roles', async () => {
@@ -352,12 +388,17 @@ describe('mongodb-atlas Realm compatibility', () => {
         ]
       }),
       user: { id: 'user-1' }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const result = await operators.findOne({ _id: new ObjectId() })
 
     expect(result).toBeNull()
-    expect(findOne).toHaveBeenCalledWith({ $and: [{ _id: expect.any(ObjectId) }] }, undefined)
+    expect(findOne).toHaveBeenCalledWith(
+      { $and: [{ _id: expect.any(ObjectId) }] },
+      { collation: { locale: 'simple' } }
+    )
   })
 
   it('keeps write-only field permissions readable in findOne responses', async () => {
@@ -390,7 +431,9 @@ describe('mongodb-atlas Realm compatibility', () => {
         ]
       }),
       user: { id: 'user-1', custom_data: { type: 'internal' } }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const result = await operators.findOne({ _id: doc._id })
 
@@ -405,6 +448,8 @@ describe('mongodb-atlas Realm compatibility', () => {
     }
     const cursor = {
       toArray: jest.fn().mockResolvedValue([doc]),
+      next: jest.fn().mockResolvedValueOnce(doc).mockResolvedValue(null),
+      close: jest.fn().mockResolvedValue(undefined),
       sort: jest.fn(),
       skip: jest.fn(),
       limit: jest.fn()
@@ -433,7 +478,9 @@ describe('mongodb-atlas Realm compatibility', () => {
         ]
       }),
       user: { id: 'user-1', custom_data: { type: 'internal' } }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const result = await operators.find({ _id: doc._id }).toArray()
 
@@ -466,7 +513,9 @@ describe('mongodb-atlas Realm compatibility', () => {
         ]
       }),
       user: { id: 'user-1', custom_data: { type: 'internal' } }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const result = await operators.findOne({ _id: doc._id })
 
@@ -503,7 +552,9 @@ describe('mongodb-atlas Realm compatibility', () => {
         ]
       }),
       user: { id: 'user-1', custom_data: { type: 'internal' } }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const result = await operators.findOne({ _id: doc._id })
 
@@ -551,7 +602,9 @@ describe('mongodb-atlas Realm compatibility', () => {
         ]
       }),
       user: { id: 'user-1', custom_data: { workspaces: ['workspace-1'] } }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const result = await operators.findOne({ _id: doc._id })
 
@@ -572,7 +625,9 @@ describe('mongodb-atlas Realm compatibility', () => {
     }
     const operators = MongoDbAtlas(createAppWithCollection(collection) as any, {
       run_as_system: true
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const result = await operators.insertMany([{ a: 1 }, { a: 2 }])
 
@@ -610,7 +665,9 @@ describe('mongodb-atlas Realm compatibility', () => {
         ]
       }),
       user: { id: 'user-1' }
-    }).db('db').collection('todos')
+    })
+      .db('db')
+      .collection('todos')
 
     const visibleResult = await operators.distinct('visible', { archived: false })
     const secretResult = await operators.distinct('secret', { archived: false })
@@ -620,12 +677,12 @@ describe('mongodb-atlas Realm compatibility', () => {
     expect(find).toHaveBeenNthCalledWith(
       1,
       { $and: [{ archived: false }] },
-      { projection: { _id: 1, visible: 1 } }
+      { collation: { locale: 'simple' } }
     )
     expect(find).toHaveBeenNthCalledWith(
       2,
       { $and: [{ archived: false }] },
-      { projection: { _id: 1, secret: 1 } }
+      { collation: { locale: 'simple' } }
     )
   })
 
@@ -654,4 +711,107 @@ describe('mongodb-atlas Realm compatibility', () => {
     expect(startSession).toHaveBeenCalledWith(options)
     expect(session).toBe(mockSession)
   })
+
+  describe.each(['findOne', 'find', 'distinct'] as const)(
+    '%s role evaluation before projection',
+    (method) => {
+      const createReadFixture = (document: Document, roles: Rules['todos']['roles']) => {
+        const findOne = jest.fn(async (_query, options) =>
+          projectReadableDocument(document, options?.projection)
+        )
+        const find = jest.fn((_query, options) => {
+          const projected = projectReadableDocument(document, options?.projection)
+          return {
+            toArray: jest.fn().mockResolvedValue([projected]),
+            next: jest.fn().mockResolvedValueOnce(projected).mockResolvedValue(null),
+            close: jest.fn().mockResolvedValue(undefined)
+          }
+        })
+        const operators = MongoDbAtlas(
+          createAppWithCollection({ collectionName: 'todos', findOne, find }) as any,
+          {
+            rules: createRules({ roles }),
+            user: { id: 'user-1' }
+          }
+        )
+          .db('db')
+          .collection('todos')
+        return { operators, findOne, find }
+      }
+
+      it('cannot hide a permission discriminator to select a more permissive role', async () => {
+        const document = { _id: new ObjectId(), locked: true, title: 'Private' }
+        const { operators, findOne, find } = createReadFixture(document, [
+          {
+            name: 'locked',
+            apply_when: { '%%root.locked': true },
+            read: false,
+            write: false
+          } as any,
+          { name: 'others', apply_when: {}, read: true, write: false } as any
+        ])
+        const projection = { _id: 0, title: 1 }
+        const result =
+          method === 'findOne'
+            ? await operators.findOne({}, projection)
+            : method === 'find'
+              ? await operators.find({}, projection).toArray()
+              : await operators.distinct('title', {}, { projection } as any)
+        expect(result).toEqual(method === 'findOne' ? {} : [])
+        expect(
+          (method === 'findOne' ? findOne : find).mock.calls[0][1]
+        ).not.toHaveProperty('projection')
+      })
+
+      it('retains fields required to choose a legitimate role before narrowing the response', async () => {
+        const document = { _id: new ObjectId(), owner: 'user-1', title: 'Allowed' }
+        const { operators, findOne, find } = createReadFixture(document, [
+          {
+            name: 'owner',
+            apply_when: { '%%root.owner': 'user-1' },
+            read: true,
+            write: false
+          } as any
+        ])
+        const projection = { _id: 0, title: 1 }
+        const result =
+          method === 'findOne'
+            ? await operators.findOne({}, projection)
+            : method === 'find'
+              ? await operators.find({}, projection).toArray()
+              : await operators.distinct('title', {}, { projection } as any)
+        expect(result).toEqual(
+          method === 'findOne'
+            ? { title: 'Allowed' }
+            : method === 'find'
+              ? [{ title: 'Allowed' }]
+              : ['Allowed']
+        )
+        expect(
+          (method === 'findOne' ? findOne : find).mock.calls[0][1]
+        ).not.toHaveProperty('projection')
+      })
+
+      it.each([{ returnKey: true }, { raw: true }, { fieldsAsRaw: { owner: true } }])(
+        'rejects options %j that replace the authorization document',
+        async (options) => {
+          const { operators, findOne, find } = createReadFixture(
+            { _id: new ObjectId(), owner: 'user-1', title: 'Private' },
+            [{ name: 'reader', apply_when: {}, read: true } as any]
+          )
+          await expect(
+            Promise.resolve().then(() =>
+              method === 'findOne'
+                ? operators.findOne({}, undefined, options as any)
+                : method === 'find'
+                  ? operators.find({}, undefined, options as any).toArray()
+                  : operators.distinct('title', {}, options as any)
+            )
+          ).rejects.toThrow('must preserve the full document')
+          expect(findOne).not.toHaveBeenCalled()
+          expect(find).not.toHaveBeenCalled()
+        }
+      )
+    }
+  )
 })

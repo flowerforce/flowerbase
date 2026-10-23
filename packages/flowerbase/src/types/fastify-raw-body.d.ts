@@ -3,7 +3,7 @@ import type { FastifyJWT } from '@fastify/jwt'
 
 declare module 'fastify' {
   interface FastifyRequest {
-    rawBody?: string
+    rawBody?: string | Buffer
     user?: FastifyJWT['user']
   }
 

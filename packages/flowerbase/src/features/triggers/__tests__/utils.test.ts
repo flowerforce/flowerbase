@@ -1,7 +1,7 @@
 import { ObjectId } from 'bson'
 import { GenerateContext } from '../../../utils/context'
 import { StateManager } from '../../../state'
-import { TRIGGER_HANDLERS } from '../utils'
+import { registerTriggerLifecycle, TRIGGER_HANDLERS } from '../utils'
 
 jest.mock('../../../utils/context', () => ({
     GenerateContext: jest.fn()
@@ -42,11 +42,10 @@ describe('TRIGGER_HANDLERS.DATABASE', () => {
             mongo: {
                 changestream: { client }
             },
-            server: {
-                once: jest.fn()
-            }
+            addHook: jest.fn()
         } as any
 
+        registerTriggerLifecycle(app)
         await TRIGGER_HANDLERS.DATABASE({
             config: {
                 database: 'flowerbase-test',

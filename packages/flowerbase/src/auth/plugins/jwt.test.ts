@@ -20,7 +20,7 @@ import jwtAuthPlugin from './jwt'
 
 const SECRET = 'test-secret'
 
-const createAccessRequest = (payload: { typ: 'access'; sub: string; iat: number }) => {
+const createAccessRequest = (payload: { typ: 'access'; sub: string; sessionVersion?: number }) => {
   const request: Record<string, unknown> = {}
   request.jwtVerify = jest.fn(async () => {
     request.user = payload
@@ -48,7 +48,7 @@ describe('jwtAuthentication', () => {
     error_code: 'InvalidSession'
   }
 
-  const setupMongo = (userPayload: { _id: ObjectId; lastLogoutAt?: Date }) => {
+  const setupMongo = (userPayload: { _id: ObjectId; sessionVersion: number }) => {
     const findOneMock = jest.fn().mockResolvedValue(userPayload)
     const collectionMock = { findOne: findOneMock }
     const dbMock = { collection: jest.fn().mockReturnValue(collectionMock) }
@@ -63,15 +63,14 @@ describe('jwtAuthentication', () => {
     } as unknown as FastifyReply
   }
 
-  it('allows access tokens issued after the last logout', async () => {
+  it('allows access tokens for the current session version', async () => {
     const userId = new ObjectId()
-    const nowSeconds = Math.floor(Date.now() / 1000)
-    setupMongo({ _id: userId, lastLogoutAt: new Date((nowSeconds - 30) * 1000) })
+    setupMongo({ _id: userId, sessionVersion: 1 })
 
     const request = createAccessRequest({
       typ: 'access',
       sub: userId.toHexString(),
-      iat: nowSeconds
+      sessionVersion: 1
     })
     const reply = createReply()
 
@@ -81,15 +80,14 @@ describe('jwtAuthentication', () => {
     expect(reply.send).not.toHaveBeenCalled()
   })
 
-  it('rejects access tokens issued before the last logout', async () => {
+  it('rejects access tokens for a revoked session version', async () => {
     const userId = new ObjectId()
-    const nowSeconds = Math.floor(Date.now() / 1000)
-    setupMongo({ _id: userId, lastLogoutAt: new Date((nowSeconds + 30) * 1000) })
+    setupMongo({ _id: userId, sessionVersion: 1 })
 
     const request = createAccessRequest({
       typ: 'access',
       sub: userId.toHexString(),
-      iat: nowSeconds
+      sessionVersion: 0
     })
     const reply = createReply()
 

@@ -76,17 +76,17 @@ describe('localUserPassController reset call', () => {
         password: 'old-hash',
         status: 'pending'
       }),
-      updateOne: jest.fn().mockResolvedValue({ acknowledged: true })
+      updateOne: jest.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 })
     }
     const resetCollection = {
       createIndex: jest.fn().mockResolvedValue('ok'),
       updateOne: jest.fn().mockResolvedValue({ acknowledged: true }),
-      deleteOne: jest.fn().mockResolvedValue({ acknowledged: true }),
-      findOne: jest.fn()
+      findOneAndDelete: jest.fn().mockResolvedValue({ _id: 'reset-request-1', email: 'john@doe.com' })
     }
     const refreshCollection = {
       createIndex: jest.fn().mockResolvedValue('ok'),
-      insertOne: jest.fn()
+      insertOne: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ matchedCount: 1 })
     }
     const usersCollection = {
       findOne: jest.fn()
@@ -111,6 +111,7 @@ describe('localUserPassController reset call', () => {
       app,
       authUsersCollection,
       resetCollection,
+      refreshCollection,
       routeHandlerRef: (path: string) => routeHandlers[path]
     }
   }
@@ -121,7 +122,7 @@ describe('localUserPassController reset call', () => {
 
   it('hashes and applies the password when the custom reset function returns success', async () => {
     ; (GenerateContext as jest.Mock).mockResolvedValue({ status: 'success' })
-    const { app, authUsersCollection, resetCollection, routeHandlerRef } = buildApp()
+    const { app, authUsersCollection, resetCollection, refreshCollection, routeHandlerRef } = buildApp()
 
     await localUserPassController(app as never)
 
@@ -149,10 +150,19 @@ describe('localUserPassController reset call', () => {
     }))
     expect(hashPassword).toHaveBeenCalledWith('new-secret')
     expect(authUsersCollection.updateOne).toHaveBeenCalledWith(
-      { email: 'john@doe.com' },
-      { $set: { password: 'hashed:new-secret' } }
+      { _id: 'auth-user-1' },
+      {
+        $set: { password: 'hashed:new-secret', lastLogoutAt: expect.any(Date) },
+        $inc: { sessionVersion: 1, credentialsVersion: 1 }
+      }
     )
-    expect(resetCollection.deleteOne).toHaveBeenCalledWith({ email: 'john@doe.com' })
+    expect(refreshCollection.updateMany).toHaveBeenCalledWith(
+      { userId: 'auth-user-1', revokedAt: null },
+      { $set: { revokedAt: expect.any(Date) } }
+    )
+    expect(resetCollection.findOneAndDelete).toHaveBeenCalledWith({
+      email: 'john@doe.com', token: 'generated-token', tokenId: 'generated-token'
+    })
     expect(res.status).toHaveBeenCalledWith(202)
     expect(result).toEqual({ status: 'success' })
   })
@@ -177,7 +187,7 @@ describe('localUserPassController reset call', () => {
       { email: 'john@doe.com' },
       expect.objectContaining({ $set: { password: expect.any(String) } })
     )
-    expect(resetCollection.deleteOne).not.toHaveBeenCalled()
+    expect(resetCollection.findOneAndDelete).not.toHaveBeenCalled()
     expect(res.status).toHaveBeenCalledWith(202)
     expect(result).toEqual({ status: 'pending' })
   })
@@ -202,7 +212,7 @@ describe('localUserPassController reset call', () => {
 
     expect(hashPassword).not.toHaveBeenCalled()
     expect(authUsersCollection.updateOne).not.toHaveBeenCalled()
-    expect(resetCollection.deleteOne).not.toHaveBeenCalled()
+    expect(resetCollection.findOneAndDelete).not.toHaveBeenCalled()
     expect(res.status).not.toHaveBeenCalled()
   })
 
@@ -233,7 +243,7 @@ describe('localUserPassController reset call', () => {
       runAsSystem: true
     }))
     expect(authUsersCollection.updateOne).toHaveBeenCalledWith(
-      { email: 'john@doe.com' },
+      { email: 'john@doe.com', status: 'pending' },
       {
         $set: {
           status: 'pending',

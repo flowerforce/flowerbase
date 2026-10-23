@@ -81,19 +81,33 @@ export async function customFunctionController(app: FastifyInstance) {
       }) as CustomFunctionAuthResult
 
 
-      if (!authResult.id) {
+      if (typeof authResult?.id !== 'string' || !authResult.id) {
         reply.code(401).send({ message: 'Unauthorized' })
         return
       }
 
       const email = authResult.email ?? authResult.id
-      let authUser = await authDb.collection(authCollection!).findOne({ email })
+      let authUser = await authDb.collection(authCollection!).findOne({
+        identities: {
+          $elemMatch: {
+            provider_type: 'custom-function',
+            provider_id: authResult.id
+          }
+        }
+      })
       if (!authUser) {
+        // Email is metadata. Only the provider identity can identify an account.
+        if (await authDb.collection(authCollection!).findOne({ email })) {
+          reply.code(401).send({ message: 'Unauthorized' })
+          return
+        }
         const authUserId = new ObjectId()
         await authDb.collection(authCollection!).insertOne({
           _id: authUserId,
           email,
           status: 'confirmed',
+          sessionVersion: 0,
+          credentialsVersion: 0,
           createdAt: new Date(),
           custom_data: {},
           identities: [
@@ -107,8 +121,15 @@ export async function customFunctionController(app: FastifyInstance) {
         })
         authUser = {
           _id: authUserId,
-          email
+          email,
+          sessionVersion: 0,
+          credentialsVersion: 0
         }
+      }
+
+      if (authUser.status === 'disabled') {
+        reply.code(401).send({ message: 'Unauthorized' })
+        return
       }
 
       const user =
@@ -120,6 +141,8 @@ export async function customFunctionController(app: FastifyInstance) {
 
       const currentUserData = {
         _id: authUser._id,
+        sessionVersion: authUser.sessionVersion,
+        credentialsVersion: authUser.credentialsVersion,
         user_data: {
           ...(user || {}),
           id: authUser._id.toString(),

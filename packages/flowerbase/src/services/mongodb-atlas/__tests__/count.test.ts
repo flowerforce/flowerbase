@@ -36,7 +36,8 @@ describe('mongodb-atlas count', () => {
     const countDocuments = jest.fn().mockResolvedValue(7)
     const collection = {
       collectionName: 'todos',
-      countDocuments
+      countDocuments,
+      aggregate: jest.fn().mockReturnValue({ toArray: jest.fn().mockResolvedValue([{ count: 7 }]) })
     }
 
     const rules = {
@@ -59,9 +60,9 @@ describe('mongodb-atlas count', () => {
     const result = await operators.count({ workspace: 'workspace-1' })
 
     expect(result).toBe(7)
-    expect(countDocuments).toHaveBeenCalledWith(
-      { $and: [{ ownerId: 'user-1' }, { workspace: 'workspace-1' }] },
-      undefined
+    expect(collection.aggregate).toHaveBeenCalledWith(
+      expect.arrayContaining([{ $match: { $and: [{ ownerId: 'user-1' }] } }, { $match: { workspace: 'workspace-1' } }, { $count: 'count' }]),
+      { collation: { locale: 'simple' } }
     )
   })
 
@@ -89,7 +90,8 @@ describe('mongodb-atlas count', () => {
     const countDocuments = jest.fn().mockResolvedValue(3)
     const collection = {
       collectionName: 'todos',
-      countDocuments
+      countDocuments,
+      aggregate: jest.fn().mockReturnValue({ toArray: jest.fn().mockResolvedValue([{ count: 3 }]) })
     }
 
     const rules = {
@@ -112,9 +114,9 @@ describe('mongodb-atlas count', () => {
     const result = await operators.countDocuments({ workspace: 'workspace-1' })
 
     expect(result).toBe(3)
-    expect(countDocuments).toHaveBeenCalledWith(
-      { $and: [{ ownerId: 'user-1' }, { workspace: 'workspace-1' }] },
-      undefined
+    expect(collection.aggregate).toHaveBeenCalledWith(
+      expect.arrayContaining([{ $match: { $and: [{ ownerId: 'user-1' }] } }, { $match: { workspace: 'workspace-1' } }, { $count: 'count' }]),
+      { collation: { locale: 'simple' } }
     )
   })
 })
