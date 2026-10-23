@@ -35,7 +35,7 @@ jobs:
       - name: Prepare prerelease and push commit
         run: | # Fix me: ugly hack for nx conflicting configuration
           sed -i '/"git": {/,/}/d' nx.json
-          npm run prepare:prerelease
+          npm_config_legacy_peer_deps=false npm run prepare:prerelease
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}

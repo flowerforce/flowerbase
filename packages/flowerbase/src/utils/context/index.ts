@@ -6,7 +6,7 @@ import vm from 'vm'
 import { EJSON } from 'bson'
 import { StateManager } from '../../state'
 import { Function as AppFunction } from '../../features/functions/interface'
-import { generateContextData } from './helpers'
+import { contextUserForRun, generateContextData } from './helpers'
 import { GenerateContextParams } from './interface'
 
 const dynamicImport = new Function('specifier', 'return import(specifier)') as (
@@ -323,11 +323,12 @@ export async function GenerateContext({
   const functionsQueue = StateManager.select("functionsQueue")
   const effectiveRunAsSystem = Boolean(runAsSystem || currentFunction.run_as_system)
   const functionToRun = { ...currentFunction, run_as_system: effectiveRunAsSystem }
+  const contextUser = contextUserForRun(user, effectiveRunAsSystem)
 
   const run = async () => {
 
     const contextData = generateContextData({
-      user,
+      user: contextUser,
       services,
       app,
       rules,
@@ -443,8 +444,9 @@ export function GenerateContextSync({
 
   const effectiveRunAsSystem = Boolean(runAsSystem || currentFunction.run_as_system)
   const functionToRun = { ...currentFunction, run_as_system: effectiveRunAsSystem }
+  const contextUser = contextUserForRun(user, effectiveRunAsSystem)
   const contextData = generateContextData({
-    user,
+    user: contextUser,
     services,
     app,
     rules,
