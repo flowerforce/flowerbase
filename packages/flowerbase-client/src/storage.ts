@@ -8,8 +8,6 @@ export type PersistedStorage = {
   hydrate: (keys: string[]) => Promise<StorageSnapshot>
 }
 
-const memoryStore = new Map<string, string>()
-
 const getStorage = () => {
   const browserStorage = globalThis.localStorage
   if (
@@ -25,6 +23,7 @@ const getStorage = () => {
     }
   }
 
+  const memoryStore = new Map<string, string>()
   return {
     getItem: (key: string) => memoryStore.get(key) ?? null,
     setItem: (key: string, value: string) => {

@@ -8,21 +8,29 @@ type ParsedPayloadError = {
 const parsePayloadError = (payload: unknown): ParsedPayloadError => {
   if (!payload || typeof payload !== 'object') return {}
 
-  const message = 'message' in payload && typeof payload.message === 'string' ? payload.message : undefined
-  const error = 'error' in payload && typeof payload.error === 'string' ? payload.error : undefined
+  const message =
+    'message' in payload && typeof payload.message === 'string'
+      ? payload.message
+      : undefined
+  const error =
+    'error' in payload && typeof payload.error === 'string' ? payload.error : undefined
   const errorCode =
     'error_code' in payload && typeof payload.error_code === 'string'
       ? payload.error_code
       : 'errorCode' in payload && typeof payload.errorCode === 'string'
         ? payload.errorCode
         : undefined
-  const link = 'link' in payload && typeof payload.link === 'string' ? payload.link : undefined
+  const link =
+    'link' in payload && typeof payload.link === 'string' ? payload.link : undefined
 
   if (error) {
     try {
       const parsed = JSON.parse(error)
       if (parsed && typeof parsed === 'object') {
-        const nestedMessage = 'message' in parsed && typeof parsed.message === 'string' ? parsed.message : undefined
+        const nestedMessage =
+          'message' in parsed && typeof parsed.message === 'string'
+            ? parsed.message
+            : undefined
         const nestedErrorCode =
           'error_code' in parsed && typeof parsed.error_code === 'string'
             ? parsed.error_code
@@ -98,6 +106,7 @@ type RequestParams = {
   body?: unknown
   bearerToken?: string
   timeout?: number
+  signal?: AbortSignal
 }
 
 const parseBody = async (response: Response) => {
@@ -111,12 +120,20 @@ const parseBody = async (response: Response) => {
   }
 }
 
-const timeoutSignal = (timeout = 10000) => {
+const timeoutSignal = (timeout = 10000, externalSignal?: AbortSignal) => {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
+  const abort = () => controller.abort(externalSignal?.reason)
+  externalSignal?.addEventListener('abort', abort, { once: true })
+  if (externalSignal?.aborted) abort()
+
   return {
+    controller,
     signal: controller.signal,
-    clear: () => clearTimeout(timer)
+    clear: () => {
+      clearTimeout(timer)
+      externalSignal?.removeEventListener('abort', abort)
+    }
   }
 }
 
@@ -125,11 +142,13 @@ export const requestJson = async <T = unknown>({
   method = 'GET',
   body,
   bearerToken,
-  timeout
+  timeout,
+  signal: externalSignal
 }: RequestParams): Promise<T> => {
-  const { signal, clear } = timeoutSignal(timeout)
+  const { signal, clear } = timeoutSignal(timeout, externalSignal)
 
   try {
+    signal.throwIfAborted()
     const response = await fetch(url, {
       method,
       headers: {
@@ -141,6 +160,7 @@ export const requestJson = async <T = unknown>({
     })
 
     const payload = await parseBody(response)
+    signal.throwIfAborted()
 
     if (!response.ok) {
       const parsedError = parsePayloadError(payload)
@@ -167,11 +187,42 @@ export const requestStream = async ({
   method = 'GET',
   body,
   bearerToken,
-  timeout
+  timeout,
+  signal: externalSignal
 }: RequestParams): Promise<AsyncIterable<Uint8Array>> => {
-  const { signal, clear } = timeoutSignal(timeout)
+  const { controller, signal, clear } = timeoutSignal(timeout, externalSignal)
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
+  let cancellation: Promise<void> | undefined
+  const cancelReader = () => {
+    if (!reader) return Promise.resolve()
+    if (!cancellation) {
+      const responseReader = reader
+      cancellation = responseReader
+        .cancel(signal.reason)
+        .catch(() => {})
+        .then(() => {
+          responseReader.releaseLock()
+        })
+    }
+    return cancellation
+  }
+  const cleanup = () => {
+    clear()
+    signal.removeEventListener('abort', onAbort)
+  }
+  const onAbort = () => {
+    cleanup()
+    void cancelReader()
+  }
+  const close = async () => {
+    controller.abort()
+    await cancelReader()
+    cleanup()
+  }
+  signal.addEventListener('abort', onAbort, { once: true })
 
   try {
+    signal.throwIfAborted()
     const response = await fetch(url, {
       method,
       headers: {
@@ -201,21 +252,39 @@ export const requestStream = async ({
       throw new Error('Response stream body is missing')
     }
 
-    const reader = response.body.getReader()
-    return {
-      async *[Symbol.asyncIterator]() {
-        try {
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            if (value) yield value
-          }
-        } finally {
-          reader.releaseLock()
+    reader = response.body.getReader()
+    const streamReader = reader
+    signal.throwIfAborted()
+    const iterator = (async function* () {
+      try {
+        while (true) {
+          signal.throwIfAborted()
+          const { done, value } = await streamReader.read()
+          signal.throwIfAborted()
+          if (done) break
+          if (value) yield value
         }
+      } finally {
+        await close()
+      }
+    })()
+    const stream: AsyncIterableIterator<Uint8Array> = {
+      [Symbol.asyncIterator]() {
+        return this
+      },
+      next: () => iterator.next(),
+      async return() {
+        await close()
+        return iterator.return(undefined)
+      },
+      async throw(error?: unknown) {
+        await close()
+        return iterator.throw(error)
       }
     }
-  } finally {
-    clear()
+    return stream
+  } catch (error) {
+    await close()
+    throw error
   }
 }

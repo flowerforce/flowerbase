@@ -1,6 +1,7 @@
 import { App } from '../app'
 import { EJSON, ObjectId } from '../bson'
 import { Credentials } from '../credentials'
+import { createWatchIterator } from '../watch'
 
 const streamFromLines = (lines: string[]) => {
   const encoded = lines.map((line) => `${line}\n`).join('')
@@ -332,5 +333,154 @@ describe('flowerbase-client watch', () => {
     expect(() => collection.watch({ filter: { $match: { operationType: 'insert' } } })).toThrow(
       'watch filter must be a query object, not a $match stage'
     )
+  })
+
+  it('discards buffered events and cancels an active watch when its user logs out', async () => {
+    jest.useFakeTimers()
+    const cancel = jest.fn()
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            'data: {"private":"first"}\n\ndata: {"private":"buffered"}\n\n'
+          )
+        )
+      },
+      cancel
+    })
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: 'access',
+            refresh_token: 'refresh',
+            user_id: 'watch-logout-user'
+          })
+        )
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'access' })))
+      .mockResolvedValueOnce(new Response(body))
+      .mockResolvedValueOnce(new Response('{}'))
+    const app = new App({ id: 'watch-logout-app', baseUrl: 'http://localhost:3000' })
+    const user = await app.logIn(Credentials.anonymous())
+    const iterator = user
+      .mongoClient('mongodb-atlas')
+      .db('testdb')
+      .collection('todos')
+      .watch()
+    await expect(iterator.next()).resolves.toEqual({
+      done: false,
+      value: { private: 'first' }
+    })
+
+    await user.logOut()
+
+    await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined })
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect((global.fetch as jest.Mock).mock.calls[2][1].signal.aborted).toBe(true)
+    expect(body.locked).toBe(false)
+    await jest.advanceTimersByTimeAsync(10000)
+    expect(global.fetch).toHaveBeenCalledTimes(4)
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  it('resolves pending consumers and removes the session listener on cancellation', async () => {
+    jest.useFakeTimers()
+    const cancel = jest.fn()
+    const body = new ReadableStream<Uint8Array>({ cancel })
+    global.fetch = jest.fn().mockResolvedValue(new Response(body))
+    const lifecycle = new AbortController()
+    const removeListener = jest.spyOn(lifecycle.signal, 'removeEventListener')
+    const iterator = createWatchIterator({
+      appId: 'watch-cancel',
+      baseUrl: 'http://localhost',
+      accessToken: 'access',
+      database: 'testdb',
+      collection: 'todos',
+      signal: lifecycle.signal
+    })
+    const pending = iterator.next()
+    await Promise.resolve()
+
+    lifecycle.abort()
+
+    await expect(pending).resolves.toEqual({ done: true, value: undefined })
+    await jest.advanceTimersByTimeAsync(0)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(removeListener).toHaveBeenCalledWith('abort', expect.any(Function))
+    expect(body.locked).toBe(false)
+  })
+
+  it('clears its reconnect delay when closed', async () => {
+    jest.useFakeTimers()
+    global.fetch = jest.fn().mockRejectedValue(new Error('network'))
+    const iterator = createWatchIterator({
+      appId: 'watch-reconnect-cancel',
+      baseUrl: 'http://localhost',
+      accessToken: 'access',
+      database: 'testdb',
+      collection: 'todos'
+    })
+    await jest.advanceTimersByTimeAsync(0)
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(jest.getTimerCount()).toBe(1)
+
+    iterator.close()
+    await jest.advanceTimersByTimeAsync(10000)
+
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(jest.getTimerCount()).toBe(0)
+  })
+
+  it('does not open a watch for an already aborted session', async () => {
+    global.fetch = jest.fn()
+    const lifecycle = new AbortController()
+    lifecycle.abort()
+    const iterator = createWatchIterator({
+      appId: 'watch-already-cancelled',
+      baseUrl: 'http://localhost',
+      accessToken: 'access',
+      database: 'testdb',
+      collection: 'todos',
+      signal: lifecycle.signal
+    })
+
+    await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined })
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('pauses stream reads until queued events are consumed', async () => {
+    jest.useFakeTimers()
+    const pull = jest.fn((controller: ReadableStreamDefaultController<Uint8Array>) => {
+      controller.enqueue(new TextEncoder().encode('data: {"operationType":"insert"}\n\n'))
+    })
+    const cancel = jest.fn()
+    const body = new ReadableStream<Uint8Array>({ pull, cancel }, { highWaterMark: 0 })
+    global.fetch = jest.fn().mockResolvedValue(new Response(body))
+    const iterator = createWatchIterator({
+      appId: 'watch-backpressure',
+      baseUrl: 'http://localhost',
+      accessToken: 'access',
+      database: 'testdb',
+      collection: 'todos'
+    })
+    await jest.advanceTimersByTimeAsync(0)
+    expect(pull).toHaveBeenCalledTimes(1)
+
+    await expect(iterator.next()).resolves.toEqual({
+      done: false,
+      value: { operationType: 'insert' }
+    })
+    await jest.advanceTimersByTimeAsync(0)
+    expect(pull).toHaveBeenCalledTimes(2)
+    await jest.advanceTimersByTimeAsync(1000)
+    expect(pull).toHaveBeenCalledTimes(2)
+
+    iterator.close()
+    await jest.advanceTimersByTimeAsync(0)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(body.locked).toBe(false)
+    await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined })
   })
 })
