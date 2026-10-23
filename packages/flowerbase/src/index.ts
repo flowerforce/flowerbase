@@ -8,7 +8,7 @@ import { loadFunctions } from './features/functions/utils'
 import { loadRules } from './features/rules/utils'
 import { loadEncryptionSchemas } from './features/encryption/utils'
 import { activateTriggers } from './features/triggers'
-import { loadTriggers } from './features/triggers/utils'
+import { loadTriggers, registerTriggerLifecycle } from './features/triggers/utils'
 import { services } from './services'
 import { StateManager } from './state'
 import { exposeRoutes } from './utils/initializer/exposeRoutes'
@@ -187,6 +187,7 @@ export async function initialize({
   logInfo('Functions registration COMPLETED')
   await generateEndpoints({ app: fastify, functionsList, endpointsList, rulesList })
   logInfo('HTTP Endpoints registration COMPLETED')
+  registerTriggerLifecycle(fastify)
   fastify.ready(() => {
     logInfo("FASTIFY IS READY")
     activateTriggers({ fastify, triggersList, functionsList })

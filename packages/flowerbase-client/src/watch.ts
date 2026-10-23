@@ -1,14 +1,7 @@
 import { EJSON } from './bson'
 import { WatchAsyncIterator, WatchConfig } from './types'
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-const createWatchRequest = ({
-  database,
-  collection,
-  filter,
-  ids
-}: WatchConfig) => ({
+const createWatchRequest = ({ database, collection, filter, ids }: WatchConfig) => ({
   name: 'watch',
   service: 'mongodb-atlas',
   arguments: [
@@ -43,10 +36,14 @@ const parseSsePayload = (line: string) => {
 export const createWatchIterator = (config: WatchConfig): WatchAsyncIterator<unknown> => {
   let closed = false
   let activeController: AbortController | null = null
+  let activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null
+  let stopReconnectDelay: (() => void) | undefined
+  let resumeReading: (() => void) | undefined
   const queue: unknown[] = []
   const waiters: Array<(value: IteratorResult<unknown>) => void> = []
 
   const enqueue = (value: unknown) => {
+    if (closed) return
     const waiter = waiters.shift()
     if (waiter) {
       waiter({ done: false, value })
@@ -58,7 +55,13 @@ export const createWatchIterator = (config: WatchConfig): WatchAsyncIterator<unk
   const close = () => {
     if (closed) return
     closed = true
+    queue.length = 0
+    config.signal?.removeEventListener('abort', close)
+    stopReconnectDelay?.()
+    resumeReading?.()
+    resumeReading = undefined
     activeController?.abort()
+    void activeReader?.cancel().catch(() => {})
     while (waiters.length > 0) {
       const resolve = waiters.shift()
       resolve?.({ done: true, value: undefined })
@@ -70,8 +73,11 @@ export const createWatchIterator = (config: WatchConfig): WatchAsyncIterator<unk
     while (!closed) {
       const controller = new AbortController()
       activeController = controller
+      let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
       const request = createWatchRequest(config)
-      const encoded = toBase64(JSON.stringify(EJSON.serialize(request, { relaxed: false })))
+      const encoded = toBase64(
+        JSON.stringify(EJSON.serialize(request, { relaxed: false }))
+      )
       const url = `${config.baseUrl}/api/client/v2.0/app/${config.appId}/functions/call?baas_request=${encodeURIComponent(encoded)}`
 
       try {
@@ -89,13 +95,14 @@ export const createWatchIterator = (config: WatchConfig): WatchAsyncIterator<unk
         }
 
         attempts = 0
-        const reader = response.body.getReader()
+        reader = response.body.getReader()
+        activeReader = reader
         const decoder = new TextDecoder()
         let buffer = ''
 
         while (!closed) {
           const { done, value } = await reader.read()
-          if (done) break
+          if (closed || done) break
 
           buffer += decoder.decode(value, { stream: true })
           const lines = buffer.split('\n')
@@ -105,6 +112,12 @@ export const createWatchIterator = (config: WatchConfig): WatchAsyncIterator<unk
             const parsed = parseSsePayload(line)
             if (parsed !== null) {
               enqueue(parsed)
+              if (queue.length > 0) {
+                await new Promise<void>((resolve) => {
+                  resumeReading = resolve
+                })
+              }
+              if (closed) break
             }
           }
         }
@@ -112,6 +125,12 @@ export const createWatchIterator = (config: WatchConfig): WatchAsyncIterator<unk
         if (closed) {
           break
         }
+      } finally {
+        controller.abort()
+        await reader?.cancel().catch(() => {})
+        reader?.releaseLock()
+        activeReader = null
+        activeController = null
       }
 
       if (closed) {
@@ -120,11 +139,21 @@ export const createWatchIterator = (config: WatchConfig): WatchAsyncIterator<unk
 
       attempts += 1
       const backoff = Math.min(5000, 250 * 2 ** (attempts - 1))
-      await sleep(backoff)
+      await new Promise<void>((resolve) => {
+        const done = () => {
+          clearTimeout(timer)
+          stopReconnectDelay = undefined
+          resolve()
+        }
+        const timer = setTimeout(done, backoff)
+        stopReconnectDelay = done
+      })
     }
   }
 
-  void run()
+  config.signal?.addEventListener('abort', close, { once: true })
+  if (config.signal?.aborted) close()
+  if (!closed) void run()
 
   return {
     [Symbol.asyncIterator]() {
@@ -132,7 +161,10 @@ export const createWatchIterator = (config: WatchConfig): WatchAsyncIterator<unk
     },
     next() {
       if (queue.length > 0) {
-        return Promise.resolve({ done: false, value: queue.shift() })
+        const value = queue.shift()
+        resumeReading?.()
+        resumeReading = undefined
+        return Promise.resolve({ done: false, value })
       }
 
       if (closed) {

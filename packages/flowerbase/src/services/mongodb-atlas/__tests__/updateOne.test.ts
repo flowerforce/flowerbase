@@ -15,10 +15,18 @@ const createRole = (overrides: Partial<Role> = {}): Role => ({
 })
 
 const createOperators = (roles: Role[]) => {
-  const updateResult = { acknowledged: true, matchedCount: 0, upsertedCount: 1 }
+  const insertedId = new ObjectId()
+  const updateResult = {
+    acknowledged: true,
+    matchedCount: 0,
+    modifiedCount: 0,
+    upsertedCount: 1,
+    upsertedId: insertedId
+  }
   const collection = {
     collectionName: 'memberships',
     findOne: jest.fn().mockResolvedValue(null),
+    insertOne: jest.fn().mockResolvedValue({ acknowledged: true, insertedId }),
     updateOne: jest.fn().mockResolvedValue(updateResult)
   }
   const app = {
@@ -168,11 +176,10 @@ describe('mongodb-atlas updateOne upsert permissions', () => {
         updateResult
       )
 
-      expect(collection.updateOne).toHaveBeenCalledTimes(1)
-      expect(collection.updateOne).toHaveBeenCalledWith(
-        { $and: [query] },
-        update,
-        options
+      expect(collection.updateOne).not.toHaveBeenCalled()
+      expect(collection.insertOne).toHaveBeenCalledWith(
+        { _id: id, userId: 'user-1', title: 'New membership', createdBy: 'user-1' },
+        {}
       )
     }
   )
@@ -193,10 +200,15 @@ describe('mongodb-atlas updateOne upsert permissions', () => {
       updateResult
     )
 
-    expect(collection.updateOne).toHaveBeenCalledWith({ $and: [{ _id: id }] }, update, {
-      ...options,
-      upsert: false
-    })
+    expect(collection.updateOne).toHaveBeenCalledWith(
+      { $and: [{ _id: id }, { _id: id }] },
+      update,
+      {
+        ...options,
+        upsert: false,
+        collation: { locale: 'simple' }
+      }
+    )
     expect(options.upsert).toBe(true)
   })
 
@@ -275,6 +287,10 @@ describe('mongodb-atlas updateOne upsert permissions', () => {
       updateResult
     )
 
-    expect(collection.updateOne).toHaveBeenCalledWith({ $and: [query] }, update, options)
+    expect(collection.updateOne).not.toHaveBeenCalled()
+    expect(collection.insertOne).toHaveBeenCalledWith(
+      { userId: 'user-1', counter: 2, createdBy: 'user-1' },
+      {}
+    )
   })
 })

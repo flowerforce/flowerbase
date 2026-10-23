@@ -662,7 +662,23 @@ const labels = await todos.distinct('label', { done: false })
 - change streams with `watch()` async iterator
 - BSON/EJSON interoperability (`ObjectId`, `Date`, etc.)
 
-`bulkWrite()` is available on the MongoDB Atlas wrapper only for privileged functions executed with `run_as_system: true`. Regular client-scoped calls continue to use the per-operation methods (`insertOne`, `updateOne`, `updateMany`, `deleteOne`, `deleteMany`, `insertMany`).
+`bulkWrite()` and `startSession()` require `run_as_system: true`. Native MongoDB sessions expose the underlying privileged client and cannot be returned to user-scoped functions.
+
+### Security behavior
+
+Database rules apply to the configured database and collection, including calls from server functions. Only explicit `run_as_system` execution bypasses them. Duplicate collection names in rule files are rejected during startup.
+
+User-scoped reads, writes and watches use MongoDB's `simple` collation so tenant filters and authorized string IDs compare exactly. Cursors authorize every consumption method, including iteration, streams and clones. Read projections run after role and field validation; computed find projections, `returnKey`, `raw` and `fieldsAsRaw` are rejected.
+
+Aggregations and counts authorize documents and remove unreadable fields before caller stages. Nested lookups and unions enforce the referenced collection's rules. Unsupported rule expressions, including `%function`, and stages that cannot be secured are rejected. User-scoped watch pipelines accept only `$match` stages. Delete events require an authorized `fullDocumentBeforeChange`; without MongoDB preimages, those events are suppressed. Update events provide the authorized `fullDocument` and readable `updatedFields`; `removedFields` and `truncatedArrays` are empty.
+
+Auth accounts contain numeric `sessionVersion` and `credentialsVersion`, initialized at registration. Logout invalidates existing access tokens and all stored copies of the submitted refresh token. Password reset and account disable invalidate both access and refresh tokens. Reset tokens can be consumed once. SSE connections recheck sessions before sending events, close at token expiry, and check revocations every second while idle. Custom authentication identifies accounts by provider identity and does not link accounts by matching email.
+
+HTTP endpoints must declare `validation_method`: `NO_VALIDATION`, `SECRET_AS_QUERY_PARAM` (`?secret=...`), or `VERIFY_PAYLOAD` (`Endpoint-Signature: sha256=<hex>`). Protected endpoints require `secret_name` to name a nonempty environment variable. Payload verification uses HMAC SHA-256 over the original request bytes. Unsupported security settings prevent endpoint registration. Monitor UI, API and WebSocket routes share the authentication, IP and rate guards, including encoded paths.
+
+Run the security regressions from the workspace root with `npx jest --config packages/flowerbase/jest.config.ts --runInBand`. Optional MongoDB integration suites use `FLOWERBASE_TEST_MONGO_URI` and `FLOWERBASE_TEST_MONGO_REPLICA_URI`; point these at disposable test databases. The replica URI is required for watch integration tests.
+
+Dependency review (2026-10-23): Fastify, Undici and the routing/URI dependencies were patched. `npm audit --omit=dev` still reports separate advisories in JWT, Swagger/static, cron/uuid and glob/brace-expansion dependencies. Their vulnerable code paths were not demonstrated as exploitable in the current Flowerbase configuration; the dependency audit is not clean.
 
 ## 💡 Use Cases by Feature
 

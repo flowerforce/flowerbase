@@ -296,6 +296,7 @@ const registerAccessToken = (user: TestUser, authId: ObjectId) => {
   const payload = {
     _id: authId,
     email: user.email,
+    sessionVersion: 0,
     user_data: userData
   } as Parameters<NonNullable<typeof appInstance>['createAccessToken']>[0]
   const token = appInstance.createAccessToken(payload)
@@ -520,6 +521,8 @@ const resetCollections = async () => {
       email: 'auth-owner@example.com',
       password: ownerPassword,
       status: 'confirmed',
+      sessionVersion: 0,
+      credentialsVersion: 0,
       createdAt: new Date(),
       userId: ownerUser.id
     },
@@ -528,6 +531,8 @@ const resetCollections = async () => {
       email: 'auth-guest@example.com',
       password: guestPassword,
       status: 'confirmed',
+      sessionVersion: 0,
+      credentialsVersion: 0,
       createdAt: new Date(),
       userId: guestUser.id
     },
@@ -536,6 +541,8 @@ const resetCollections = async () => {
       email: 'auth-admin@example.com',
       password: adminPassword,
       status: 'confirmed',
+      sessionVersion: 0,
+      credentialsVersion: 0,
       createdAt: new Date(),
       userId: adminUser.id
     }
@@ -1447,7 +1454,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   // CUSTOM TESTS
   it('tries to read from auth_users', async () => {
     const res = getAuthUsersCollection(ownerUser).find({}).toArray()
-    await expect(res).rejects.toThrow('READ FORBIDDEN!')
+    await expect(res).rejects.toThrow('Collection access not permitted')
   })
 
   it('tries to read from auth_users via a lookup', async () => {
@@ -1464,7 +1471,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
     await expect(
       getTodosCollection(ownerUser).aggregate(pipeline).toArray()
-    ).rejects.toThrow('READ FORBIDDEN!')
+    ).rejects.toThrow('Collection access not permitted')
   })
 
   it('blocks unionWith to auth_users', async () => {
@@ -1485,7 +1492,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
     await expect(
       getTodosCollection(ownerUser).aggregate(pipeline).toArray()
-    ).rejects.toThrow('READ FORBIDDEN!')
+    ).rejects.toThrow('Collection access not permitted')
   })
 
   it('blocks facet lookup to auth_users', async () => {
@@ -1514,10 +1521,10 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
     await expect(
       getTodosCollection(ownerUser).aggregate(pipeline).toArray()
-    ).rejects.toThrow('READ FORBIDDEN!')
+    ).rejects.toThrow('Collection access not permitted')
   })
 
-  it('filters sensitive fields in aggregate lookups', async () => {
+  it('rejects lookup aggregation with unsupported function-based permissions', async () => {
     const pipeline: Document[] = [
       {
         $match: {
@@ -1540,19 +1547,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       }
     ]
 
-    const res = (await getTodosCollection(ownerUser)
-      .aggregate(pipeline)
-      .toArray()) as Array<{
-      projects?: ProjectDoc[]
-    }>
-
-    const projects = res.flatMap((item) => item.projects ?? [])
-    expect(projects.length).toBeGreaterThan(0)
-    projects.forEach((project) => {
-      expect(project).toHaveProperty('summary')
-      expect(project).not.toHaveProperty('secretNotes')
-      expect(project).not.toHaveProperty('internalCode')
-    })
+    await expect(
+      getTodosCollection(ownerUser).aggregate(pipeline).toArray()
+    ).rejects.toThrow('Aggregation authorization cannot compile %function')
   })
 
   afterAll(async () => {

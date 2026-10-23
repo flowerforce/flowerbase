@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb'
-import { toWatchMatchFilter, watchPipelineRequestsDelete } from '../index'
+import { toWatchMatchFilter } from '../index'
 
 describe('mongodb-atlas watch filter mapping', () => {
   it('keeps change-event keys untouched and prefixes only document keys', () => {
@@ -41,38 +41,4 @@ describe('mongodb-atlas watch filter mapping', () => {
     expect(output['fullDocument.requestId']).toEqual(id)
   })
 
-  it('detects delete operation requests in watch pipeline matches', () => {
-    expect(
-      watchPipelineRequestsDelete([
-        {
-          $match: {
-            $or: [
-              { operationType: 'insert' },
-              { operationType: 'delete' }
-            ]
-          }
-        }
-      ] as any)
-    ).toBe(true)
-
-    expect(
-      watchPipelineRequestsDelete([
-        {
-          $match: {
-            operationType: { $in: ['insert', 'replace'] }
-          }
-        }
-      ] as any)
-    ).toBe(false)
-
-    expect(
-      watchPipelineRequestsDelete([
-        {
-          $project: {
-            operationType: 1
-          }
-        }
-      ] as any)
-    ).toBe(false)
-  })
 })

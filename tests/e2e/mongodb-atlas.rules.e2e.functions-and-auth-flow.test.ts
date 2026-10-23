@@ -44,7 +44,6 @@ type TestUser = User & {
   }
 }
 
-
 const todoIds = {
   ownerFirst: new ObjectId('000000000000000000000001'),
   ownerSecond: new ObjectId('000000000000000000000002'),
@@ -152,6 +151,7 @@ const registerAccessToken = (user: TestUser, authId: ObjectId) => {
   const payload = {
     _id: authId,
     email: user.email,
+    sessionVersion: 0,
     user_data: userData
   } as Parameters<NonNullable<typeof appInstance>['createAccessToken']>[0]
   const token = appInstance.createAccessToken(payload)
@@ -187,9 +187,24 @@ const resetCollections = async () => {
   ])
 
   await db.collection(TODO_COLLECTION).insertMany([
-    { _id: todoIds.ownerFirst, title: 'Owner task 1', userId: ownerUser.id, sensitive: 'redacted' },
-    { _id: todoIds.ownerSecond, title: 'Owner task 2', userId: ownerUser.id, sensitive: 'redacted' },
-    { _id: todoIds.otherUser, title: 'Other user task', userId: guestUser.id, sensitive: 'redacted' }
+    {
+      _id: todoIds.ownerFirst,
+      title: 'Owner task 1',
+      userId: ownerUser.id,
+      sensitive: 'redacted'
+    },
+    {
+      _id: todoIds.ownerSecond,
+      title: 'Owner task 2',
+      userId: ownerUser.id,
+      sensitive: 'redacted'
+    },
+    {
+      _id: todoIds.otherUser,
+      title: 'Other user task',
+      userId: guestUser.id,
+      sensitive: 'redacted'
+    }
   ])
 
   await db.collection(USER_COLLECTION).insertMany([
@@ -354,6 +369,8 @@ const resetCollections = async () => {
       email: 'auth-owner@example.com',
       password: ownerPassword,
       status: 'confirmed',
+      sessionVersion: 0,
+      credentialsVersion: 0,
       createdAt: new Date(),
       userId: ownerUser.id
     },
@@ -362,6 +379,8 @@ const resetCollections = async () => {
       email: 'auth-guest@example.com',
       password: guestPassword,
       status: 'confirmed',
+      sessionVersion: 0,
+      credentialsVersion: 0,
       createdAt: new Date(),
       userId: guestUser.id
     },
@@ -370,6 +389,8 @@ const resetCollections = async () => {
       email: 'auth-admin@example.com',
       password: adminPassword,
       status: 'confirmed',
+      sessionVersion: 0,
+      credentialsVersion: 0,
       createdAt: new Date(),
       userId: adminUser.id
     }
@@ -379,7 +400,10 @@ const resetCollections = async () => {
 const ensureFilteredTriggerCollections = async () => {
   const db = client.db(DB_NAME)
 
-  const recreateCollection = async (name: string, options?: Parameters<typeof db.createCollection>[1]) => {
+  const recreateCollection = async (
+    name: string,
+    options?: Parameters<typeof db.createCollection>[1]
+  ) => {
     try {
       await db.collection(name).drop()
     } catch {
@@ -455,7 +479,8 @@ const isReplicaSetNotInitializedError = (error: unknown) => {
     message.includes('not yet a member of a replset') ||
     message.includes('replset not yet initialized') ||
     ('code' in error && (error as { code?: number }).code === 94) ||
-    ('codeName' in error && (error as { codeName?: string }).codeName === 'NotYetInitialized')
+    ('codeName' in error &&
+      (error as { codeName?: string }).codeName === 'NotYetInitialized')
   )
 }
 
@@ -465,7 +490,11 @@ const ensureReplicaSet = async (client: MongoClient) => {
   for (let attempt = 0; attempt < 30; attempt++) {
     try {
       const status = await adminDb.command({ replSetGetStatus: 1 })
-      if (status.members?.some((member: { stateStr: string }) => member.stateStr === 'PRIMARY')) {
+      if (
+        status.members?.some(
+          (member: { stateStr: string }) => member.stateStr === 'PRIMARY'
+        )
+      ) {
         return
       }
     } catch (error) {
@@ -558,9 +587,12 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       documentId: changeEventId.toString()
     })
 
-    const logged = await client.db(DB_NAME).collection(TRIGGER_EVENTS_COLLECTION).findOne({
-      documentId: changeEventId.toString()
-    })
+    const logged = await client
+      .db(DB_NAME)
+      .collection(TRIGGER_EVENTS_COLLECTION)
+      .findOne({
+        documentId: changeEventId.toString()
+      })
 
     expect(logged).toMatchObject({
       operationType: 'insert',
@@ -630,7 +662,10 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     })
 
     expect(response.statusCode).toBe(200)
-    const body = EJSON.deserialize(response.json()) as { count: number; users: Array<{ email: string }> }
+    const body = EJSON.deserialize(response.json()) as {
+      count: number
+      users: Array<{ email: string }>
+    }
     expect(body.count).toBe(2)
     expect(body.users).toHaveLength(2)
     expect(body.users.map((user) => user.email).sort()).toEqual([
@@ -684,8 +719,8 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(response.statusCode).toBe(400)
     const body = response.json() as { error?: string; error_code?: string }
     expect(body.error_code).toBe('FunctionExecutionError')
-    const parsedError = body.error ? JSON.parse(body.error) as { message?: string } : {}
-    expect(parsedError.message).toBe('READ FORBIDDEN!')
+    const parsedError = body.error ? (JSON.parse(body.error) as { message?: string }) : {}
+    expect(parsedError.message).toBe('Collection access not permitted')
   })
 
   it('exposes the new API endpoint through the dedicated function', async () => {
@@ -944,10 +979,13 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       })
       expect(registration.statusCode).toBe(201)
 
-      const authUser = await client
+      const authUser = (await client
         .db(DB_NAME)
         .collection(AUTH_USERS_COLLECTION)
-        .findOne({ email }) as { confirmationToken?: string; confirmationTokenId?: string } | null
+        .findOne({ email })) as {
+        confirmationToken?: string
+        confirmationTokenId?: string
+      } | null
       expect(authUser?.confirmationToken).toBeDefined()
       expect(authUser?.confirmationTokenId).toBeDefined()
 
@@ -1025,10 +1063,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       await client
         .db(DB_NAME)
         .collection(AUTH_USERS_COLLECTION)
-        .updateOne(
-          { _id: authUser!._id },
-          { $set: { status: 'confirmed' } }
-        )
+        .updateOne({ _id: authUser!._id }, { $set: { status: 'confirmed' } })
 
       const creationEvent = await waitForTriggerEventType(
         authUser!._id.toString(),
@@ -1234,10 +1269,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const loginBody = login.json() as { user_id?: string }
     expect(loginBody.user_id).toBeDefined()
 
-    const loginEvent = await waitForTriggerEventType(
-      loginBody.user_id!,
-      'on_user_login'
-    )
+    const loginEvent = await waitForTriggerEventType(loginBody.user_id!, 'on_user_login')
     expect(loginEvent).toBeDefined()
     expect(loginEvent?.email).toBe(email)
   })
@@ -1245,21 +1277,26 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   it('fires provider-filtered create trigger for local-userpass only', async () => {
     const authId = new ObjectId()
     const email = 'provider-local-create@example.com'
-    await client.db(DB_NAME).collection(AUTH_USERS_COLLECTION).insertOne({
-      _id: authId,
-      email,
-      password: 'hashed',
-      status: 'pending',
-      createdAt: new Date(),
-      identities: [
-        {
-          id: authId.toString(),
-          provider_id: authId.toString(),
-          provider_type: 'local-userpass',
-          provider_data: { email }
-        }
-      ]
-    })
+    await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .insertOne({
+        _id: authId,
+        sessionVersion: 0,
+        credentialsVersion: 0,
+        email,
+        password: 'hashed',
+        status: 'pending',
+        createdAt: new Date(),
+        identities: [
+          {
+            id: authId.toString(),
+            provider_id: authId.toString(),
+            provider_type: 'local-userpass',
+            provider_data: { email }
+          }
+        ]
+      })
 
     await client
       .db(DB_NAME)
@@ -1280,20 +1317,25 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
   it('fires provider-filtered create trigger for anon-user only', async () => {
     const authId = new ObjectId()
-    await client.db(DB_NAME).collection(AUTH_USERS_COLLECTION).insertOne({
-      _id: authId,
-      email: `anon-${authId.toString()}@users.invalid`,
-      status: 'pending',
-      createdAt: new Date(),
-      identities: [
-        {
-          id: authId.toString(),
-          provider_id: authId.toString(),
-          provider_type: 'anon-user',
-          provider_data: {}
-        }
-      ]
-    })
+    await client
+      .db(DB_NAME)
+      .collection(AUTH_USERS_COLLECTION)
+      .insertOne({
+        _id: authId,
+        sessionVersion: 0,
+        credentialsVersion: 0,
+        email: `anon-${authId.toString()}@users.invalid`,
+        status: 'pending',
+        createdAt: new Date(),
+        identities: [
+          {
+            id: authId.toString(),
+            provider_id: authId.toString(),
+            provider_type: 'anon-user',
+            provider_data: {}
+          }
+        ]
+      })
 
     await client
       .db(DB_NAME)
@@ -1515,5 +1557,4 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       require.main.path = originalMainPath
     }
   })
-
 })

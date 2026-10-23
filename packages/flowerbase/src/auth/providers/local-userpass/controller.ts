@@ -32,6 +32,7 @@ import {
   ResetPasswordSendDto
 } from './dtos'
 import { sendConfirmationRequest } from '../../../shared/handleUserRegistration'
+import { updatePasswordAndRevokeSessions } from '../../sessions'
 
 const rateLimitStore = new Map<string, number[]>()
 
@@ -139,15 +140,12 @@ export async function localUserPassController(app: FastifyInstance) {
         }
 
         const hashedPassword = await hashPassword(password)
-        await authDb.collection(authCollection!).updateOne(
-          { email },
-          {
-            $set: {
-              password: hashedPassword
-            }
-          }
-        )
-        await authDb?.collection(resetPasswordCollection).deleteOne({ email })
+        const resetRequest = await authDb.collection(resetPasswordCollection)
+          .findOneAndDelete({ email, token, tokenId })
+        if (!resetRequest) throw new Error(AUTH_ERRORS.INVALID_RESET_PARAMS)
+        if (!await updatePasswordAndRevokeSessions(authDb, { _id: authUser._id }, hashedPassword)) {
+          throw new Error(AUTH_ERRORS.INVALID_RESET_PARAMS)
+        }
         return { status: 'success' as const }
       }
 
@@ -250,19 +248,23 @@ export async function localUserPassController(app: FastifyInstance) {
         confirmationTokenId: req.body.tokenId
       })) as { _id: ObjectId; status?: string } | null
 
-      if (!existing) {
+      if (!existing || existing.status === 'disabled') {
         res.status(500)
         throw new Error(AUTH_ERRORS.INVALID_TOKEN)
       }
 
       if (existing.status !== 'confirmed') {
-        await authDb.collection(authCollection!).updateOne(
-          { _id: existing._id },
+        const result = await authDb.collection(authCollection!).updateOne(
+          {
+            _id: existing._id, status: existing.status,
+            confirmationToken: req.body.token, confirmationTokenId: req.body.tokenId
+          },
           {
             $set: { status: 'confirmed' },
             $unset: { confirmationToken: '', confirmationTokenId: '' }
           }
         )
+        if (!result.matchedCount) throw new Error(AUTH_ERRORS.INVALID_TOKEN)
       }
 
       res.status(200)
@@ -319,7 +321,7 @@ export async function localUserPassController(app: FastifyInstance) {
         email: req.body.username
       })
 
-      if (!authUser) {
+      if (!authUser || authUser.status === 'disabled') {
         res.status(401)
         return invalidPasswordError
       }
@@ -459,7 +461,7 @@ export async function localUserPassController(app: FastifyInstance) {
 
       const resetRequest = await authDb
         ?.collection(resetPasswordCollection)
-        .findOne({ token, tokenId })
+        .findOneAndDelete({ token, tokenId })
 
       if (!resetRequest) {
         throw new Error(AUTH_ERRORS.INVALID_RESET_PARAMS)
@@ -472,24 +474,12 @@ export async function localUserPassController(app: FastifyInstance) {
         Date.now() - createdAt.getTime() > resetPasswordTtlSeconds * 1000
 
       if (isExpired) {
-        await authDb
-          ?.collection(resetPasswordCollection)
-          .deleteOne({ _id: resetRequest._id })
         throw new Error(AUTH_ERRORS.INVALID_RESET_PARAMS)
       }
       const hashedPassword = await hashPassword(password)
-      await authDb.collection(authCollection!).updateOne(
-        { email: resetRequest.email },
-        {
-          $set: {
-            password: hashedPassword
-          }
-        }
-      )
-
-      await authDb
-        ?.collection(resetPasswordCollection)
-        .deleteOne({ _id: resetRequest._id })
+      if (!await updatePasswordAndRevokeSessions(authDb, { email: resetRequest.email }, hashedPassword)) {
+        throw new Error(AUTH_ERRORS.INVALID_RESET_PARAMS)
+      }
     }
   )
 }

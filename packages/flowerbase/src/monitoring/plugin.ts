@@ -199,15 +199,32 @@ const createMonitoringPlugin = fp(async (
     return user === DEFAULT_CONFIG.MONIT_USER && pass === DEFAULT_CONFIG.MONIT_PASSWORD
   }
 
-  const isMonitRoute = (url: string) => {
-    const path = url.split('?')[0]
-    return path === prefix || path.startsWith(`${prefix}/`)
-  }
+  const monitoredRequests = new WeakSet<FastifyRequest>()
   const shouldSkipLog = (req: FastifyRequest) =>
-    isMonitRoute(req.url) || req.method === 'OPTIONS'
+    monitoredRequests.has(req) || req.method === 'OPTIONS'
 
-  app.addHook('onRequest', (req, reply, done) => {
-    if (isMonitRoute(req.url)) {
+  app.addHook('onRequest', (req, _reply, done) => {
+    (req as { __monitStart?: number }).__monitStart = Date.now()
+    done()
+  })
+
+  app.addHook('onError', (req, _reply, error, done) => {
+    if (!shouldSkipLog(req)) {
+      addEvent({
+        id: createEventId(),
+        ts: Date.now(),
+        type: 'error',
+        source: 'http',
+        message: `${req.method} ${req.url} -> error`,
+        data: sanitize({ error: error?.message ?? error })
+      })
+    }
+    done()
+  })
+
+  await app.register(async (monitorApp) => {
+    monitorApp.addHook('onRequest', (req, reply, done) => {
+      monitoredRequests.add(req)
       const audit = (status: 'deny', reason?: string) => {
         addEvent({
           id: createEventId(),
@@ -248,151 +265,136 @@ const createMonitoringPlugin = fp(async (
           .send({ message: 'Unauthorized' })
         return
       }
-    }
-    (req as { __monitStart?: number }).__monitStart = Date.now()
-    done()
-  })
+      done()
+    })
 
-  app.addHook('onError', (req, reply, error, done) => {
-    if (!shouldSkipLog(req)) {
-      addEvent({
-        id: createEventId(),
-        ts: Date.now(),
-        type: 'error',
-        source: 'http',
-        message: `${req.method} ${req.url} -> error`,
-        data: sanitize({ error: error?.message ?? error })
-      })
-    }
-    done()
-  })
+    await monitorApp.register(fastifyWebsocket)
 
-  await app.register(fastifyWebsocket)
-
-  const sendUi = async (_req: FastifyRequest, reply: FastifyReply) => {
-    const raw = readAsset('ui.html', prefix)
-    if (!raw) {
-      const tried = resolveAssetCandidates('ui.html', prefix).join(', ')
-      reply.code(404).send(`ui.html not found. Tried: ${tried}`)
-      return
-    }
-    const html = raw.replace(/__MONIT_BASE__/g, prefix)
-    reply.header('Cache-Control', 'no-store')
-    reply.type('text/html').send(html)
-  }
-
-  app.get(prefix, sendUi)
-  app.get(`${prefix}/`, sendUi)
-  app.get(`${prefix}/ui.css`, async (_req, reply) => {
-    const css = readAsset('ui.css', prefix)
-    if (!css) {
-      const tried = resolveAssetCandidates('ui.css', prefix).join(', ')
-      reply.code(404).send(`ui.css not found. Tried: ${tried}`)
-      return
-    }
-    reply.header('Cache-Control', 'no-store')
-    reply.type('text/css').send(css)
-  })
-  const jsAssets = [
-    'ui.js',
-    'ui.shared.js',
-    'ui.events.js',
-    'ui.users.js',
-    'ui.functions.js',
-    'ui.triggers.js',
-    'ui.collections.js',
-    'ui.endpoints.js'
-  ]
-  jsAssets.forEach((asset) => {
-    app.get(`${prefix}/${asset}`, async (_req, reply) => {
-      const raw = readAsset(asset, prefix)
+    const sendUi = async (_req: FastifyRequest, reply: FastifyReply) => {
+      const raw = readAsset('ui.html', prefix)
       if (!raw) {
-        const tried = resolveAssetCandidates(asset, prefix).join(', ')
-        reply.code(404).send(`${asset} not found. Tried: ${tried}`)
+        const tried = resolveAssetCandidates('ui.html', prefix).join(', ')
+        reply.code(404).send(`ui.html not found. Tried: ${tried}`)
         return
       }
-      const js = raw.replace(/__MONIT_BASE__/g, prefix)
+      const html = raw.replace(/__MONIT_BASE__/g, prefix)
       reply.header('Cache-Control', 'no-store')
-      reply.type('application/javascript').send(js)
-    })
-  })
-
-  const resolveCodeMirrorAsset = (internalPath: string) => {
-    try {
-      return require.resolve(`codemirror/${internalPath}`)
-    } catch {
-      return ''
+      reply.type('text/html').send(html)
     }
-  }
 
-  const codemirrorAssets: Record<string, string> = {
-    'codemirror.js': resolveCodeMirrorAsset('lib/codemirror.js'),
-    'codemirror.css': resolveCodeMirrorAsset('lib/codemirror.css'),
-    'javascript.js': resolveCodeMirrorAsset('mode/javascript/javascript.js'),
-    'foldcode.js': resolveCodeMirrorAsset('addon/fold/foldcode.js'),
-    'foldgutter.js': resolveCodeMirrorAsset('addon/fold/foldgutter.js'),
-    'brace-fold.js': resolveCodeMirrorAsset('addon/fold/brace-fold.js'),
-    'comment-fold.js': resolveCodeMirrorAsset('addon/fold/comment-fold.js'),
-    'foldgutter.css': resolveCodeMirrorAsset('addon/fold/foldgutter.css')
-  }
-
-  Object.entries(codemirrorAssets).forEach(([assetName, relativePath]) => {
-    app.get(`${prefix}/vendor/codemirror/${assetName}`, async (_req, reply) => {
-      const assetPath = relativePath || ''
-      if (!assetPath || !fs.existsSync(assetPath)) {
-        reply.code(404).send(`${assetName} not found`)
+    monitorApp.get(prefix, sendUi)
+    monitorApp.get(`${prefix}/`, sendUi)
+    monitorApp.get(`${prefix}/ui.css`, async (_req, reply) => {
+      const css = readAsset('ui.css', prefix)
+      if (!css) {
+        const tried = resolveAssetCandidates('ui.css', prefix).join(', ')
+        reply.code(404).send(`ui.css not found. Tried: ${tried}`)
         return
       }
-      const asset = fs.readFileSync(assetPath, 'utf8')
       reply.header('Cache-Control', 'no-store')
-      reply.type(assetName.endsWith('.css') ? 'text/css' : 'application/javascript').send(asset)
+      reply.type('text/css').send(css)
     })
-  })
+    const jsAssets = [
+      'ui.js',
+      'ui.shared.js',
+      'ui.events.js',
+      'ui.users.js',
+      'ui.functions.js',
+      'ui.triggers.js',
+      'ui.collections.js',
+      'ui.endpoints.js'
+    ]
+    jsAssets.forEach((asset) => {
+      monitorApp.get(`${prefix}/${asset}`, async (_req, reply) => {
+        const raw = readAsset(asset, prefix)
+        if (!raw) {
+          const tried = resolveAssetCandidates(asset, prefix).join(', ')
+          reply.code(404).send(`${asset} not found. Tried: ${tried}`)
+          return
+        }
+        const js = raw.replace(/__MONIT_BASE__/g, prefix)
+        reply.header('Cache-Control', 'no-store')
+        reply.type('application/javascript').send(js)
+      })
+    })
 
-  app.get(`${prefix}/ws`, { websocket: true }, (connection) => {
-    const socket =
-      (connection as {
-        socket?: { send: (data: string) => void; readyState: number; on: Function }
-      }).socket ?? (connection as { send: (data: string) => void; readyState: number; on: Function })
-    clients.add(socket)
-    socket.send(JSON.stringify({ type: 'init', events: eventStore.list({ limit: maxEvents }) }))
-    addEvent({
-      id: createEventId(),
-      ts: Date.now(),
-      type: 'log',
-      source: 'monit',
-      message: 'websocket connected'
+    const resolveCodeMirrorAsset = (internalPath: string) => {
+      try {
+        return require.resolve(`codemirror/${internalPath}`)
+      } catch {
+        return ''
+      }
+    }
+
+    const codemirrorAssets: Record<string, string> = {
+      'codemirror.js': resolveCodeMirrorAsset('lib/codemirror.js'),
+      'codemirror.css': resolveCodeMirrorAsset('lib/codemirror.css'),
+      'javascript.js': resolveCodeMirrorAsset('mode/javascript/javascript.js'),
+      'foldcode.js': resolveCodeMirrorAsset('addon/fold/foldcode.js'),
+      'foldgutter.js': resolveCodeMirrorAsset('addon/fold/foldgutter.js'),
+      'brace-fold.js': resolveCodeMirrorAsset('addon/fold/brace-fold.js'),
+      'comment-fold.js': resolveCodeMirrorAsset('addon/fold/comment-fold.js'),
+      'foldgutter.css': resolveCodeMirrorAsset('addon/fold/foldgutter.css')
+    }
+
+    Object.entries(codemirrorAssets).forEach(([assetName, relativePath]) => {
+      monitorApp.get(`${prefix}/vendor/codemirror/${assetName}`, async (_req, reply) => {
+        const assetPath = relativePath || ''
+        if (!assetPath || !fs.existsSync(assetPath)) {
+          reply.code(404).send(`${assetName} not found`)
+          return
+        }
+        const asset = fs.readFileSync(assetPath, 'utf8')
+        reply.header('Cache-Control', 'no-store')
+        reply.type(assetName.endsWith('.css') ? 'text/css' : 'application/javascript').send(asset)
+      })
     })
-    socket.on('close', () => {
-      clients.delete(socket)
+
+    monitorApp.get(`${prefix}/ws`, { websocket: true }, (connection) => {
+      const socket =
+        (connection as {
+          socket?: { send: (data: string) => void; readyState: number; on: Function }
+        }).socket ?? (connection as { send: (data: string) => void; readyState: number; on: Function })
+      clients.add(socket)
+      socket.send(JSON.stringify({ type: 'init', events: eventStore.list({ limit: maxEvents }) }))
       addEvent({
         id: createEventId(),
         ts: Date.now(),
         type: 'log',
         source: 'monit',
-        message: 'websocket disconnected'
+        message: 'websocket connected'
+      })
+      socket.on('close', () => {
+        clients.delete(socket)
+        addEvent({
+          id: createEventId(),
+          ts: Date.now(),
+          type: 'log',
+          source: 'monit',
+          message: 'websocket disconnected'
+        })
       })
     })
-  })
 
-  registerEventsRoutes(app, { prefix, eventStore, getStats })
-  registerTriggerRoutes(app, { prefix })
-  registerEndpointRoutes(app, { prefix, allowInvoke, addEvent })
-  registerFunctionRoutes(app, {
-    prefix,
-    allowEdit,
-    allowInvoke,
-    maxHistory,
-    addFunctionHistory,
-    functionHistory,
-    addEvent
-  })
-  registerUserRoutes(app, { prefix, addEvent })
-  registerCollectionRoutes(app, {
-    prefix,
-    collectionHistory,
-    maxCollectionHistory,
-    addCollectionHistory
+    registerEventsRoutes(monitorApp, { prefix, eventStore, getStats })
+    registerTriggerRoutes(monitorApp, { prefix })
+    registerEndpointRoutes(monitorApp, { prefix, allowInvoke, addEvent })
+    registerFunctionRoutes(monitorApp, {
+      prefix,
+      allowEdit,
+      allowInvoke,
+      maxHistory,
+      addFunctionHistory,
+      functionHistory,
+      addEvent
+    })
+    registerUserRoutes(monitorApp, { prefix, addEvent })
+    registerCollectionRoutes(monitorApp, {
+      prefix,
+      collectionHistory,
+      maxCollectionHistory,
+      addCollectionHistory
+    })
   })
 }, { name: 'monitoring' })
 

@@ -57,12 +57,16 @@ describe('mongodb-atlas findOneAndUpdate', () => {
       .db('db')
       .collection('todos')
 
-    const result = await operators.findOneAndUpdate({ _id: id }, { $set: { title: 'New' } })
+    const result = await operators.findOneAndUpdate(
+      { _id: id },
+      { $set: { title: 'New' } }
+    )
 
     expect(findOne).toHaveBeenCalled()
     expect(findOneAndUpdate).toHaveBeenCalledWith(
-      { $and: [{ _id: id }] },
-      { $set: { title: 'New' } }
+      { $and: [{ _id: id }, { _id: id }] },
+      { $set: { title: 'New' } },
+      { collation: { locale: 'simple' } }
     )
     expect(result).toEqual(updatedDoc)
   })
@@ -112,17 +116,15 @@ describe('mongodb-atlas findOneAndUpdate', () => {
       .db('db')
       .collection('todos')
 
-    const result = await operators.findOneAndUpdate(
-      { _id: id },
-      { $inc: { value: 1 } },
-      { returnNewDocument: true } as any
-    )
+    const result = await operators.findOneAndUpdate({ _id: id }, { $inc: { value: 1 } }, {
+      returnNewDocument: true
+    } as any)
 
     expect(result).toEqual(updatedDoc)
     expect(findOneAndUpdate).toHaveBeenCalledWith(
-      { $and: [{ _id: id }] },
+      { $and: [{ _id: id }, { _id: id }] },
       { $inc: { value: 1 } },
-      { returnDocument: 'after' }
+      { returnDocument: 'after', collation: { locale: 'simple' } }
     )
   })
 
@@ -131,9 +133,11 @@ describe('mongodb-atlas findOneAndUpdate', () => {
     const insertedDoc = { _id: id, title: 'Created', userId: 'user-1' }
     const findOne = jest.fn().mockResolvedValue(null)
     const findOneAndUpdate = jest.fn().mockResolvedValue(insertedDoc)
+    const insertOne = jest.fn().mockResolvedValue({ acknowledged: true, insertedId: id })
     const collection = {
       collectionName: 'todos',
       findOne,
+      insertOne,
       findOneAndUpdate
     }
 
@@ -147,16 +151,13 @@ describe('mongodb-atlas findOneAndUpdate', () => {
 
     const result = await operators.findOneAndUpdate(
       { _id: id },
-      { $set: { title: 'Created' } },
-      { upsert: true }
+      { $set: { title: 'Created', userId: 'user-1' } },
+      { upsert: true, returnDocument: 'after' }
     )
 
     expect(result).toEqual(insertedDoc)
-    expect(findOneAndUpdate).toHaveBeenCalledWith(
-      { $and: [{ _id: id }] },
-      { $set: { title: 'Created' } },
-      { upsert: true }
-    )
+    expect(findOneAndUpdate).not.toHaveBeenCalled()
+    expect(insertOne).toHaveBeenCalledWith(insertedDoc, {})
   })
 
   it('rejects upsert when insert permission is denied', async () => {

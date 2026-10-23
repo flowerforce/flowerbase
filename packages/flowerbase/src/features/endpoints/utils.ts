@@ -6,6 +6,7 @@ import { services } from '../../services'
 
 import { GenerateContext } from '../../utils/context'
 import { Endpoints, GenerateHandlerParams } from './interface'
+import type { EndpointAuthorization } from './authorization'
 
 /**
  * > Loads the endpoint config json file
@@ -54,51 +55,58 @@ export const loadEndpoints = async (rootDir = process.cwd()): Promise<Endpoints>
 export const getMethodsConfig = (
   app: FastifyInstance,
   handler: ReturnType<typeof generateHandler>,
-  endpoint: string
+  endpoint: string,
+  authorize: EndpointAuthorization
 ) => ({
   ALL: () => app.all(endpoint, {
+    ...authorize,
     config: {
-      rawBody: true
+      rawBody: !authorize.preParsing
     },
     schema: {
       tags: ['Endpoints']
     }
   }, handler),
   GET: () => app.get(endpoint, {
+    ...authorize,
     config: {
-      rawBody: true
+      rawBody: !authorize.preParsing
     },
     schema: {
       tags: ['Endpoints']
     }
   }, handler),
   POST: () => app.post(endpoint, {
+    ...authorize,
     config: {
-      rawBody: true
+      rawBody: !authorize.preParsing
     },
     schema: {
       tags: ['Endpoints']
     }
   }, handler),
   PUT: () => app.put(endpoint, {
+    ...authorize,
     config: {
-      rawBody: true
+      rawBody: !authorize.preParsing
     },
     schema: {
       tags: ['Endpoints']
     }
   }, handler),
   PATCH: () => app.patch(endpoint, {
+    ...authorize,
     config: {
-      rawBody: true
+      rawBody: !authorize.preParsing
     },
     schema: {
       tags: ['Endpoints']
     }
   }, handler),
   DELETE: () => app.delete(endpoint, {
+    ...authorize,
     config: {
-      rawBody: true
+      rawBody: !authorize.preParsing
     },
     schema: {
       tags: ['Endpoints']

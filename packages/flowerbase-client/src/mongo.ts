@@ -107,7 +107,8 @@ export const createMongoClient = (app: App, serviceName: MongoDbServiceName, use
             collection,
             filter,
             ids,
-            timeout: app.timeout
+            timeout: app.timeout,
+            signal: app.getSessionSignal(userId)
           })
         }
       }
