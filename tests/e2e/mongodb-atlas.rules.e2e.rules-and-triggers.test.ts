@@ -8,6 +8,8 @@ import type { User } from '../../packages/flowerbase/src/auth/dtos'
 import { API_VERSION, AUTH_CONFIG } from '../../packages/flowerbase/src/constants'
 import { hashPassword } from '../../packages/flowerbase/src/utils/crypto'
 import { registerMongoAtlasE2eSetup } from './mongodb-atlas.rules.e2e.setup'
+import MongoDbAtlas from '../../packages/flowerbase/src/services/mongodb-atlas'
+import { StateManager } from '../../packages/flowerbase/src/state'
 
 jest.setTimeout(120000)
 
@@ -202,16 +204,16 @@ const callServiceOperation = async ({
 }: {
   collection: string
   method:
-  | 'find'
-  | 'findOne'
-  | 'count'
-  | 'countDocuments'
-  | 'findOneAndUpdate'
-  | 'deleteOne'
-  | 'deleteMany'
-  | 'insertOne'
-  | 'updateOne'
-  | 'aggregate'
+    | 'find'
+    | 'findOne'
+    | 'count'
+    | 'countDocuments'
+    | 'findOneAndUpdate'
+    | 'deleteOne'
+    | 'deleteMany'
+    | 'insertOne'
+    | 'updateOne'
+    | 'aggregate'
   user: TestUser | null
   query?: Document
   filter?: Document
@@ -304,7 +306,14 @@ const createCollectionProxy = (collection: string, user: TestUser | null) => ({
   insertOne: (document: Document) =>
     callServiceOperation({ collection, method: 'insertOne', user, document }),
   updateOne: (query: Document, update: Document, options?: Document) =>
-    callServiceOperation({ collection, method: 'updateOne', user, query, update, options }),
+    callServiceOperation({
+      collection,
+      method: 'updateOne',
+      user,
+      query,
+      update,
+      options
+    }),
   findOneAndUpdate: (query: Document, update: Document) =>
     callServiceOperation({ collection, method: 'findOneAndUpdate', user, query, update }),
   deleteOne: (query: Document, options?: Document) =>
@@ -370,6 +379,7 @@ const registerAccessToken = (user: TestUser, authId: ObjectId) => {
   const payload = {
     _id: authId,
     email: user.email,
+    sessionVersion: 0,
     user_data: userData
   } as Parameters<NonNullable<typeof appInstance>['createAccessToken']>[0]
   const token = appInstance.createAccessToken(payload)
@@ -812,6 +822,8 @@ const resetCollections = async () => {
       email: 'auth-owner@example.com',
       password: ownerPassword,
       status: 'confirmed',
+      sessionVersion: 0,
+      credentialsVersion: 0,
       createdAt: new Date(),
       userId: ownerUser.id
     },
@@ -820,6 +832,8 @@ const resetCollections = async () => {
       email: 'auth-guest@example.com',
       password: guestPassword,
       status: 'confirmed',
+      sessionVersion: 0,
+      credentialsVersion: 0,
       createdAt: new Date(),
       userId: guestUser.id
     },
@@ -828,6 +842,8 @@ const resetCollections = async () => {
       email: 'auth-admin@example.com',
       password: adminPassword,
       status: 'confirmed',
+      sessionVersion: 0,
+      credentialsVersion: 0,
       createdAt: new Date(),
       userId: adminUser.id
     }
@@ -1421,9 +1437,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     const summary = (await getTodosCollection(ownerUser)
       .aggregate(pipeline)
       .toArray()) as Array<{
-        _id: string
-        count: number
-      }>
+      _id: string
+      count: number
+    }>
 
     expect(summary).toHaveLength(1)
     expect(summary[0]).toEqual({ _id: ownerUser.id, count: 2 })
@@ -1438,10 +1454,10 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
     await expect(
       getTodosCollection(ownerUser).aggregate(pipeline).toArray()
-    ).rejects.toThrow('Stage $out is not allowed in client aggregate pipelines')
+    ).rejects.toThrow('Aggregation authorization cannot compile stage $out')
   })
 
-  it('requires a pipeline for unionWith in client aggregates', async () => {
+  it('rejects simple unionWith when foreign rules require unsupported functions', async () => {
     const pipeline: Document[] = [
       {
         $unionWith: 'projects'
@@ -1450,7 +1466,45 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
     await expect(
       getTodosCollection(ownerUser).aggregate(pipeline).toArray()
-    ).rejects.toThrow('$unionWith must provide a pipeline when called from the client')
+    ).rejects.toThrow('Aggregation authorization cannot compile %function')
+  })
+
+  it('guards simple unionWith on supported rules before returning foreign documents', async () => {
+    const documents = (await getTodosCollection(ownerUser)
+      .aggregate([{ $unionWith: 'activityLogs' }])
+      .toArray()) as Document[]
+    expect(documents).toHaveLength(4)
+    expect(
+      documents
+        .filter((document) => document.status)
+        .every((document) => document.status === 'active')
+    ).toBe(true)
+  })
+
+  it('allows replacing a document root after authorization has selected owned documents', async () => {
+    const documents = (await getTodosCollection(ownerUser)
+      .aggregate([{ $replaceRoot: { newRoot: { owner: '$userId', label: '$title' } } }])
+      .toArray()) as Document[]
+    expect(documents).toHaveLength(2)
+    expect(documents.every((document) => document.owner === ownerUser.id)).toBe(true)
+  })
+
+  it('keeps non-system internal aggregates subject to authorization', async () => {
+    const service = MongoDbAtlas(appInstance!, {
+      rules: StateManager.select('rules'),
+      user: ownerUser
+    })
+      .db(DB_NAME)
+      .collection(TODO_COLLECTION)
+    const cursor = service.aggregate(
+      [{ $group: { _id: '$userId', count: { $sum: 1 } } }],
+      {},
+      false
+    )
+    expect(await cursor.toArray()).toEqual([{ _id: ownerUser.id, count: 2 }])
+    expect(() =>
+      service.aggregate([{ $unionWith: AUTH_USERS_COLLECTION }], {}, false)
+    ).toThrow('Collection access not permitted')
   })
 
   it('applies filters in activityLogs aggregations for non-admin users', async () => {
@@ -1632,7 +1686,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
 
   it('blocks access to auth_users collection without rules', async () => {
     await expect(getAuthUsersCollection(ownerUser).find({}).toArray()).rejects.toThrow(
-      'READ FORBIDDEN!'
+      'Collection access not permitted'
     )
   })
 
@@ -1643,7 +1697,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
         email: 'blocked@example.com',
         password: 'xxx'
       })
-    ).rejects.toThrow('CREATE FORBIDDEN!')
+    ).rejects.toThrow('Collection access not permitted')
   })
 
   it('limits projects to the owner and hides forbidden fields', async () => {
@@ -1961,39 +2015,29 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(adminCounters).toHaveLength(4)
   })
 
-  it('counts accessible counters using RBAC filters', async () => {
-    const ownerCount = await getCountersCollection(ownerUser).count({})
-    expect(ownerCount).toBe(3)
-
-    const ownerWorkspaceTwoCount = await getCountersCollection(ownerUser).count({
-      workspace: 'workspace-2'
-    })
-    expect(ownerWorkspaceTwoCount).toBe(0)
-
-    const guestCount = await getCountersCollection(guestUser).count({})
-    expect(guestCount).toBe(1)
-
-    const guestWorkspaceTwoCount = await getCountersCollection(guestUser).count({
-      workspace: 'workspace-2'
-    })
-    expect(guestWorkspaceTwoCount).toBe(1)
-
-    const adminCount = await getCountersCollection(adminUser).count({})
-    expect(adminCount).toBe(4)
+  it('counts readable todos after role and collection filters', async () => {
+    expect(await getTodosCollection(ownerUser).count({})).toBe(2)
+    expect(await getTodosCollection(guestUser).count({})).toBe(1)
+    expect(await getTodosCollection(adminUser).count({})).toBe(0)
   })
 
-  it('supports client aggregate pipelines with $sort/$skip/$limit', async () => {
+  it('rejects count with function-based rules that cannot be compiled safely', async () => {
+    for (const user of [ownerUser, guestUser, adminUser]) {
+      await expect(getCountersCollection(user).count({}))
+        .rejects.toThrow('Aggregation authorization cannot compile %function')
+    }
+  })
+
+  it('rejects function-based counter aggregation rules even with sort/skip/limit', async () => {
     const ownerPipeline = [
       { $match: { workspace: 'workspace-1' } },
       { $sort: { value: -1 } },
       { $skip: 1 },
       { $limit: 1 }
     ]
-    const ownerResults = (await getCountersCollection(ownerUser)
-      .aggregate(ownerPipeline)
-      .toArray()) as CounterDoc[]
-    expect(ownerResults).toHaveLength(1)
-    expect(ownerResults[0].value).toBe(200)
+    await expect(
+      getCountersCollection(ownerUser).aggregate(ownerPipeline).toArray()
+    ).rejects.toThrow('Aggregation authorization cannot compile %function')
 
     const guestPipeline = [
       { $match: { workspace: 'workspace-2' } },
@@ -2001,11 +2045,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       { $skip: 0 },
       { $limit: 1 }
     ]
-    const guestResults = (await getCountersCollection(guestUser)
-      .aggregate(guestPipeline)
-      .toArray()) as CounterDoc[]
-    expect(guestResults).toHaveLength(1)
-    expect(guestResults[0].workspace).toBe('workspace-2')
+    await expect(
+      getCountersCollection(guestUser).aggregate(guestPipeline).toArray()
+    ).rejects.toThrow('Aggregation authorization cannot compile %function')
   })
 
   it('supports client find queries with $sort/$skip/$limit options', async () => {
@@ -2022,17 +2064,15 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     expect(guestResults[0].workspace).toBe('workspace-2')
   })
 
-  it('sorts/limits/makes skips work on find and aggregate results with multiple records', async () => {
+  it('preserves native find sorting and rejects unsupported aggregate permissions', async () => {
     const ownerDescPipeline = [
       { $match: { workspace: 'workspace-1' } },
       { $sort: { value: -1 } },
       { $limit: 3 }
     ]
-    const ownerDescResults = (await getCountersCollection(ownerUser)
-      .aggregate(ownerDescPipeline)
-      .toArray()) as CounterDoc[]
-    expect(ownerDescResults.length).toBe(3)
-    expect(ownerDescResults.map((counter) => counter.value)).toEqual([400, 200, 100])
+    await expect(
+      getCountersCollection(ownerUser).aggregate(ownerDescPipeline).toArray()
+    ).rejects.toThrow('Aggregation authorization cannot compile %function')
 
     const ownerSkipPipeline = [
       { $match: { workspace: 'workspace-1' } },
@@ -2040,10 +2080,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       { $skip: 1 },
       { $limit: 2 }
     ]
-    const ownerSkipResults = (await getCountersCollection(ownerUser)
-      .aggregate(ownerSkipPipeline)
-      .toArray()) as CounterDoc[]
-    expect(ownerSkipResults.map((counter) => counter.value)).toEqual([200, 100])
+    await expect(
+      getCountersCollection(ownerUser).aggregate(ownerSkipPipeline).toArray()
+    ).rejects.toThrow('Aggregation authorization cannot compile %function')
 
     const ownerDescFind = (await getCountersCollection(ownerUser)
       .find({}, undefined, { sort: { value: -1 }, limit: 3 })
@@ -2060,10 +2099,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
       { $sort: { value: 1 } },
       { $limit: 3 }
     ]
-    const ownerAscResults = (await getCountersCollection(ownerUser)
-      .aggregate(ownerAscPipeline)
-      .toArray()) as CounterDoc[]
-    expect(ownerAscResults.map((counter) => counter.value)).toEqual([100, 200, 400])
+    await expect(
+      getCountersCollection(ownerUser).aggregate(ownerAscPipeline).toArray()
+    ).rejects.toThrow('Aggregation authorization cannot compile %function')
 
     const ownerAscFind = (await getCountersCollection(ownerUser)
       .find({}, undefined, { sort: { value: 1 }, limit: 3 })
@@ -2117,10 +2155,11 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     )
     expect(ownerUpdate.matchedCount).toBe(1)
 
-    const updatedOwnerDoc =
-      (await getCountersApplyWhenFunctionCollection(ownerUser).findOne({
-        _id: counterApplyWhenFunctionIds.adminWorkspaceDoc
-      })) as CounterApplyWhenFunctionDoc | null
+    const updatedOwnerDoc = (await getCountersApplyWhenFunctionCollection(
+      ownerUser
+    ).findOne({
+      _id: counterApplyWhenFunctionIds.adminWorkspaceDoc
+    })) as CounterApplyWhenFunctionDoc | null
     expect(updatedOwnerDoc?.value).toBe(615)
 
     const guestDoc = await getCountersApplyWhenFunctionCollection(guestUser).findOne({
@@ -2150,7 +2189,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('keeps write-only fields readable in find and findOne responses', async () => {
-    const found = (await getUploadsCollection(ownerUser).find({}).toArray()) as UploadDoc[]
+    const found = (await getUploadsCollection(ownerUser)
+      .find({})
+      .toArray()) as UploadDoc[]
     expect(found).toHaveLength(1)
     expect(found[0]).toMatchObject({
       _id: uploadIds.owner,
@@ -2169,7 +2210,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('keeps readable the exact Internal role shape with only write permissions on name and address', async () => {
-    const found = (await getInternalContactsCollection(ownerUser).find({}).toArray()) as Document[]
+    const found = (await getInternalContactsCollection(ownerUser)
+      .find({})
+      .toArray()) as Document[]
     expect(found).toHaveLength(1)
     expect(found[0]).toEqual({
       _id: new ObjectId('000000000000000000000350'),
@@ -2186,7 +2229,9 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
   })
 
   it('keeps readable the exact Internal role shape with only read permissions on name and address', async () => {
-    const found = (await getInternalReadContactsCollection(ownerUser).find({}).toArray()) as Document[]
+    const found = (await getInternalReadContactsCollection(ownerUser)
+      .find({})
+      .toArray()) as Document[]
     expect(found).toHaveLength(1)
     expect(found[0]).toEqual({
       _id: new ObjectId('000000000000000000000351'),
@@ -2526,7 +2571,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
     }
   })
 
-  it('emits delete watch event when filter combines insert branch and delete branch', async () => {
+  it('suppresses mixed-filter delete events without an authorizable pre-image', async () => {
     const accountId = ownerUser.custom_data?.key
     const requestId = new ObjectId()
     const documentId = new ObjectId()
@@ -2561,9 +2606,7 @@ describe('MongoDB Atlas rule enforcement (e2e)', () => {
         .collection(UPLOADS_COLLECTION)
         .deleteOne({ _id: documentId })
 
-      const event = await watch.nextEvent()
-      expect(event.operationType).toBe('delete')
-      expect(String(event.documentKey?._id)).toBe(String(documentId))
+      await watch.expectNoEvent()
     } finally {
       await watch.close()
     }

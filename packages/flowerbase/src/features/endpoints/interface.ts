@@ -24,11 +24,14 @@ export type Endpoint<T = 'ALL'> = {
   http_method: HTTP_METHOD<T>
   route: string
   function_name: string
-  secret_name: string
+  secret_name?: string
   validation_method: string
   respond_result: boolean
   fetch_custom_user_data: boolean
   create_user_on_auth: boolean
+  can_evaluate?: unknown
+  run_as_user_id?: unknown
+  run_as_user_id_script_source?: unknown
   disabled: boolean
 }
 export type Endpoints<T = 'ALL'> = Endpoint<T>[]

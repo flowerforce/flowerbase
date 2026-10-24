@@ -25,10 +25,13 @@ export const loadRules = async (rootDir = process.cwd()): Promise<Rules> => {
   const rulesByCollection = rulesFiles.reduce((acc, rulesFile) => {
     const filePath = rulesFile
     const collectionRules = removeEmptyFieldRules(readJsonContent(filePath) as RulesConfig)
+    if (Object.prototype.hasOwnProperty.call(acc, collectionRules.collection)) {
+      throw new Error(`Duplicate rules for collection "${collectionRules.collection}"`)
+    }
     acc[collectionRules.collection] = collectionRules
 
     return acc
-  }, {} as Rules)
+  }, Object.create(null) as Rules)
 
   return rulesByCollection
 }

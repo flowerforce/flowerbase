@@ -103,6 +103,8 @@ const response = await user.functions.calculateScore({ workspaceId: 'w1' })
 
 Le risposte sono normalizzate lato client per gestire payload JSON/EJSON.
 
+Per `callFunctionStreaming`, `timeout` comprende anche la lettura della risposta. Interrompere l'iterazione annulla la richiesta e libera lo stream.
+
 ## Mongo service
 
 ```ts
@@ -142,6 +144,8 @@ Metodi disponibili su `collection`:
 ## Watch / Change streams
 
 `watch()` restituisce un async iterator con reconnect automatico e metodo `close()`.
+
+Il logout, la rimozione dell'utente e una nuova autenticazione dello stesso utente chiudono gli stream della sessione precedente e scartano gli eventi ancora in coda.
 
 ```ts
 const stream = collection.watch()
@@ -185,7 +189,9 @@ La sessione (`accessToken`, `refreshToken`, `userId`) viene salvata con chiave:
 Storage usato:
 
 - `localStorage` se disponibile (browser)
-- memory store fallback (ambienti senza `localStorage`)
+- storage in memoria dedicato all'istanza (ambienti senza `localStorage`)
+
+Sul server, crea una nuova `App` per ogni richiesta per mantenere le sessioni isolate. `App.getApp()` restituisce un singleton e condivide intenzionalmente la stessa istanza.
 
 Su bootstrap dell'app viene tentato un refresh automatico dell'access token usando il refresh token salvato.
 

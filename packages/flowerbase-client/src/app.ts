@@ -35,6 +35,11 @@ export class App {
   private readonly sessionManager: SessionManager
   private readonly usersById = new Map<string, User>()
   private readonly sessionsByUserId = new Map<string, SessionData>()
+  private readonly sessionControllers = new Map<string, AbortController>()
+  private readonly pendingRefreshes = new Map<
+    string,
+    { signal: AbortSignal; promise: Promise<string> }
+  >()
   private usersOrder: string[] = []
   private readonly profilesByUserId = new Map<string, ProfileData>()
   private readonly sessionBootstrapPromise: Promise<void>
@@ -203,13 +208,34 @@ export class App {
 
   private setSessionForUser(session: SessionData) {
     this.sessionsByUserId.set(session.userId, session)
-    this.sessionManager.set(session)
+    if (this.sessionManager.get()?.userId === session.userId) {
+      this.sessionManager.set(session)
+    }
     this.persistSessionsByUser()
   }
 
   private clearSessionForUser(userId: string) {
+    const controller = this.sessionControllers.get(userId)
+    this.sessionControllers.delete(userId)
+    this.pendingRefreshes.delete(userId)
     this.sessionsByUserId.delete(userId)
+    this.profilesByUserId.delete(userId)
     this.persistSessionsByUser()
+    this.setCurrentSessionFromOrder()
+    controller?.abort()
+  }
+
+  private getSessionController(userId: string): AbortController {
+    const existing = this.sessionControllers.get(userId)
+    if (existing) return existing
+    const controller = new AbortController()
+    this.sessionControllers.set(userId, controller)
+    return controller
+  }
+
+  getSessionSignal(userId: string): AbortSignal {
+    this.getSessionOrThrow(userId)
+    return this.getSessionController(userId).signal
   }
 
   private setCurrentSessionFromOrder() {
@@ -249,12 +275,16 @@ export class App {
     return `${this.baseUrl}${API_PREFIX}/app/${this.id}/functions${path}`
   }
 
-  private async createSession(refreshToken: string): Promise<SessionResponse> {
+  private async createSession(
+    refreshToken: string,
+    signal: AbortSignal
+  ): Promise<SessionResponse> {
     return requestJson<SessionResponse>({
       url: this.authUrl('/session'),
       method: 'POST',
       bearerToken: refreshToken,
-      timeout: this.timeout
+      timeout: this.timeout,
+      signal
     })
   }
 
@@ -269,14 +299,9 @@ export class App {
     }
 
     try {
-      const result = await this.createSession(session.refreshToken)
-      this.setSessionForUser({
-        ...session,
-        accessToken: result.access_token
-      })
+      await this.refreshSession(session, this.getSessionSignal(session.userId))
     } catch {
-      this.clearSessionForUser(session.userId)
-      this.setCurrentSessionFromOrder()
+      // Refresh handles failed sessions; superseded bootstrap results are ignored.
     }
   }
 
@@ -289,7 +314,10 @@ export class App {
     providerType: CredentialsLike['provider'],
     profileEmail?: string
   ) {
-    const sessionResult = await this.createSession(data.refresh_token)
+    this.clearSessionForUser(data.user_id)
+    const signal = this.getSessionController(data.user_id).signal
+    const sessionResult = await this.createSession(data.refresh_token, signal)
+    signal.throwIfAborted()
     const session: SessionData = {
       accessToken: sessionResult.access_token,
       refreshToken: data.refresh_token,
@@ -299,6 +327,7 @@ export class App {
     const user = this.getOrCreateUser(data.user_id)
     user.setProviderType(providerType)
     this.touchUser(data.user_id)
+    this.setCurrentSessionFromOrder()
     if (profileEmail) {
       user.profile = { email: profileEmail }
     }
@@ -317,6 +346,7 @@ export class App {
   }
 
   async logIn(credentials: CredentialsLike) {
+    await this.sessionManager.whenReady()
     if (credentials.provider === 'local-userpass') {
       const result = await this.postProvider<LoginResponse>('/local-userpass/login', {
         username: credentials.email,
@@ -382,12 +412,13 @@ export class App {
 
   async deleteUser(user: User) {
     await this.requestWithAccessToken(
-      (accessToken) =>
+      (accessToken, signal) =>
         requestJson({
           url: this.authUrl('/delete'),
           method: 'DELETE',
           bearerToken: accessToken,
-          timeout: this.timeout
+          timeout: this.timeout,
+          signal
         }),
       user.id
     )
@@ -430,19 +461,27 @@ export class App {
   }
 
   private async requestWithAccessToken<T>(
-    operation: (accessToken: string) => Promise<T>,
+    operation: (accessToken: string, signal: AbortSignal) => Promise<T>,
     userId?: string
   ) {
     const firstSession = this.getSessionOrThrow(userId)
+    const signal = this.getSessionSignal(firstSession.userId)
+    const execute = async (accessToken: string) => {
+      const result = await operation(accessToken, signal)
+      signal.throwIfAborted()
+      return result
+    }
     try {
-      return await operation(firstSession.accessToken)
+      return await execute(firstSession.accessToken)
     } catch (error) {
       if (!(error instanceof FlowerbaseHttpError) || error.status !== 401) {
         throw error
       }
-      await this.refreshAccessToken(userId)
-      const refreshedSession = this.getSessionOrThrow(userId)
-      return operation(refreshedSession.accessToken)
+      signal.throwIfAborted()
+      await this.refreshSession(firstSession, signal)
+      signal.throwIfAborted()
+      const refreshedSession = this.getSessionOrThrow(firstSession.userId)
+      return execute(refreshedSession.accessToken)
     }
   }
 
@@ -454,13 +493,14 @@ export class App {
     }
 
     const result = await this.requestWithAccessToken(
-      (accessToken) =>
+      (accessToken, signal) =>
         requestJson<unknown>({
           url: this.functionsUrl(`/call?func=${name}`),
           method: 'POST',
           body: payload,
           bearerToken: accessToken,
-          timeout: this.timeout
+          timeout: this.timeout,
+          signal
         }),
       userId
     )
@@ -478,8 +518,16 @@ export class App {
       name,
       arguments: args
     }
-    const resolveSession = () => this.getSessionOrThrow(userId)
-    const refreshSession = () => this.refreshAccessToken(userId)
+    const firstSession = this.getSessionOrThrow(userId)
+    const signal = this.getSessionSignal(firstSession.userId)
+    const resolveSession = () => {
+      signal.throwIfAborted()
+      return this.getSessionOrThrow(firstSession.userId)
+    }
+    const refreshSession = () => {
+      signal.throwIfAborted()
+      return this.refreshSession(firstSession, signal)
+    }
     const timeout = this.timeout
     const url = this.functionsUrl('/call')
 
@@ -496,7 +544,8 @@ export class App {
               method: 'POST',
               body: payload,
               bearerToken: session.accessToken,
-              timeout
+              timeout,
+              signal
             })
           } catch (error) {
             if (
@@ -513,6 +562,7 @@ export class App {
 
           try {
             for await (const chunk of stream) {
+              signal.throwIfAborted()
               yield chunk
             }
             return
@@ -547,13 +597,14 @@ export class App {
     }
 
     return this.requestWithAccessToken(
-      (accessToken) =>
+      (accessToken, signal) =>
         requestJson<unknown>({
           url: this.functionsUrl(`/call?col=${args[0].collection}-${name}`),
           method: 'POST',
           body: payload,
           bearerToken: accessToken,
-          timeout: this.timeout
+          timeout: this.timeout,
+          signal
         }),
       userId
     )
@@ -561,17 +612,20 @@ export class App {
 
   async getProfile(userId?: string): Promise<ProfileData> {
     await this.ensureSessionBootstrapped()
+    const session = this.getSessionOrThrow(userId)
+    const signal = this.getSessionSignal(session.userId)
     const profile = await this.requestWithAccessToken(
-      (accessToken) =>
+      (accessToken, signal) =>
         requestJson<ProfileData>({
           url: this.authUrl('/profile'),
           method: 'GET',
           bearerToken: accessToken,
-          timeout: this.timeout
+          timeout: this.timeout,
+          signal
         }),
-      userId
+      session.userId
     )
-    const session = this.getSessionOrThrow(userId)
+    signal.throwIfAborted()
     this.profilesByUserId.set(session.userId, profile)
     return profile
   }
@@ -579,44 +633,54 @@ export class App {
   async refreshAccessToken(userId?: string) {
     await this.ensureSessionBootstrapped()
     const session = this.getSessionOrThrow(userId)
+    return this.refreshSession(session, this.getSessionSignal(session.userId))
+  }
 
-    try {
-      const result = await this.createSession(session.refreshToken)
-
-      this.setSessionForUser({
-        ...session,
-        accessToken: result.access_token
-      })
-      this.touchUser(session.userId)
-      this.notifyListeners(session.userId)
-
-      return result.access_token
-    } catch (error) {
-      this.clearSessionForUser(session.userId)
-      this.setCurrentSessionFromOrder()
-      this.notifyListeners(session.userId)
-      throw error
+  private refreshSession(session: SessionData, signal: AbortSignal): Promise<string> {
+    signal.throwIfAborted()
+    const pending = this.pendingRefreshes.get(session.userId)
+    if (pending?.signal === signal) {
+      return pending.promise
     }
+
+    const promise = (async () => {
+      try {
+        const result = await this.createSession(session.refreshToken, signal)
+        signal.throwIfAborted()
+        this.setSessionForUser({ ...session, accessToken: result.access_token })
+        this.notifyListeners(session.userId)
+        return result.access_token
+      } catch (error) {
+        if (!signal.aborted) {
+          this.clearSessionForUser(session.userId)
+          this.notifyListeners(session.userId)
+        }
+        throw error
+      } finally {
+        if (this.pendingRefreshes.get(session.userId)?.signal === signal) {
+          this.pendingRefreshes.delete(session.userId)
+        }
+      }
+    })()
+
+    this.pendingRefreshes.set(session.userId, { signal, promise })
+    return promise
   }
 
   async logoutUser(userId?: string) {
-    const session = this.getSession(userId ?? this.currentUser?.id)
-    try {
-      if (session) {
-        await requestJson({
-          url: this.authUrl('/session'),
-          method: 'DELETE',
-          bearerToken: session.refreshToken,
-          timeout: this.timeout
-        })
-      }
-    } finally {
-      if (session) {
-        this.clearSessionForUser(session.userId)
-        this.notifyListeners(session.userId)
-      }
-      this.setCurrentSessionFromOrder()
-    }
+    await this.sessionManager.whenReady()
+    const targetUserId = userId ?? this.currentUser?.id
+    if (!targetUserId) return
+    const session = this.getSession(targetUserId)
+    this.clearSessionForUser(targetUserId)
+    this.notifyListeners(targetUserId)
+    if (!session) return
+    await requestJson({
+      url: this.authUrl('/session'),
+      method: 'DELETE',
+      bearerToken: session.refreshToken,
+      timeout: this.timeout
+    })
   }
 
   addListener(callback: () => void) {

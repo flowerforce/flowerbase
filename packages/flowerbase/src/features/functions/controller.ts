@@ -2,6 +2,7 @@ import type { ServerResponse } from 'http'
 import { EJSON, ObjectId } from 'bson'
 import type { FastifyRequest } from 'fastify'
 import type { Document } from 'mongodb'
+import { AccessSession, isAccessSessionActive, readAccessSession } from '../../auth/accessSession'
 import { DEFAULT_CONFIG } from '../../constants'
 import { services } from '../../services'
 import { GenerateContext } from '../../utils/context'
@@ -101,6 +102,8 @@ type WatchSubscriber = {
   user: Record<string, any>
   response: ServerResponse
   documentFilter?: Document
+  session: AccessSession
+  stopSessionChecks: () => void
 }
 
 type SharedWatchStream = {
@@ -112,6 +115,7 @@ type SharedWatchStream = {
     close: () => Promise<void> | void
   }
   subscribers: Map<string, WatchSubscriber>
+  close?: () => Promise<void>
 }
 
 const sharedWatchStreams = new Map<string, SharedWatchStream>()
@@ -254,7 +258,8 @@ const resolveWatchStream = (
   database: string,
   collection: string,
   watchArgs: Record<string, unknown>,
-  user: Record<string, any>
+  user: Record<string, any>,
+  session: AccessSession
 ) => {
   const keys = Object.keys(watchArgs)
   const hasOnlyAllowedKeys = keys.every((key) => key === 'filter' || key === 'ids')
@@ -293,6 +298,7 @@ const resolveWatchStream = (
     collection,
     pipeline,
     options,
+    session,
     permissionContext: getWatchPermissionContext(user)
   })
 
@@ -474,6 +480,12 @@ export const functionsController: FunctionController = async (
     }
     const { baas_request, stitch_request } = query
 
+    const session = readAccessSession(req.user)
+    if (!session || !await isAccessSessionActive(app, session)) {
+      res.status(401)
+      return { error: 'unauthorized', error_code: 'InvalidSession' }
+    }
+
     const decodedConfig = JSON.parse(
       Buffer.from(baas_request || stitch_request || '', 'base64').toString('utf8')
     )
@@ -497,7 +509,7 @@ export const functionsController: FunctionController = async (
       extraFilter,
       options: watchOptions,
       pipeline: watchPipeline
-    } = resolveWatchStream(database, collection, watchArgs, user)
+    } = resolveWatchStream(database, collection, watchArgs, user, session)
 
     let hub = sharedWatchStreams.get(streamKey)
     if (!hub) {
@@ -530,15 +542,30 @@ export const functionsController: FunctionController = async (
       logWatchStats('hub-reused', { streamKey, database, collection })
     }
 
+    res.hijack()
     res.raw.writeHead(200, headers)
     res.raw.flushHeaders();
+
+    const removeSubscriber = async (currentHub: SharedWatchStream, id: string, endResponse = false) => {
+      const current = currentHub.subscribers.get(id)
+      if (!current) return
+      current.stopSessionChecks()
+      currentHub.subscribers.delete(id)
+      if (endResponse && !current.response.writableEnded && !current.response.destroyed) {
+        current.response.end()
+      }
+      if (!currentHub.subscribers.size) await currentHub.close?.()
+    }
 
     const ensureHubListeners = (currentHub: SharedWatchStream) => {
       if ((currentHub as SharedWatchStream & { listenersBound?: boolean }).listenersBound) {
         return
       }
 
+      let closed = false
       const closeHub = async () => {
+        if (closed) return
+        closed = true
         currentHub.stream.off('change', onHubChange)
         currentHub.stream.off('error', onHubError)
         sharedWatchStreams.delete(streamKey)
@@ -549,16 +576,24 @@ export const functionsController: FunctionController = async (
           // Ignore stream close errors.
         }
       }
+      currentHub.close = closeHub
 
       const onHubChange = async (change: Document) => {
         const subscribers = Array.from(currentHub.subscribers.values())
         await Promise.all(subscribers.map(async (subscriber) => {
           const subscriberRes = subscriber.response
           if (subscriberRes.writableEnded || subscriberRes.destroyed) {
-            currentHub.subscribers.delete(subscriber.id)
+            await removeSubscriber(currentHub, subscriber.id)
             logWatchStats('subscriber-auto-removed', { streamKey, subscriberId: subscriber.id })
             return
           }
+
+          if (!await isAccessSessionActive(app, subscriber.session)) {
+            await removeSubscriber(currentHub, subscriber.id, true)
+            return
+          }
+          if (subscriberRes.writableEnded || subscriberRes.destroyed ||
+            !currentHub.subscribers.has(subscriber.id)) return
 
           const docId =
             (change as { documentKey?: { _id?: unknown } })?.documentKey?._id ??
@@ -584,11 +619,19 @@ export const functionsController: FunctionController = async (
               .findOne(readQuery)
 
             if (!isReadableDocumentResult(readableDoc)) return
+            if (!await isAccessSessionActive(app, subscriber.session)) {
+              await removeSubscriber(currentHub, subscriber.id, true)
+              return
+            }
+            if (subscriberRes.writableEnded || subscriberRes.destroyed ||
+              !currentHub.subscribers.has(subscriber.id)) return
             subscriberRes.write(`data: ${serializeEjson(change)}\n\n`)
           } catch (error) {
-            subscriberRes.write(`event: error\ndata: ${formatFunctionExecutionError(error)}\n\n`)
-            subscriberRes.end()
-            currentHub.subscribers.delete(subscriber.id)
+            if (await isAccessSessionActive(app, subscriber.session) &&
+              !subscriberRes.writableEnded && !subscriberRes.destroyed) {
+              subscriberRes.write(`event: error\ndata: ${formatFunctionExecutionError(error)}\n\n`)
+            }
+            await removeSubscriber(currentHub, subscriber.id, true)
             logWatchStats('subscriber-error-removed', { streamKey, subscriberId: subscriber.id })
           }
         }))
@@ -599,14 +642,14 @@ export const functionsController: FunctionController = async (
       }
 
       const onHubError = async (error: unknown) => {
-        for (const subscriber of currentHub.subscribers.values()) {
+        for (const subscriber of Array.from(currentHub.subscribers.values())) {
           const subscriberRes = subscriber.response
-          if (!subscriberRes.writableEnded && !subscriberRes.destroyed) {
+          if (await isAccessSessionActive(app, subscriber.session) &&
+            !subscriberRes.writableEnded && !subscriberRes.destroyed) {
             subscriberRes.write(`event: error\ndata: ${formatFunctionExecutionError(error)}\n\n`)
-            subscriberRes.end()
           }
+          await removeSubscriber(currentHub, subscriber.id, true)
         }
-        currentHub.subscribers.clear()
         await closeHub()
       }
 
@@ -620,7 +663,9 @@ export const functionsController: FunctionController = async (
     const subscriber: WatchSubscriber = {
       id: subscriberId,
       user,
+      session,
       response: res.raw,
+      stopSessionChecks: () => {},
       documentFilter: (() => {
         if (!extraFilter) return undefined
         const mapped = mapWatchFilterToDocumentQuery(extraFilter)
@@ -629,18 +674,35 @@ export const functionsController: FunctionController = async (
       })()
     }
     hub.subscribers.set(subscriberId, subscriber)
-    logWatchStats('subscriber-added', { streamKey, subscriberId })
-
-    req.raw.on('close', () => {
-      const currentHub = sharedWatchStreams.get(streamKey)
-      if (!currentHub) return
-      currentHub.subscribers.delete(subscriberId)
-      logWatchStats('subscriber-closed', { streamKey, subscriberId })
-      if (!currentHub.subscribers.size) {
-        void currentHub.stream.close()
-        sharedWatchStreams.delete(streamKey)
-        logWatchStats('hub-empty-closed', { streamKey })
+    const subscriberHub = hub
+    let sessionCheckRunning = false
+    const checkSession = async () => {
+      if (sessionCheckRunning || !subscriberHub.subscribers.has(subscriberId)) return
+      sessionCheckRunning = true
+      try {
+        if (!await isAccessSessionActive(app, session)) {
+          await removeSubscriber(subscriberHub, subscriberId, true)
+        }
+      } finally {
+        sessionCheckRunning = false
       }
-    })
+    }
+    const expiryTimer = setTimeout(() => {
+      void removeSubscriber(subscriberHub, subscriberId, true)
+    }, Math.max(0, session.exp * 1000 - Date.now()))
+    const sessionTimer = setInterval(() => { void checkSession() }, 1000)
+    expiryTimer.unref()
+    sessionTimer.unref()
+    const onDisconnect = () => {
+      void removeSubscriber(subscriberHub, subscriberId)
+      logWatchStats('subscriber-closed', { streamKey, subscriberId })
+    }
+    res.raw.on('close', onDisconnect)
+    subscriber.stopSessionChecks = () => {
+      clearTimeout(expiryTimer)
+      clearInterval(sessionTimer)
+      res.raw.off('close', onDisconnect)
+    }
+    logWatchStats('subscriber-added', { streamKey, subscriberId })
   })
 }

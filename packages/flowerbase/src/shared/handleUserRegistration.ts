@@ -27,6 +27,9 @@ export const sendConfirmationRequest = async (
     if (!authUser) {
         return null
     }
+    if (authUser.status === 'disabled') {
+        throw new Error('User is disabled')
+    }
 
     if (authUser.status === 'confirmed' || autoConfirm) {
         return { status: 'success' as const }
@@ -49,8 +52,8 @@ export const sendConfirmationRequest = async (
 
     const token = generateToken()
     const tokenId = generateToken()
-    await db?.collection(authCollection!).updateOne(
-        { email: normalizedEmail },
+    const created = await db?.collection(authCollection!).updateOne(
+        { email: normalizedEmail, status: authUser.status },
         {
             $set: {
                 status: 'pending',
@@ -59,6 +62,7 @@ export const sendConfirmationRequest = async (
             }
         }
     )
+    if (!created.matchedCount) throw new Error('User confirmation state changed')
 
     let confirmationStatus: ConfirmationResult['status'] = 'fail'
     try {
@@ -83,13 +87,14 @@ export const sendConfirmationRequest = async (
     }
 
     if (confirmationStatus === 'success') {
-        await db?.collection(authCollection!).updateOne(
-            { email: normalizedEmail },
+        const confirmed = await db?.collection(authCollection!).updateOne(
+            { email: normalizedEmail, status: 'pending', confirmationToken: token, confirmationTokenId: tokenId },
             {
                 $set: { status: 'confirmed' },
                 $unset: { confirmationToken: '', confirmationTokenId: '' }
             }
         )
+        if (!confirmed.matchedCount) throw new Error('User confirmation state changed')
         return { status: 'success' as const }
     }
 
@@ -97,13 +102,14 @@ export const sendConfirmationRequest = async (
         return { status: 'pending' as const }
     }
 
-    await db?.collection(authCollection!).updateOne(
-        { email: normalizedEmail },
+    const failed = await db?.collection(authCollection!).updateOne(
+        { email: normalizedEmail, status: 'pending', confirmationToken: token, confirmationTokenId: tokenId },
         {
             $set: { status: 'failed' },
             $unset: { confirmationToken: '', confirmationTokenId: '' }
         }
     )
+    if (!failed.matchedCount) throw new Error('User confirmation state changed')
 
     return { status: 'fail' as const }
 }
@@ -148,6 +154,8 @@ const handleUserRegistration: HandleUserRegistration = (app, opt) => async ({ em
             email,
             password: hashedPassword,
             status: (skipUserCheck || autoConfirm) ? 'confirmed' : 'pending',
+            sessionVersion: 0,
+            credentialsVersion: 0,
             createdAt: new Date(),
             custom_data: {
                 // TODO: aggiungere dati personalizzati alla registrazione

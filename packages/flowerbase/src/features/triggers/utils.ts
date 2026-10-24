@@ -12,31 +12,52 @@ import { HandlerParams, Trigger, Triggers } from './interface'
 const normalizeTriggerPayload = <T>(value: T): T =>
   EJSON.deserialize(EJSON.serialize(value, { relaxed: false })) as T
 
+type TriggerLifecycle = {
+  closing: boolean
+  handlers: { handler: () => Promise<void> | void; label: string }[]
+  tasks: Set<Promise<void>>
+}
+const triggerLifecycles = new WeakMap<HandlerParams['app'], TriggerLifecycle>()
+
+export const registerTriggerLifecycle = (app: HandlerParams['app']) => {
+  const state: TriggerLifecycle = { closing: false, handlers: [], tasks: new Set() }
+  triggerLifecycles.set(app, state)
+  app.addHook('preClose', async () => {
+    state.closing = true
+    await Promise.all(state.handlers.map(async ({ handler, label }) => {
+      try { await handler() }
+      catch (error) { console.error(`${label} close error`, error) }
+    }))
+    await Promise.all(state.tasks)
+    state.handlers = []
+  })
+}
+
+const getTriggerLifecycle = (app: HandlerParams['app']) => {
+  const state = triggerLifecycles.get(app)
+  if (!state) throw new Error('Trigger lifecycle must be registered before activating triggers')
+  return state
+}
+
 const registerOnClose = (
   app: HandlerParams['app'],
   handler: () => Promise<void> | void,
   label: string
 ) => {
-  if (app.server) {
-    app.server.once('close', () => {
-      Promise.resolve(handler()).catch((error) => {
-        console.error(`${label} close error`, error)
-      })
-    })
-    return
-  }
+  getTriggerLifecycle(app).handlers.push({ handler, label })
+}
 
-  try {
-    app.addHook('onClose', async () => {
-      try {
-        await handler()
-      } catch (error) {
-        console.error(`${label} close error`, error)
-      }
-    })
-  } catch (error) {
-    console.error(`${label} hook registration error`, error)
-  }
+const trackTriggerWork = (
+  app: HandlerParams['app'],
+  handler: () => Promise<void>,
+  reportError: (error: unknown) => void
+): Promise<void> => {
+  const state = getTriggerLifecycle(app)
+  if (state.closing) return Promise.resolve()
+  const task = Promise.resolve().then(handler).catch(reportError)
+  state.tasks.add(task)
+  void task.then(() => state.tasks.delete(task), () => state.tasks.delete(task))
+  return task
 }
 
 const shouldIgnoreStreamError = (error: unknown) => {
@@ -134,7 +155,7 @@ const handleCronTrigger = async ({
   triggerType,
   functionName
 }: HandlerParams) => {
-  const task = cron.schedule(config.schedule, async () => {
+  const task = cron.schedule(config.schedule, () => trackTriggerWork(app, async () => {
     emitTriggerEvent({
       status: 'fired',
       triggerName,
@@ -170,7 +191,10 @@ const handleCronTrigger = async ({
         error
       })
     }
-  })
+  }, (error) => emitTriggerEvent({
+    status: 'error', triggerName, triggerType, functionName,
+    meta: { schedule: config.schedule }, error
+  })))
   registerOnClose(app, () => task.stop(), 'Scheduled trigger')
 }
 
@@ -284,7 +308,7 @@ const handleAuthenticationTrigger = async ({
     if (shouldIgnoreStreamError(error)) return
     console.error('Authentication trigger change stream error', error)
   })
-  changeStream.on('change', async function (change) {
+  changeStream.on('change', (change) => trackTriggerWork(app, async () => {
     const operationType = change['operationType' as keyof typeof change] as
       | 'insert'
       | 'update'
@@ -675,7 +699,9 @@ const handleAuthenticationTrigger = async ({
         error
       })
     }
-  })
+  }, (error) => emitTriggerEvent({
+    status: 'error', triggerName, triggerType, functionName, meta: baseMeta, error
+  })))
   registerOnClose(
     app,
     async () => {
@@ -751,7 +777,7 @@ const handleDataBaseTrigger = async ({
     if (shouldIgnoreStreamError(error)) return
     console.error('Database trigger change stream error', error)
   })
-  changeStream.on('change', async function ({ clusterTime, ...change }) {
+  changeStream.on('change', ({ clusterTime, ...change }) => trackTriggerWork(app, async () => {
     emitTriggerEvent({
       status: 'fired',
       triggerName,
@@ -791,7 +817,10 @@ const handleDataBaseTrigger = async ({
         error
       })
     }
-  })
+  }, (error) => emitTriggerEvent({
+    status: 'error', triggerName, triggerType, functionName,
+    meta: { database, collection: collectionName }, error
+  })))
   registerOnClose(
     app,
     async () => {

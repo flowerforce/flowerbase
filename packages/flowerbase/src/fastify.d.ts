@@ -6,6 +6,7 @@ type JwtUserData = UserData
 
 type JwtAccessPayload = {
   typ: 'access'
+  sessionVersion: number
   id: string
   user_data: JwtUserData
   data: JwtUserData
@@ -14,6 +15,7 @@ type JwtAccessPayload = {
 
 type JwtRefreshPayload = {
   typ: 'refresh'
+  credentialsVersion: number
   baas_id: string
 }
 

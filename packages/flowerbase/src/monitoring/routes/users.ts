@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { ObjectId } from 'mongodb'
 import { loadAuthConfig, loadCustomUserData, PASSWORD_RULES } from '../../auth/utils'
+import { revokeRefreshTokens, updatePasswordAndRevokeSessions } from '../../auth/sessions'
 import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME } from '../../constants'
 import handleUserRegistration from '../../shared/handleUserRegistration'
 import { PROVIDER } from '../../shared/models/handleUserRegistration.model'
@@ -195,7 +196,6 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
     }
 
     const db = app.mongo.client.db(AUTH_DB_NAME)
-    const authCollection = AUTH_CONFIG.authCollection ?? 'auth_users'
     const selector: Record<string, unknown> = {}
 
     if (params.id && ObjectId.isValid(params.id)) {
@@ -208,11 +208,9 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
     }
 
     const hashedPassword = await hashPassword(password)
-    const result = await db.collection(authCollection).updateOne(selector, {
-      $set: { password: hashedPassword }
-    })
+    const updated = await updatePasswordAndRevokeSessions(db, selector, hashedPassword)
 
-    if (!result.matchedCount) {
+    if (!updated) {
       reply.code(404)
       return { error: 'User not found' }
     }
@@ -249,13 +247,26 @@ export const registerUserRoutes = (app: FastifyInstance, deps: UserRoutesDeps) =
       ? (body.disabled ? 'disabled' : 'confirmed')
       : (body?.status ?? 'disabled')
 
-    const result = await db.collection(authCollection).updateOne(selector, {
-      $set: { status }
-    })
+    const user = await db.collection(authCollection).findOne(selector)
+    if (!user) {
+      reply.code(404)
+      return { error: 'User not found' }
+    }
+    const now = new Date()
+    const result = await db.collection(authCollection).updateOne(
+      { _id: user._id },
+      status === 'disabled'
+        ? { $set: { status, lastLogoutAt: now }, $inc: { sessionVersion: 1, credentialsVersion: 1 } }
+        : { $set: { status } }
+    )
 
     if (!result.matchedCount) {
       reply.code(404)
       return { error: 'User not found' }
+    }
+
+    if (status === 'disabled') {
+      await revokeRefreshTokens(db, user._id, now)
     }
 
     addEvent({

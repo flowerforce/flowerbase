@@ -1,6 +1,6 @@
 import { ObjectId } from 'bson'
 import { FastifyInstance } from 'fastify'
-import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME, DEFAULT_CONFIG } from '../constants'
+import { AUTH_CONFIG, AUTH_DB_NAME, DB_NAME } from '../constants'
 import { StateManager } from '../state'
 import { hashToken } from '../utils/crypto'
 import { SessionCreatedDto } from './dtos'
@@ -25,7 +25,6 @@ export async function authController(app: FastifyInstance) {
 
   const authDb = app.mongo.client.db(AUTH_DB_NAME)
   const customUserDb = app.mongo.client.db(DB_NAME)
-  const refreshTokenTtlMs = DEFAULT_CONFIG.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
 
   try {
     await authDb.collection(refreshTokensCollection).createIndex(
@@ -119,6 +118,7 @@ export async function authController(app: FastifyInstance) {
       const refreshToken = authHeader.slice('Bearer '.length).trim()
       const refreshTokenHash = hashToken(refreshToken)
       const storedToken = await authDb.collection(refreshTokensCollection).findOne({
+        userId: new ObjectId(req.user.sub),
         tokenHash: refreshTokenHash,
         revokedAt: null,
         expiresAt: { $gt: new Date() }
@@ -132,7 +132,11 @@ export async function authController(app: FastifyInstance) {
         ?.collection(authCollection)
         .findOne({ _id: new this.mongo.ObjectId(req.user.sub) })
 
-      if (!auth_user) {
+      if (
+        !auth_user || auth_user.status === 'disabled' ||
+        !Number.isSafeInteger(req.user.credentialsVersion) ||
+        req.user.credentialsVersion !== auth_user.credentialsVersion
+      ) {
         res.code(401).send(unauthorizedSessionError)
         return
       }
@@ -167,6 +171,10 @@ export async function authController(app: FastifyInstance) {
       }
     },
     async function (req, res) {
+      if (req.user.typ !== 'refresh') {
+        res.code(401).send(unauthorizedSessionError)
+        return
+      }
       const authHeader = req.headers.authorization
       if (!authHeader?.startsWith('Bearer ')) {
         res.status(204)
@@ -175,32 +183,20 @@ export async function authController(app: FastifyInstance) {
       const refreshToken = authHeader.slice('Bearer '.length).trim()
       const refreshTokenHash = hashToken(refreshToken)
       const now = new Date()
-      const expiresAt = new Date(Date.now() + refreshTokenTtlMs)
-      const updateResult = await authDb.collection(refreshTokensCollection).findOneAndUpdate(
-        { tokenHash: refreshTokenHash },
+      const userId = new ObjectId(req.user.sub)
+      const updateResult = await authDb.collection(refreshTokensCollection).updateMany(
+        { tokenHash: refreshTokenHash, userId, revokedAt: null },
         {
           $set: {
-            revokedAt: now,
-            expiresAt
+            revokedAt: now
           }
-        },
-        { returnDocument: 'after' }
+        }
       )
 
-      const fromToken = req.user?.sub
-      let userId = updateResult?.value?.userId
-      if (!userId && fromToken) {
-        try {
-          userId = new ObjectId(fromToken)
-        } catch {
-          userId = fromToken
-        }
-      }
-
-      if (userId && authCollection) {
+      if (updateResult.matchedCount) {
         await authDb.collection(authCollection).updateOne(
           { _id: userId },
-          { $set: { lastLogoutAt: now } }
+          { $set: { lastLogoutAt: now }, $inc: { sessionVersion: 1 } }
         )
       }
 

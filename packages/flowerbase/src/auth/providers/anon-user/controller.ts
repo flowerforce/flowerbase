@@ -49,6 +49,8 @@ export async function anonUserController(app: FastifyInstance) {
         _id: userId,
         email: anonEmail,
         status: 'confirmed',
+        sessionVersion: 0,
+        credentialsVersion: 0,
         createdAt: now,
         lastLoginAt: now,
         custom_data: {},
@@ -64,6 +66,8 @@ export async function anonUserController(app: FastifyInstance) {
 
       const currentUserData = {
         _id: userId,
+        sessionVersion: 0,
+        credentialsVersion: 0,
         user_data: {}
       }
       const refreshToken = this.createRefreshToken(currentUserData)

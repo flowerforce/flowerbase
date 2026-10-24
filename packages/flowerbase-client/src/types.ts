@@ -67,6 +67,7 @@ export type WatchConfig = {
   filter?: Record<string, unknown>
   ids?: unknown[]
   timeout?: number
+  signal?: AbortSignal
 }
 
 export type WatchAsyncIterator<TChange = unknown> = AsyncIterableIterator<TChange> & {
