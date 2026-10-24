@@ -1,3 +1,10 @@
+## 1.11.0 (2026-10-24)
+
+
+### 🚀 Features
+
+- implement upsert validation and handling in MongoDB Atlas service ([451e692](https://github.com/flowerforce/flowerbase/commit/451e692))
+
 ## 1.10.0 (2026-05-28)
 
 
