@@ -1,3 +1,10 @@
+## 1.11.1 (2026-10-24)
+
+
+### 🩹 Fixes
+
+- specify document type in authorizedFindCursor to improve type safety ([4bb4f15](https://github.com/flowerforce/flowerbase/commit/4bb4f15))
+
 ## 1.11.0 (2026-10-24)
 
 
