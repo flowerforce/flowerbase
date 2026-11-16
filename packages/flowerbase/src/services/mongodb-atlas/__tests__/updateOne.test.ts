@@ -1,4 +1,5 @@
 import { BSON, Document, ObjectId, UpdateFilter } from 'mongodb'
+import { runInNewContext } from 'node:vm'
 import MongoDbAtlas from '..'
 import { Rules } from '../../../features/rules/interface'
 import { Role } from '../../../utils/roles/interface'
@@ -52,6 +53,78 @@ const createOperators = (roles: Role[]) => {
 }
 
 describe('mongodb-atlas updateOne upsert permissions', () => {
+  it.each([
+    [
+      'class instance',
+      runInNewContext('new (class Payload { constructor() { this.role = "admin" } })')
+    ],
+    ['invalid VM date', runInNewContext('new Date(NaN)')],
+    [
+      'VM serialization hook',
+      runInNewContext('({ toBSON() { return { role: "admin" } } })')
+    ],
+    [
+      'custom prototype with native constructor',
+      Object.create({ constructor: Object, role: 'admin' })
+    ]
+  ])('rejects a %s without weakening upsert value checks', async (_name, value) => {
+    const { operators, collection } = createOperators([createRole()])
+    await expect(
+      operators.updateOne({}, { $set: { payload: value } }, { upsert: true })
+    ).rejects.toThrow('Upsert value cannot be validated')
+    expect(collection.insertOne).not.toHaveBeenCalled()
+    expect(collection.updateOne).not.toHaveBeenCalled()
+  })
+
+  it('rejects a statically denied winning role before reading MongoDB', async () => {
+    const { operators, collection } = createOperators([
+      createRole({ apply_when: { '%%user.id': 'other-user' } }),
+      createRole({ write: false, fields: { title: { write: true } } }),
+      createRole()
+    ])
+    await expect(
+      operators.updateOne({}, { $set: { title: 'Denied' } }, { upsert: true })
+    ).rejects.toThrow('Update not permitted')
+    expect(collection.findOne).not.toHaveBeenCalled()
+    expect(collection.insertOne).not.toHaveBeenCalled()
+    expect(collection.updateOne).not.toHaveBeenCalled()
+  })
+
+  it('keeps document-dependent roles possible until the full candidate is validated', async () => {
+    const { operators, collection } = createOperators([
+      createRole({ apply_when: { '%%root.userId': 'user-1' } }),
+      createRole({ write: false })
+    ])
+    await operators.updateOne(
+      { userId: 'user-1' },
+      { $set: { title: 'Allowed' } },
+      { upsert: true }
+    )
+    expect(collection.findOne).toHaveBeenCalledTimes(1)
+    expect(collection.insertOne).toHaveBeenCalledWith(
+      { userId: 'user-1', title: 'Allowed' },
+      {}
+    )
+  })
+
+  it('keeps additional-field write grants available to authorized upserts', async () => {
+    const { operators, collection } = createOperators([
+      createRole({
+        write: undefined,
+        additional_fields: { write: { '%%user.id': 'user-1' } }
+      })
+    ])
+    await operators.updateOne(
+      { userId: 'user-1' },
+      { $set: { title: 'Allowed' } },
+      { upsert: true }
+    )
+    expect(collection.insertOne).toHaveBeenCalledWith(
+      { userId: 'user-1', title: 'Allowed' },
+      {}
+    )
+  })
+
   it.each([
     ['insert and write are denied', { insert: false, write: false }],
     ['insert is denied despite write permission', { insert: false, write: true }],

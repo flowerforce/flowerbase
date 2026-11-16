@@ -1,3 +1,10 @@
+## 0.6.0 (2026-10-24)
+
+
+### 🚀 Features
+
+- enhance session management and abort signal handling ([b45d05b](https://github.com/flowerforce/flowerbase/commit/b45d05b))
+
 ## 0.5.0 (2026-05-28)
 
 

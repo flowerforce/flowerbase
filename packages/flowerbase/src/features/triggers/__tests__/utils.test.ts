@@ -40,7 +40,7 @@ describe('TRIGGER_HANDLERS.DATABASE', () => {
 
         const app = {
             mongo: {
-                changestream: { client }
+                client
             },
             addHook: jest.fn()
         } as any

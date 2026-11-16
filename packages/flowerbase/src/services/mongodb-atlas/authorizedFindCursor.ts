@@ -196,7 +196,7 @@ export const createAuthorizedFindCursor = ({
     tryNext: () => next(true),
     hasNext: () => exclusive(async () => typeof (await load()) !== 'undefined'),
     toArray: async () => {
-      const documents = []
+      const documents: Document[] = []
       for await (const document of proxy) documents.push(document)
       return documents
     },

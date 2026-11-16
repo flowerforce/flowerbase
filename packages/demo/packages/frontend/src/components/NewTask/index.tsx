@@ -94,15 +94,15 @@ export const NewTask = ({ onClose }: NewTaskProps) => {
             </div>
 
             <div className="flex flex-column">
-                <label htmlFor="status" className="font-bold mb-2">
-                    Secret note (encrypted)
+                <label htmlFor="secureNote" className="font-bold mb-2">
+                    Note
                 </label>
                 <InputText
                     id="secureNote"
                     {...register("secureNote")}
                     className={errors.secureNote ? "p-invalid" : ""}
                     aria-invalid={errors.secureNote ? "true" : "false"}
-                    placeholder="Enter a secret note"
+                    placeholder="Enter a note"
                 />
                 {errors.secureNote && (
                     <small className="p-error">{errors.secureNote.message}</small>

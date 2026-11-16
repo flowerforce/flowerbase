@@ -1,3 +1,28 @@
+## Unreleased
+
+### Breaking changes
+
+- Remove built-in MongoDB CSFLE support, `mongodbEncryptionConfig`, encryption schema loading, KMS/key-vault initialization, and the separate change-stream client. Flowerbase now uses the standard MongoDB client for all operations. Existing encrypted data is not converted.
+
+### Fixes
+
+- Reject provably unauthorized client upserts before database access while retaining full candidate validation and write protections.
+- Accept ordinary objects and valid dates from sandboxed server functions in authorized upserts; continue rejecting custom prototypes, serialization hooks, and unsupported values.
+
+## 1.11.1 (2026-10-24)
+
+
+### 🩹 Fixes
+
+- specify document type in authorizedFindCursor to improve type safety ([4bb4f15](https://github.com/flowerforce/flowerbase/commit/4bb4f15))
+
+## 1.11.0 (2026-10-24)
+
+
+### 🚀 Features
+
+- implement upsert validation and handling in MongoDB Atlas service ([451e692](https://github.com/flowerforce/flowerbase/commit/451e692))
+
 ## 1.10.0 (2026-05-28)
 
 
