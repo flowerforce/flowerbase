@@ -1,6 +1,8 @@
 import cloneDeep from 'lodash/cloneDeep'
 import get from 'lodash/get'
 import isEqual from 'lodash/isEqual'
+import isPlainRecord from 'lodash/isPlainObject'
+import { types } from 'node:util'
 import set from 'lodash/set'
 import unset from 'lodash/unset'
 import {
@@ -23,7 +25,6 @@ import { evaluateExpression } from '../../utils/roles/helpers'
 import { FieldPermissionExpression, Role } from '../../utils/roles/interface'
 import { getWinningRoleAsync } from '../../utils/roles/machines/utils'
 import { emitServiceEvent } from '../monitoring'
-import { CHANGESTREAM } from '../../constants'
 import {
   CRUD_OPERATIONS,
   GetOperatorsFunction,
@@ -41,6 +42,7 @@ import {
 import { buildAuthorizedReadPipeline, rewriteAuthorizedReadStages } from './readPipeline'
 import { authorizeAggregate } from './authorizedAggregate'
 import { authorizeWatch } from './authorizedWatch'
+import { assertUpdateMayBePermitted } from './updateAuthorization'
 import { createAuthorizedFindCursor, projectReadableDocument } from './authorizedFindCursor'
 
 //TODO aggiungere no-sql inject security
@@ -86,9 +88,12 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
 const isTraversablePlainObject = (value: unknown): value is Record<string, unknown> => {
-  if (!isPlainObject(value)) return false
+  // Server functions run in a VM, whose Object.prototype is a different object.
+  if (!isPlainRecord(value)) return false
   const prototype = Object.getPrototypeOf(value)
-  return prototype === Object.prototype || prototype === null
+  if (prototype === null) return true
+  const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value
+  return typeof constructor === 'function' && constructor.prototype === prototype
 }
 
 const looksLikeFindOptions = (value: unknown) => {
@@ -477,6 +482,13 @@ const checkUpsertValue = (value: unknown) => {
   if (['undefined', 'function', 'symbol', 'bigint'].includes(typeof value)) {
     throw new Error('Upsert value cannot be validated')
   }
+  if (
+    value &&
+    typeof value === 'object' &&
+    typeof (value as { toBSON?: unknown }).toBSON !== 'undefined'
+  ) {
+    throw new Error('Upsert value cannot be validated')
+  }
   if (Array.isArray(value)) {
     for (const entry of value) checkUpsertValue(entry)
   } else if (isTraversablePlainObject(value)) {
@@ -485,13 +497,12 @@ const checkUpsertValue = (value: unknown) => {
     value !== null &&
     typeof value === 'object' &&
     (!(
-      value instanceof Date ||
+      types.isDate(value) ||
       value instanceof BSON.ObjectId ||
       value instanceof BSON.Decimal128 ||
       value instanceof BSON.Binary
     ) ||
-      (value instanceof Date && !Number.isFinite(value.getTime())) ||
-      typeof (value as { toBSON?: unknown }).toBSON !== 'undefined')
+      (types.isDate(value) && !Number.isFinite(Date.prototype.getTime.call(value))))
   ) {
     throw new Error('Upsert value cannot be validated')
   }
@@ -1101,6 +1112,7 @@ const getOperators: GetOperatorsFunction = (
       try {
         const normalizedData = normalizeUpdatePayload(data as Document)
         if (!run_as_system) {
+          if (options?.upsert) await assertUpdateMayBePermitted(roles, user)
           const userOptions = getUserWriteOptions(options)
           checkDenyOperation(
             normalizedRules,
@@ -1169,6 +1181,7 @@ const getOperators: GetOperatorsFunction = (
       try {
         const normalizedOptions = normalizeFindOneAndUpdateOptions(options)
         if (!run_as_system) {
+          if (normalizedOptions?.upsert) await assertUpdateMayBePermitted(roles, user)
           const userOptions = getUserWriteOptions(normalizedOptions)
           checkDenyOperation(
             normalizedRules,
@@ -1354,9 +1367,8 @@ const getOperators: GetOperatorsFunction = (
           options as RealmCompatibleWatchOptions
         )
         const requestedPipeline = [...extraMatches, ...pipeline]
-        const changestreamCollection = mongo[CHANGESTREAM].client.db(dbName).collection(collName)
         if (run_as_system) {
-          const result = changestreamCollection.watch(requestedPipeline, watchOptions)
+          const result = collection.watch(requestedPipeline, watchOptions)
           emitMongoEvent('watch')
           return result
         }
@@ -1375,7 +1387,7 @@ const getOperators: GetOperatorsFunction = (
           { $and: [{ operationType: { $ne: 'delete' } }, rootFilter('fullDocument')] },
           { $and: [{ operationType: 'delete' }, rootFilter('fullDocumentBeforeChange')] }
         ] } }, ...requestedPipeline] : requestedPipeline
-        const stream = changestreamCollection.watch(guardedPipeline, {
+        const stream = collection.watch(guardedPipeline, {
           ...watchOptions,
           collation: { locale: 'simple' },
           fullDocument: 'updateLookup',
@@ -1497,6 +1509,7 @@ const getOperators: GetOperatorsFunction = (
       try {
         const normalizedData = normalizeUpdatePayload(data as Document)
         if (!run_as_system) {
+          if (options?.upsert) await assertUpdateMayBePermitted(roles, user)
           const userOptions = getUserWriteOptions(options)
           checkDenyOperation(
             normalizedRules,

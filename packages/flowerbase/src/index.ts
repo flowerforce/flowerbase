@@ -6,14 +6,12 @@ import { loadEndpoints } from './features/endpoints/utils'
 import { registerFunctions } from './features/functions'
 import { loadFunctions } from './features/functions/utils'
 import { loadRules } from './features/rules/utils'
-import { loadEncryptionSchemas } from './features/encryption/utils'
 import { activateTriggers } from './features/triggers'
 import { loadTriggers, registerTriggerLifecycle } from './features/triggers/utils'
 import { services } from './services'
 import { StateManager } from './state'
 import { exposeRoutes } from './utils/initializer/exposeRoutes'
 import { registerPlugins } from './utils/initializer/registerPlugins'
-import { type MongoDbEncryptionConfig } from './utils/initializer/mongodbCSFLE'
 export * from './model'
 
 
@@ -43,7 +41,6 @@ export type InitializeConfig = {
   host?: string
   corsConfig?: CorsConfig
   basePath?: string
-  mongodbEncryptionConfig?: MongoDbEncryptionConfig
   timeoutConfig?: FastifyTimeoutConfig
 }
 
@@ -63,7 +60,6 @@ export async function initialize({
   mongodbUrl = DEFAULT_CONFIG.MONGODB_URL,
   corsConfig = DEFAULT_CONFIG.CORS_OPTIONS,
   basePath,
-  mongodbEncryptionConfig,
   timeoutConfig
 }: InitializeConfig) {
   if (!jwtSecret || jwtSecret.trim().length === 0) {
@@ -98,8 +94,6 @@ export async function initialize({
   logInfo("Endpoints LOADED")
   const rulesList = await loadRules(resolvedBasePath)
   logInfo("Rules LOADED")
-  const encryptionSchemas = await loadEncryptionSchemas(resolvedBasePath)
-  logInfo("Encryption schemas LOADED")
 
   const stateConfig = {
     functions: functionsList,
@@ -175,9 +169,7 @@ export async function initialize({
     mongodbUrl,
     jwtSecret,
     functionsList,
-    corsConfig,
-    encryptionSchemas,
-    mongodbEncryptionConfig
+    corsConfig
   })
 
   logInfo('Plugins registration COMPLETED')

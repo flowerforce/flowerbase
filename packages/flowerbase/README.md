@@ -265,131 +265,8 @@ Example
 ```
 If you're configuring the project from scratch, you can skip ahead to the [Build](#build) step.
 
-## 🔐 7 Client-Side Field Level Encryption (CSFLE)
+Flowerbase uses the standard MongoDB client. Automatic Client-Side Field Level Encryption (CSFLE), KMS configuration, and encryption schema loading are not supported.
 
-Flowerbase supports MongoDB Client-Side Field Level Encryption. When enabled, sensitive fields are encrypted by the MongoDB driver before writing to MongoDB and decrypted automatically when reading.
-
-What Flowerbase does for you:
-
-- Loads all `encryption.json` files under `data_sources/mongodb-atlas/**`.
-- Builds the MongoDB `schemaMap` automatically from those files.
-- Resolves each `keyAlias` in your schemas to a real Data Encryption Key (DEK) `keyId`.
-- Ensures DEKs exist in the key vault (creates them if missing).
-- Configures Fastify MongoDB plugin `autoEncryption` with the generated `schemaMap`.
-
-### 1. Install encryption drivers
-
-Refer to the official MongoDB documentation for CSFLE installation requirements: https://www.mongodb.com/docs/manual/core/csfle/install.
-
-It is recommended to use the [**Automatic Encryption Shared Library**](https://www.mongodb.com/docs/manual/core/csfle/reference/install-library/?encryption-component=crypt_shared#std-label-csfle-reference-shared-library-download) instead of mongocryptd.
-
-Note that the project should also install [mongodb-client-encryption](https://www.npmjs.com/package/mongodb-client-encryption), matching the mongodb driver version.
-
-### 2. Add encryption schema files
-
-Create one `encryption.json` per collection you want to encrypt:
-
-Path example:
-
-```text
-src/data_sources/mongodb-atlas/<database>/<collection>/encryption.json
-```
-
-Example:
-
-```json
-{
-  "database": "appDb",
-  "collection": "records",
-  "schema": {
-    "bsonType": "object",
-    "encryptMetadata": {
-      "keyAlias": "root-key"
-    },
-    "properties": {
-      "protectedField1": {
-        "encrypt": {
-          "bsonType": "string",
-          "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
-        }
-      },
-      "protectedField2": {
-        "encrypt": {
-          "bsonType": "string",
-          "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic",
-          "keyAlias": "deep-key"
-        }
-      }
-    }
-  }
-}
-```
-
-Notes:
-
-- `encryptMetadata.keyAlias` applies as default key for that object level.
-- `encrypt.keyAlias` overrides key selection for a specific field.
-- If a field has `encrypt` but no `keyAlias`, MongoDB uses nearest `encryptMetadata`.
-
-### 3. Pass `mongodbEncryptionConfig` to `initialize()`
-
-`initialize()` accepts `mongodbEncryptionConfig` to configure KMS providers and key vault settings.
-
-#### Local KMS provider example (development)
-
-```ts
-import { initialize } from "@flowerforce/flowerbase";
-
-await initialize({
-  projectId: "my-project-id",
-  mongodbUrl: process.env.MONGODB_URL,
-  jwtSecret: process.env.JWT_SECRET,
-  mongodbEncryptionConfig: {
-    kmsProviders: [
-      {
-        provider: "local",
-        keyAlias: "root-key",
-        config: {
-          // 96-byte local master key encoded as base64
-          key: process.env.LOCAL_MASTER_KEY_BASE64,
-        },
-      },
-      {
-        provider: "local",
-        keyAlias: "deep-key",
-        config: { key: process.env.LOCAL_MASTER_KEY_BASE64 },
-      },
-    ],
-    keyVaultDb: "encryption",
-    keyVaultCollection: "__keyVault",
-    extraOptions: {
-      // Optional: path to crypt shared library
-      // cryptSharedLibPath: '/opt/mongo_crypt_v1/lib/mongo_crypt_v1.so'
-    },
-  },
-});
-```
-
-#### AWS KMS provider example
-
-```ts
-mongodbEncryptionConfig: {
-  kmsProviders: [
-    {
-      provider: "aws",
-      keyAlias: "root-key",
-      config: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      },
-      masterKey: {
-        key: process.env.AWS_KMS_KEY_ARN,
-        region: process.env.AWS_REGION,
-      },
-    },
-  ];
-}
-```
 ---
 
 <a id="migration"></a>
@@ -676,7 +553,11 @@ Auth accounts contain numeric `sessionVersion` and `credentialsVersion`, initial
 
 HTTP endpoints must declare `validation_method`: `NO_VALIDATION`, `SECRET_AS_QUERY_PARAM` (`?secret=...`), or `VERIFY_PAYLOAD` (`Endpoint-Signature: sha256=<hex>`). Protected endpoints require `secret_name` to name a nonempty environment variable. Payload verification uses HMAC SHA-256 over the original request bytes. Unsupported security settings prevent endpoint registration. Monitor UI, API and WebSocket routes share the authentication, IP and rate guards, including encoded paths.
 
+Client upserts with a provably denied write permission fail with `Update not permitted` before database access. Document-dependent permissions still require validation against the stored document or the complete insertion candidate. Authorized server functions retain these checks, including support for ordinary objects and dates created inside the function sandbox.
+
 Run the security regressions from the workspace root with `npx jest --config packages/flowerbase/jest.config.ts --runInBand`. Optional MongoDB integration suites use `FLOWERBASE_TEST_MONGO_URI` and `FLOWERBASE_TEST_MONGO_REPLICA_URI`; point these at disposable test databases. The replica URI is required for watch integration tests.
+
+The service-level regression suite `src/services/mongodb-atlas/__tests__/serviceAuthorization.integration.test.ts` registers the Flowerbase plugins and exercises ordinary-user aggregation and count authorization, field masking, denied client upserts, and an authorized sandboxed server function against a real MongoDB instance.
 
 Dependency review (2026-10-23): Fastify, Undici and the routing/URI dependencies were patched. `npm audit --omit=dev` still reports separate advisories in JWT, Swagger/static, cron/uuid and glob/brace-expansion dependencies. Their vulnerable code paths were not demonstrated as exploitable in the current Flowerbase configuration; the dependency audit is not clean.
 

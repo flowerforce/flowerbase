@@ -1,7 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { Document } from 'mongodb'
 import MongoDbAtlas from '..'
-import { CHANGESTREAM } from '../../../constants'
 import { Rules } from '../../../features/rules/interface'
 import { Role } from '../../../utils/roles/interface'
 
@@ -34,7 +33,7 @@ const fixture = (roles = [role()], filters: any[] = []) => {
   const db = jest
     .fn()
     .mockReturnValue({ collection: jest.fn().mockReturnValue(collection) })
-  const app = { mongo: { client: { db }, [CHANGESTREAM]: { client: { db } } } }
+  const app = { mongo: { client: { db } } }
   const rules = {
     documents: { database: 'db', collection: 'documents', roles, filters }
   } as Rules

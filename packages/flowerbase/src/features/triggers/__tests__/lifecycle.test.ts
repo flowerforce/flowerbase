@@ -47,9 +47,7 @@ describe('trigger shutdown lifecycle', () => {
       })
     })
     app.decorate('mongo', {
-      changestream: {
-        client: { db: () => ({ collection: () => ({ watch: () => stream }) }) }
-      }
+      client: { db: () => ({ collection: () => ({ watch: () => stream }) }) }
     } as any)
     let completed = false
     jest.mocked(GenerateContext).mockImplementation(async () => {
@@ -93,10 +91,8 @@ describe('trigger shutdown lifecycle', () => {
     const stream = Object.assign(new EventEmitter(), { close: jest.fn(async () => {}) })
     const findOneAndUpdate = jest.fn().mockRejectedValue(failure)
     app.decorate('mongo', {
-      changestream: {
-        client: {
-          db: () => ({ collection: () => ({ watch: () => stream, findOneAndUpdate }) })
-        }
+      client: {
+        db: () => ({ collection: () => ({ watch: () => stream, findOneAndUpdate }) })
       }
     } as any)
     registerTriggerLifecycle(app)

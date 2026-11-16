@@ -1,6 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb'
 import MongoDbAtlas from '..'
-import { CHANGESTREAM } from '../../../constants'
 import { Role } from '../../../utils/roles/interface'
 import { Rules } from '../../../features/rules/interface'
 
@@ -23,7 +22,7 @@ integration('authorized watch on MongoDB replica set', () => {
   const operators = (collection = 'documents') =>
     MongoDbAtlas(
       {
-        mongo: { client, [CHANGESTREAM]: { client } }
+        mongo: { client }
       } as any,
       {
         user: { id: 'user-1' },

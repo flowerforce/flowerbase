@@ -18,7 +18,6 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@flowerforce/flowerbase": "file:../../flowerbase",
-    "mongodb-client-encryption": "^6.5.0"
+    "@flowerforce/flowerbase": "file:../../flowerbase"
   }
 }
